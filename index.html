@@ -100,7 +100,7 @@
     <script>
         const newsData = {
             global: [
-                { id: "NO.10", title: "美联储降息预期升温 国际金价再创历史新高", time: "07:45", tag: "大宗商品", summary: "最新通胀数据超预期回落，市场押注美联储年内将启动第二次降息，现货黄金盘中突破关口，避险情绪与流动性预期共同推升避险资产价格。", impact: "驱动抗通胀标D与黄金概念股，贵金属板块短期波动加大。", asset: "现货黄金 / XAUUSD, GDX" },
+                { id: "NO.10", title: "美联储降息预期升温 国际金价再创历史新高", time: "07:45", tag: "大宗商品", summary: "最新通胀数据超预期回落，市场押注美联储年内将启动第二次降息，现货黄金盘中突破关口，避险情绪与流动性预期共同推升避险资产价格。", impact: "驱动抗通胀标的与黄金概念股，贵金属板块短期波动加大。", asset: "现货黄金 / XAUUSD, GDX" },
                 { id: "NO.09", title: "欧央行维持基调 市场评估欧洲经济衰退风险", time: "07:30", tag: "欧洲市场", summary: "欧洲中央银行最新政策会议暗示通胀压力持续放缓，但工业产出疲软加剧了德国及欧元区整体经济停滞的忧虑。", impact: "欧元兑美元震荡走低，欧洲高股息防御性股票受资金青睐。", asset: "欧元/美元 (EUR/USD), VGK" },
                 { id: "NO.08", title: "中东能源运输通道安全性引发国际原油震荡", time: "07:10", tag: "原油/能源", summary: "主要运河与海峡地缘局势不确定性增加，保险公司提高航运附加费，布伦特原油在多空博弈下呈现高振幅走势。", impact: "提高全球油气运输成本，对航运业及炼化产业利润形成挤压。", asset: "布伦特原油 (Brent), XLE" },
                 { id: "NO.07", title: "微软与OpenAI联合发布下一代企业级AI模型", time: "06:50", tag: "前沿科技", summary: "新一代大模型在逻辑推理与复杂代码生成领域实现突破，算力需求较上一代提升超40%，推动全球云服务商加码数据中心建设。", impact: "进一步夯实AI产业链底层逻辑，算力芯片与光模块板块维持强催化。", asset: "MSFT, NVDA, 光模块ETF" },
@@ -217,38 +217,39 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:667px;background-color:#0D1117;color:#FFF;padding:18px 16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;";
+                // 优化海报容器，给每个新闻卡片分配绝对充裕且带安全行高的几何空间
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:667px;background-color:#0D1117;color:#FFF;padding:16px 16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;";
 
                 let itemsHtml = group.map(item => `
-                    <div style="height:118px;border-bottom:1px solid #30363D;display:flex;flex-direction:column;justify-content:center;overflow:hidden;">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;display:flex;justify-content:space-between;">
+                    <div style="height:120px;border-bottom:1px solid #30363D;display:flex;flex-direction:column;justify-content:space-evenly;overflow:hidden;padding:2px 0;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;display:flex;justify-content:space-between;line-height:1.2;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;">${item.section}</span>
                         </div>
-                        <div style="font-size:12px;font-weight:bold;color:#FFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:3px 0;">${item.title}</div>
-                        <div style="font-size:10px;color:#9CA3AF;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.summary}</div>
+                        <div style="font-size:12px;font-weight:bold;color:#FFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${item.title}</div>
+                        <div style="font-size:10px;color:#9CA3AF;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.summary}</div>
                     </div>
                 `).join('');
 
                 wrapper.innerHTML = `
-                    <div style="height:45px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;">
+                    <div style="height:42px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;">
                         <div>
                             <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
-                            <div style="font-size:14px;font-weight:bold;color:#FFF;margin-top:2px;">每日财经看板</div>
+                            <div style="font-size:13px;font-weight:bold;color:#FFF;margin-top:2px;line-height:1.2;">每日财经看板</div>
                         </div>
                         <div style="font-size:9px;color:#8B949E;text-align:right;">全景套卡 (${idx + 1}/6)</div>
                     </div>
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;margin:6px 0;">${itemsHtml}</div>
-                    <div style="height:55px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:6px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
+                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;margin:4px 0;">${itemsHtml}</div>
+                    <div style="height:52px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:5px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
                         <div>
-                            <div style="font-size:10px;color:#F0B90B;font-weight:bold;">长按识别二维码</div>
-                            <div style="font-size:8px;color:#9CA3AF;">在线查看完整 20 条解读与标的</div>
+                            <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:1.2;">长按识别二维码</div>
+                            <div style="font-size:8px;color:#9CA3AF;line-height:1.2;">在线查看完整 20 条解读与标的</div>
                         </div>
                         <div id="qr-eq-${idx}" style="background:#FFF;padding:2px;border-radius:2px;"></div>
                     </div>
                 `;
 
                 document.body.appendChild(wrapper);
-                new QRCode(wrapper.querySelector(`#qr-eq-${idx}`), { text: window.location.href, width: 40, height: 40 });
+                new QRCode(wrapper.querySelector(`#qr-eq-${idx}`), { text: window.location.href, width: 38, height: 38 });
                 await new Promise(r => setTimeout(r, 120));
                 const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0D1117' });
                 const img = document.createElement('img');
@@ -268,7 +269,7 @@
                     <div style="font-size:9px;color:#E5E7EB;letter-spacing:1px;font-weight:bold;">END PAGE · (6/6)</div>
                 </div>
                 <div style="text-align:center;background:rgba(0,0,0,0.25);backdrop-filter:blur(2px);padding:25px 10px;border-radius:12px;">
-                    <div style="font-family:'Playfair Display', Georgia, 'Times New Roman', serif;font-size:40px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 0 12px rgba(255,255,255,0.9), 0 0 25px rgba(240,185,11,0.7);letter-spacing:1px;">God bless you</div>
+                    <div style="font-family:'Playfair Display', Georgia, 'Times New Roman', serif;font-size:40px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 0 12px rgba(255,255,255,0.9), 0 0 25px rgba(240,185,11,0.7);letter-spacing:1px;line-height:1.2;">God bless you</div>
                     <div style="margin-top:10px;font-size:10px;color:#F0B90B;font-weight:600;letter-spacing:2px;text-shadow:0 1px 3px rgba(0,0,0,0.8);">✦ 愿智慧与财富同在 ✦</div>
                 </div>
                 <div style="text-align:center;font-size:9px;color:#E5E7EB;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:6px;border-radius:6px;letter-spacing:1px;">2026 FINANCIAL NEWS TERMINAL · ALL RIGHTS RESERVED</div>
