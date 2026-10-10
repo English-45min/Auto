@@ -93,7 +93,7 @@
         </div>
     </div>
 
-    <!-- 自动化注入标记：Python 脚本将每天定时更新此处的 newsData -->
+    <!-- 自动化注入标记 (Python 脚本会自动更新此处的 newsData) -->
     <!-- NEWS_DATA_START -->
     <script>
         const newsData = {
@@ -193,7 +193,7 @@
             }
         }
 
-        // ==================== 海报生成引擎（像素锁定，绝对防重叠） ====================
+        // ==================== 海报生成引擎（像素级防重叠锁定） ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
             renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成标准高清海报套图...</div>';
@@ -216,7 +216,6 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 严格锁定 375px × 720px 尺寸，使用绝对像素盒模型，防止任何挤压变形
                 wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:720px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:sans-serif;";
 
                 let itemsHtml = group.map(item => `
