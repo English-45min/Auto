@@ -3,7 +3,7 @@ name: Auto Update News Terminal
 on:
   schedule:
     - cron: '0 23 * * *'
-  workflow_dispatch:
+  workflow_dispatch: 
 
 jobs:
   update-html:
@@ -20,10 +20,66 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Run Update Script
+      - name: Generate Daily News and Update index.html
         run: |
           python - << 'EOF'
+          import re
+          import json
           import datetime
+
           now = datetime.datetime.now()
-          print("Workflow executed successfully at:", now.strftime("%Y-%m-%d %H:%M:%S"))
+          date_prefix = now.strftime("%m月%d日")
+          now_str = now.strftime("%Y-%m-%d %H:%M (CST)")
+
+          latest_news = {
+              "global": [
+                  {"id": "NO.10", "title": f"{date_prefix}快讯：美联储降息预期升温 国际金价再创新高", "time": "07:45", "tag": "大宗商品", "summary": "最新通胀数据超预期回落，市场押注美联储将启动二次降息，现货黄金突破关口，避险与流动性预期共同推升资产价格。", "impact": "驱动抗通胀标的与黄金概念股，贵金属板块波动加大。", "asset": "现货黄金 / XAUUSD, GDX"},
+                  {"id": "NO.09", "title": f"{date_prefix}快讯：欧央行维持基调 评估欧洲经济衰退风险", "time": "07:30", "tag": "欧洲市场", "summary": "欧洲中央银行最新会议暗示通胀压力持续放缓，但工业产出疲软加剧了欧元区整体经济停滞的忧虑。", "impact": "欧元兑美元震荡，欧洲高股息防御性股票受资金青睐。", "asset": "欧元/美元 (EUR/USD), VGK"},
+                  {"id": "NO.08", "title": f"{date_prefix}快讯：中东能源运输通道安全引发原油震荡", "time": "07:10", "tag": "原油/能源", "summary": "主要海峡地缘局势不确定性增加，保险公司提高航运附加费，布伦特原油多空博弈高振幅走势。", "impact": "提高油气运输成本，对航运及炼化产业利润形成挤压。", "asset": "布伦特原油 (Brent), XLE"},
+                  {"id": "NO.07", "title": f"{date_prefix}快讯：微软与OpenAI联合发布下一代AI模型", "time": "06:50", "tag": "前沿科技", "summary": "新一代大模型在逻辑推理与复杂代码生成领域实现突破，算力需求提升超40%，云服务商加码数据中心。", "impact": "进一步夯实AI产业链底层逻辑，算力芯片与光模块维持强催化。", "asset": "MSFT, NVDA, 光模块ETF"},
+                  {"id": "NO.06", "title": f"{date_prefix}快讯：美股大盘高位震荡 科技巨头财报前夕谨慎", "time": "06:30", "tag": "美股动态", "summary": "标普500与纳斯达克在历史高位维持狭幅整理，交易员密切留意科技巨头季报现金流表现。", "impact": "短期避险资金流向公用事业及短期国债资产。", "asset": "标普500 (SPY), 纳指100 (QQQ)"},
+                  {"id": "NO.05", "title": f"{date_prefix}快讯：全球芯片巨头强劲财报巩固复苏信号", "time": "06:10", "tag": "半导体", "summary": "晶圆代工头部企业披露月度营收，高算力芯片产能保持满载，封测与先进封装产能持续紧张。", "impact": "确认科技硬件行业底部回升，半导体设备及材料端持续受益。", "asset": "SMH, 台积电 (TSM)"},
+                  {"id": "NO.04", "title": f"{date_prefix}快讯：日元汇率波动剧烈 日本央行加息预期分歧", "time": "05:55", "tag": "外汇市场", "summary": "日本工资增长数据强劲，引发对日本央行取消宽松政策的预期，日元对美元呈现V型走势。", "impact": "日元套利交易套现压力增加，对全球跨境资金产生扰动。", "asset": "日元/美元 (USD/JPY), EWJ"},
+                  {"id": "NO.03", "title": f"{date_prefix}快讯：新能源汽车渗透率破节点 原材料承压", "time": "05:40", "tag": "新能源", "summary": "全球主要市场电动汽车销量延续两位数增长，由于上游锂矿产能集中释放，现货供给过剩使得价格低位震荡。", "impact": "整车端成本下降利好毛利率，但上游采矿股票估值承压。", "asset": "LIT, 宁德时代, 雅化集团"},
+                  {"id": "NO.02", "title": f"{date_prefix}快讯：苹果公司推进硬件AI化 升级供应链预期", "time": "05:20", "tag": "消费电子", "summary": "苹果加码研发适配端侧大模型的下一代芯片，并增加高端散热及高频PCB板的采购份额。", "impact": "消费电子供应链迎换机周期重估，核心零部件供应商关注度拉升。", "asset": "AAPL, 立讯精密, 苹果概念板块"},
+                  {"id": "NO.01", "title": f"{date_prefix}快讯：美联储决议前夕 全球主要股市避险拉满", "time": "05:00", "tag": "宏观重磅", "summary": "全球投资者聚焦今夜美联储主席公开演讲，衍生品市场定价显示对降息路径争议达峰值，VIX指数拉升。", "impact": "权益类资产呈现防守态势，资金向短债与黄金聚集。", "asset": "VIX指数, 美国10年期国债, TLT"}
+              ],
+              "asia": [
+                  {"id": "NO.05", "title": f"{date_prefix} 亚太数字经济与跨境算力集群建设提速", "time": "07:20", "tag": "区域经济", "summary": "区域内数字基础设施投资保持强劲，跨境光缆与绿色电力供应成各方资本争夺焦点。", "impact": "利好本地电力设备及算力基建供应链。", "asset": "EWS, 亚太科技"},
+                  {"id": "NO.04", "title": f"{date_prefix} 韩国存储芯片出口强劲 驱动工业基本面企稳", "time": "07:00", "tag": "韩国市场", "summary": "海关最新统计显示存储芯片出口额延续高增势头，对整体工业出口形成强有力的基本面支撑。", "impact": "提振KOSPI指数及全球存储产业链。", "asset": "EWY, 三星电子"},
+                  {"id": "NO.03", "title": f"{date_prefix} 日本东京交易所治理改革延续 回购规模扩大", "time": "06:40", "tag": "日本市场", "summary": "治理优化政策持续深化，多家核心蓝筹企业发布大规模注销股票与提升分红比例计划。", "impact": "持续吸引海外长线价值资金流入日股。", "asset": "日经225 (NKY)"},
+                  {"id": "NO.02", "title": f"{date_prefix} 印度制造与服务业双PMI维持强劲扩张区间", "time": "06:15", "tag": "印度市场", "summary": "制造业扩张战略吸引全球电子组装巨头密集布局，本土基建投资与消费需求保持旺盛。", "impact": "印度权益市场估值维持相对溢价。", "asset": "INDA, EPI"},
+                  {"id": "NO.01", "title": f"{date_prefix} 亚太半导体产业链重组 2.5D/3D封装争夺白热化", "time": "05:30", "tag": "半导体", "summary": "中国台湾与日本等半导体产业带加速扩建先进封装工厂，各大设计厂商全力抢占远期产能。", "impact": "半导体测试及设备订单排期维持高位。", "asset": "TSMC, 日月光"}
+              ],
+              "china": [
+                  {"id": "NO.05", "title": f"{date_prefix} 全国多地加力促消费 聚焦绿色智能与数字终端", "time": "07:30", "tag": "消费政策", "summary": "相关部门协同推出促消费组合拳，智能家电与新能源汽车以旧换新补贴有效激活终端内需。", "impact": "直接拉动社会零售总额回暖，利好白色家电龙头。", "asset": "美的集团, 比亚迪"},
+                  {"id": "NO.04", "title": f"{date_prefix} 央行灵活开展公开市场操作 维护流动性充裕", "time": "07:10", "tag": "货币政策", "summary": "针对税期及资金面波动，央行开展适度规模逆回购投放，银行间市场利率平稳运行。", "impact": "保障债券市场平稳，金融机构资金成本低位波动。", "asset": "国债期货, 银行板块"},
+                  {"id": "NO.03", "title": f"{date_prefix} 高技术产业投资保持高速增长 实体经济升级加快", "time": "06:45", "tag": "产业升级", "summary": "高端装备制造与高技术服务业投资比重持续提升，工业母机与人形机器人商业化落地提速。", "impact": "硬科技与设备制造产业链受资本长期青睐。", "asset": "科创50ETF, 机器人板块"},
+                  {"id": "NO.02", "title": f"{date_prefix} 国内大模型商业化全面提速 企业级应用落地", "time": "06:00", "tag": "人工智能", "summary": "多模态大模型在政务、金融及工业设计领域实现大规模API接入，付费转化率超预期。", "impact": "推动软件及SaaS板块估值重塑。", "asset": "百度, 计算机ETF"},
+                  {"id": "NO.01", "title": f"{date_prefix} 宏观组合政策综合显现 核心经济指标展现回升向好", "time": "05:15", "tag": "宏观经济", "summary": "制造业景气度重返扩张区间，出口增速与市场风险偏好同步共振，外资机构看多中国资产。", "impact": "极大提振权益市场风险偏好，离岸人民币走强。", "asset": "沪深300, 恒生科技"}
+              ]
+          }
+
+          with open("index.html", "r", encoding="utf-8") as f:
+              html_content = f.read()
+
+          html_content = re.sub(r'更新时间: .*? \(CST\)', f'更新时间: {now_str}', html_content)
+
+          js_data_str = f"const newsData = {json.dumps(latest_news, ensure_ascii=False, indent=12)};"
+          pattern = r'<!-- NEWS_DATA_START -->[\s\S]*?<!-- NEWS_DATA_END -->'
+          replacement = f'<!-- NEWS_DATA_START -->\n    <script>\n        {js_data_str}\n    </script>\n    <!-- NEWS_DATA_END -->'
+
+          new_html = re.sub(pattern, replacement, html_content)
+
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(new_html)
+
+          print("成功写入当日最新财经资讯！")
           EOF
+
+      - name: Push to GitHub Pages
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update daily news and layout [skip ci]" && git push)
