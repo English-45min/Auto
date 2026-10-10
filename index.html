@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif; }
         .tab-active { border-bottom: 2px solid #F0B90B; color: #F0B90B; font-weight: bold; }
     </style>
 </head>
@@ -84,11 +84,11 @@
     <div id="posterModal" class="fixed inset-0 bg-black/85 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-bbCard border border-bbBorder rounded-xl max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="p-3 border-b border-bbBorder flex justify-between items-center">
-                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 精致留白版 9:16 朋友圈 6 图</span>
+                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 紧凑居中版 9:16 朋友圈 6 图</span>
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-950" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：长按图片保存或直接发送朋友圈，视觉舒展不压迫！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：长按图片保存或直接发送朋友圈，中心聚合、精致紧凑！</div>
         </div>
     </div>
 
@@ -192,7 +192,7 @@
             }
         }
 
-        // ==================== ✨ 高感精致留白版海报生成引擎 ====================
+        // ==================== ✨ 完美居中、紧凑贴合海报生成引擎 ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
             renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成标准高清海报套图...</div>';
@@ -215,44 +215,44 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 海报尺寸 375x840，四周预留 24px/20px 大气内衬空白
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:840px;background-color:#0A0D12;color:#FFF;padding:28px 22px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;";
+                // 总高 840px，上下左右留白大气，中间区域采用 flex 完美居中聚合
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:840px;background-color:#0D1117;color:#FFF;padding:28px 20px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;";
 
-                // 卡片设计：拉开行距与边距，杜绝紧凑拥挤感
-                let itemsHtml = group.map(item => `
-                    <div style="background:#131822;border:1px solid #262C36;border-radius:10px;padding:12px 14px;box-sizing:border-box;margin-bottom:12px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:700;line-height:14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+                // 4 条新闻卡片紧凑贴合，无多余独立背景框拖沓，用纯净细分割线隔开
+                let itemsHtml = group.map((item, index) => `
+                    <div style="padding:${index === 0 ? '0 0 12px 0' : '12px 0'}; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:700;line-height:14px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;font-weight:normal;">${item.section}</span>
                         </div>
-                        <div style="font-size:12.5px;font-weight:700;color:#F3F4F6;line-height:20px;margin-bottom:6px;word-break:break-all;">
+                        <div style="font-size:12px;font-weight:700;color:#F3F4F6;line-height:19px;margin-bottom:4px;word-break:break-all;">
                             ${item.title}
                         </div>
-                        <div style="font-size:10px;color:#9CA3AF;line-height:16px;word-break:break-all;">
+                        <div style="font-size:9.5px;color:#9CA3AF;line-height:15px;word-break:break-all;">
                             ${item.summary}
                         </div>
                     </div>
                 `).join('');
 
                 wrapper.innerHTML = `
-                    <!-- 优雅顶栏 Header -->
-                    <div style="height:42px;border-bottom:1.5px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:8px;margin-bottom:6px;">
+                    <!-- 顶栏 Header 紧贴主题上方 -->
+                    <div style="border-bottom:1.5px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;margin-bottom:14px;">
                         <div>
-                            <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:2px 5px;border-radius:3px;letter-spacing:0.5px;">BLOOMBERG</div>
-                            <div style="font-size:14px;font-weight:800;color:#FFF;margin-top:4px;line-height:14px;letter-spacing:0.5px;">每日财经看板</div>
+                            <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
+                            <div style="font-size:13px;font-weight:800;color:#FFF;margin-top:2px;line-height:13px;">每日财经看板</div>
                         </div>
                         <div style="font-size:9px;color:#6B7280;text-align:right;font-weight:600;">全景套卡 (${idx + 1}/6)</div>
                     </div>
 
-                    <!-- 4 条独立舒展卡片容器 -->
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:4px 0;">${itemsHtml}</div>
+                    <!-- 4 条新闻主体区（整体居中、紧凑贴合） -->
+                    <div style="display:flex;flex-direction:column;justify-content:center;">${itemsHtml}</div>
 
-                    <!-- 底部终端科技感 Footer / 二维码 -->
-                    <div style="height:50px;background:#131822;border:1px solid #262C36;padding:6px 14px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+                    <!-- 底部二维码 Footer 紧贴新闻主题下方 -->
+                    <div style="background:#161B22;border:1px solid #30363D;padding:6px 12px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;margin-top:14px;">
                         <div>
-                            <div style="font-size:10.5px;color:#F0B90B;font-weight:700;line-height:16px;">长按识别二维码</div>
-                            <div style="font-size:8.5px;color:#8B949E;line-height:13px;">扫码手机查看完整 20 条解读</div>
+                            <div style="font-size:10px;color:#F0B90B;font-weight:700;line-height:14px;">长按识别二维码</div>
+                            <div style="font-size:8px;color:#8B949E;line-height:12px;">扫码手机查看完整 20 条解读</div>
                         </div>
-                        <div id="qr-eq-${idx}" style="background:#FFF;padding:3px;border-radius:4px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;"></div>
+                        <div id="qr-eq-${idx}" style="background:#FFF;padding:2px;border-radius:3px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;"></div>
                     </div>
                 `;
 
@@ -263,17 +263,17 @@
                 qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:28px;height:28px;display:block;" crossorigin="anonymous" />`;
 
                 await new Promise(r => setTimeout(r, 600));
-                const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0A0D12', useCORS: true });
+                const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0D1117', useCORS: true });
                 const img = document.createElement('img');
                 img.src = canvas.toDataURL('image/png');
-                img.style.cssText = "width:100%;border-radius:10px;border:1px solid #262C36;box-shadow:0 10px 25px rgba(0,0,0,0.5);";
+                img.style.cssText = "width:100%;border-radius:8px;border:1px solid #30363D;box-shadow:0 8px 20px rgba(0,0,0,0.4);";
                 renderArea.appendChild(img);
                 document.body.removeChild(wrapper);
             }
 
-            // 第 6 张星际背景末页（God bless you 强制单行 + 高清无死角展示背影）
+            // 第 6 张星际背景末页（同样完美居中、紧凑）
             const lastWrapper = document.createElement('div');
-            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:840px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:28px 22px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:840px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:28px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
             
             lastWrapper.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);">
@@ -294,7 +294,7 @@
             const lastCanvas = await html2canvas(lastWrapper, { scale: 2, useCORS: true });
             const lastImg = document.createElement('img');
             lastImg.src = lastCanvas.toDataURL('image/png');
-            lastImg.style.cssText = "width:100%;border-radius:10px;border:1px solid #262C36;box-shadow:0 10px 25px rgba(0,0,0,0.5);";
+            lastImg.style.cssText = "width:100%;border-radius:8px;border:1px solid #30363D;box-shadow:0 8px 20px rgba(0,0,0,0.4);";
             renderArea.appendChild(lastImg);
             document.body.removeChild(lastWrapper);
         }
