@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>彭博财经终端 | 每日全球与国内焦点新闻看板</title>
-    <!-- Tailwind CSS & FontAwesome -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -23,17 +22,16 @@
         }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2canvas & QRCode -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         .tab-active { border-bottom: 2px solid #F0B90B; color: #F0B90B; font-weight: bold; }
     </style>
 </head>
-<body class="bg-bbDark text-gray-100 min-h-screen pb-12 transition-colors duration-200" id="mainBody">
+<body class="bg-bbDark text-gray-100 min-h-screen pb-12" id="mainBody">
 
-    <!-- 顶栏 Header -->
+    <!-- 顶栏 -->
     <header class="sticky top-0 z-40 bg-bbDark/95 border-b border-bbBorder px-4 py-3 backdrop-blur-md flex justify-between items-center">
         <div class="flex items-center space-x-2">
             <span class="bg-bbGold text-black text-xs font-black px-2 py-1 rounded tracking-wider">BLOOMBERG</span>
@@ -50,13 +48,13 @@
         </div>
     </header>
 
-    <!-- 状态与更新时间 -->
+    <!-- 状态与时间 -->
     <div class="max-w-3xl mx-auto px-4 mt-4 flex justify-between items-center text-xs text-bbTextMuted">
         <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
             <span>终端实时同步中</span>
         </div>
-        <div id="updateTime">更新时间: 2026-10-09 08:00 (CST)</div>
+        <div id="updateTime">更新时间: 2026-10-10 08:00 (CST)</div>
     </div>
 
     <!-- 搜索 -->
@@ -95,35 +93,35 @@
         </div>
     </div>
 
-    <!-- 自动化注入标记 (请勿删除以下两行注释) -->
+    <!-- 自动化注入标记：Python 脚本将每天定时更新此处的 newsData -->
     <!-- NEWS_DATA_START -->
     <script>
         const newsData = {
             global: [
-                { id: "NO.10", title: "美联储降息预期升温 国际金价再创历史新高", time: "07:45", tag: "大宗商品", summary: "最新通胀数据超预期回落，市场押注美联储年内将启动第二次降息，现货黄金盘中突破关口，避险情绪与流动性预期共同推升避险资产价格。", impact: "驱动抗通胀标的与黄金概念股，贵金属板块短期波动加大。", asset: "现货黄金 / XAUUSD, GDX" },
-                { id: "NO.09", title: "欧央行维持基调 市场评估欧洲经济衰退风险", time: "07:30", tag: "欧洲市场", summary: "欧洲中央银行最新政策会议暗示通胀压力持续放缓，但工业产出疲软加剧了德国及欧元区整体经济停滞的忧虑。", impact: "欧元兑美元震荡走低，欧洲高股息防御性股票受资金青睐。", asset: "欧元/美元 (EUR/USD), VGK" },
-                { id: "NO.08", title: "中东能源运输通道安全性引发国际原油震荡", time: "07:10", tag: "原油/能源", summary: "主要运河与海峡地缘局势不确定性增加，保险公司提高航运附加费，布伦特原油在多空博弈下呈现高振幅走势。", impact: "提高全球油气运输成本，对航运业及炼化产业利润形成挤压。", asset: "布伦特原油 (Brent), XLE" },
-                { id: "NO.07", title: "微软与OpenAI联合发布下一代企业级AI模型", time: "06:50", tag: "前沿科技", summary: "新一代大模型在逻辑推理与复杂代码生成领域实现突破，算力需求较上一代提升超40%，推动全球云服务商加码数据中心建设。", impact: "进一步夯实AI产业链底层逻辑，算力芯片与光模块板块维持强催化。", asset: "MSFT, NVDA, 光模块ETF" },
-                { id: "NO.06", title: "美股大盘高位震荡 科技巨头财报前夕资金趋于谨慎", time: "06:30", tag: "美股动态", summary: "标普500与纳斯达克指数在历史高位附近维持狭幅整理，交易员正密切留意即将披露的科技“七巨头”季报现金流表现。", impact: "市场短期避险资金流向公用事业及短期国债收益率资产。", asset: "标普500 (SPY), 纳指100 (QQQ)" },
-                { id: "NO.05", title: "全球芯片巨头强劲财报巩固半导体周期复苏信号", time: "06:10", tag: "半导体", summary: "晶圆代工头部企业披露最新月度营收，高算力芯片产能保持满载，封测与先进封装产能持续紧张到下半年。", impact: "确认全球科技硬件行业底部回升，半导体设备及材料端持续受益。", asset: "SMH, 台积电 (TSM)" },
-                { id: "NO.04", title: "日元汇率波动剧烈 日本央行加息时点预期分歧放大", time: "05:55", tag: "外汇市场", summary: "日本最新工资增长数据强劲，引发市场对日本央行取消宽松政策的预期，日元对美元呈现V型走势。", impact: "日元套利交易套现压力增加，对全球跨境流动资金产生短期扰动。", asset: "日元/美元 (USD/JPY), EWJ" },
-                { id: "NO.03", title: "全球新能源汽车渗透率突破关键节点 电池原材料承压", time: "05:40", tag: "新能源", summary: "全球主要市场电动汽车销量延续两位数增长，然而由于上游锂矿及钴产能集中释放，现货供给过剩使得上游资源价格持续低位震荡。", impact: "整车制造端成本下降利好毛利率，但上游采矿及资源类股票估值承压。", asset: "LIT, 宁德时代, 雅化集团" },
-                { id: "NO.02", title: "苹果公司推进硬件AI化 升级供应链采购预期", time: "05:20", tag: "消费电子", summary: "供应链消息指出，苹果正加码研发适配端侧大模型的下一代芯片，并增加高端散热及高频PCB板的采购份额。", impact: "消费电子供应链迎换机周期重估，相关核心零部件供应商关注度拉升。", asset: "AAPL, 立讯精密, 苹果概念板块" },
-                { id: "NO.01", title: "美联储决议公布前夕 全球主要股市避险情绪拉满", time: "05:00", tag: "宏观重磅", summary: "全球投资者目光聚焦今夜美联储主席最新公开演讲，衍生品市场定价显示对于降息路径的争议达今年峰值，金融市场波动率指数（VIX）快速攀升。", impact: "全球权益类资产呈现观望防守态势，资金短期向短债与黄金等避风港聚集。", asset: "VIX指数, 美国10年期国债, TLT" }
+                { id: "NO.10", title: "美联储降息预期升温 国际金价再创新高", time: "07:45", tag: "大宗商品", summary: "最新通胀数据超预期回落，市场押注美联储将启动二次降息，现货黄金突破关口，避险与流动性预期共同推升资产价格。", impact: "驱动抗通胀标的与黄金概念股，贵金属板块波动加大。", asset: "现货黄金 / XAUUSD, GDX" },
+                { id: "NO.09", title: "欧央行维持基调 评估欧洲经济衰退风险", time: "07:30", tag: "欧洲市场", summary: "欧洲中央银行最新会议暗示通胀压力持续放缓，但工业产出疲软加剧了欧元区整体经济停滞的忧虑。", impact: "欧元兑美元震荡，欧洲高股息防御性股票受资金青睐。", asset: "欧元/美元 (EUR/USD), VGK" },
+                { id: "NO.08", title: "中东能源运输通道安全引发原油震荡", time: "07:10", tag: "原油/能源", summary: "主要海峡地缘局势不确定性增加，保险公司提高航运附加费，布伦特原油多空博弈高振幅走势。", impact: "提高油气运输成本，对航运及炼化产业利润形成挤压。", asset: "布伦特原油 (Brent), XLE" },
+                { id: "NO.07", title: "微软与OpenAI联合发布下一代AI模型", time: "06:50", tag: "前沿科技", summary: "新一代大模型在逻辑推理与复杂代码生成领域实现突破，算力需求提升超40%，云服务商加码数据中心。", impact: "进一步夯实AI产业链底层逻辑，算力芯片与光模块维持强催化。", asset: "MSFT, NVDA, 光模块ETF" },
+                { id: "NO.06", title: "美股大盘高位震荡 科技巨头财报前夕谨慎", time: "06:30", tag: "美股动态", summary: "标普500与纳斯达克在历史高位维持狭幅整理，交易员密切留意科技巨头季报现金流表现。", impact: "短期避险资金流向公用事业及短期国债资产。", asset: "标普500 (SPY), 纳指100 (QQQ)" },
+                { id: "NO.05", title: "全球芯片巨头强劲财报巩固复苏信号", time: "06:10", tag: "半导体", summary: "晶圆代工头部企业披露月度营收，高算力芯片产能保持满载，封测与先进封装产能持续紧张。", impact: "确认科技硬件行业底部回升，半导体设备及材料端持续受益。", asset: "SMH, 台积电 (TSM)" },
+                { id: "NO.04", title: "日元汇率波动剧烈 日本央行加息预期分歧", time: "05:55", tag: "外汇市场", summary: "日本工资增长数据强劲，引发对日本央行取消宽松政策的预期，日元对美元呈现V型走势。", impact: "日元套利交易套现压力增加，对全球跨境资金产生扰动。", asset: "日元/美元 (USD/JPY), EWJ" },
+                { id: "NO.03", title: "新能源汽车渗透率破节点 原材料承压", time: "05:40", tag: "新能源", summary: "全球主要市场电动汽车销量延续两位数增长，由于上游锂矿产能集中释放，现货供给过剩使得价格低位震荡。", impact: "整车端成本下降利好毛利率，但上游采矿股票估值承压。", asset: "LIT, 宁德时代, 雅化集团" },
+                { id: "NO.02", title: "苹果公司推进硬件AI化 升级供应链预期", time: "05:20", tag: "消费电子", summary: "苹果加码研发适配端侧大模型的下一代芯片，并增加高端散热及高频PCB板的采购份额。", impact: "消费电子供应链迎换机周期重估，核心零部件供应商关注度拉升。", asset: "AAPL, 立讯精密, 苹果概念板块" },
+                { id: "NO.01", title: "美联储决议前夕 全球主要股市避险拉满", time: "05:00", tag: "宏观重磅", summary: "全球投资者聚焦今夜美联储主席公开演讲，衍生品市场定价显示对降息路径争议达峰值，VIX指数拉升。", impact: "权益类资产呈现防守态势，资金向短债与黄金聚集。", asset: "VIX指数, 美国10年期国债, TLT" }
             ],
             asia: [
-                { id: "NO.05", title: "东南亚数字经济规模加速扩张 吸引跨国云巨头加码", time: "07:20", tag: "区域经济", summary: "新加坡与马来西亚数据中心集群建设加速，多个科技巨头相继宣布在东南亚落地区域算力中心。", impact: "带动本地电力供应、冷却设备及跨境光缆基础设施建设投资。", asset: "EWS, 东南亚科技概念" },
-                { id: "NO.04", title: "韩国出口数据超预期 芯片与汽车构成双轮驱动", time: "07:00", tag: "韩国市场", summary: "韩国最新海关出口数据显示，存储芯片出口额同比增长超五成，带动整体工业生产总值企稳反弹。", impact: "提振KOSPI指数表现，对全球存储器产业链形成强基本面支撑。", asset: "EWY, 三星电子, 海力士" },
-                { id: "NO.03", title: "日本股市企业重组潮延续 股票回购规模创历史同期新高", time: "06:40", tag: "日本市场", summary: "东京证券交易所推动治理变革成效显现，多家蓝筹公司宣布大规模股票注销与派息计划。", impact: "持续吸引海外长线价值投资者流入日股市场。", asset: "日经225指数 (NKY), DXJ" },
-                { id: "NO.02", title: "印度经济增速强劲 吸引外商直接投资（FDI）持续流入", time: "06:15", tag: "印度市场", summary: "制造与服务业双PMI维持扩张区间，印度制造业扩张政策持续吸引全球电子组装企业投资建设工厂。", impact: "印度市场估值溢价维持高位，基建与消费龙头板块表现活跃。", asset: "INDA, EPI" },
-                { id: "NO.01", title: "亚太半导体供应链重组 先进封装产能争夺白热化", time: "05:30", tag: "半导体", summary: "中国台湾及日本半导体产业带积极扩建2.5D/3D先进封装工厂，全球各大设计厂商均在抢占未来两年产能配额。", impact: "半导体设备及测试环节厂商订单排期已延长至下半年。", asset: "TSMC, 日月光, 彰化银行" }
+                { id: "NO.05", title: "东南亚数字经济扩张 吸引跨国云巨头", time: "07:20", tag: "区域经济", summary: "新加坡与马来西亚数据中心集群建设加速，多个科技巨头相继宣布在东南亚落地区域算力中心。", impact: "带动本地电力供应、冷却设备及跨境光缆投资。", asset: "EWS, 东南亚科技概念" },
+                { id: "NO.04", title: "韩国出口数据超预期 芯片汽车双驱动", time: "07:00", tag: "韩国市场", summary: "韩国海关数据显示存储芯片出口额同比增长超五成，带动整体工业生产总值企稳反弹。", impact: "提振KOSPI指数表现，对全球存储器产业链形成强支撑。", asset: "EWY, 三星电子, 海力士" },
+                { id: "NO.03", title: "日本股市企业重组潮 股票回购规模新高", time: "06:40", tag: "日本市场", summary: "东京证券交易所推动治理变革成效显现，多家蓝筹公司宣布大规模股票注销与派息计划。", impact: "持续吸引海外长线价值投资者流入日股市场。", asset: "日经225指数 (NKY), DXJ" },
+                { id: "NO.02", title: "印度经济增速强劲 外商直接投资流入", time: "06:15", tag: "印度市场", summary: "制造与服务业双PMI维持扩张，印度制造业政策持续吸引全球电子组装企业投资建设工厂。", impact: "印度市场估值溢价维持高位，基建与消费龙头表现活跃。", asset: "INDA, EPI" },
+                { id: "NO.01", title: "亚太半导体供应链重组 封装争夺白热化", time: "05:30", tag: "半导体", summary: "中国台湾及日本半导体产业带积极扩建2.5D/3D先进封装工厂，设计厂商抢瞻产能配额。", impact: "半导体设备及测试环节厂商订单排期延长。", asset: "TSMC, 日月光" }
             ],
             china: [
-                { id: "NO.05", title: "全国多地出台提振消费专项举措 聚焦绿色与数字消费", time: "07:30", tag: "消费政策", summary: "相关部门出台一系列促消费组合拳，包括针对智能家电、新能源汽车的专项补贴以及发放地方消费券。", impact: "直接拉动终端零售额增长，利好白色家电及新能源整车龙头。", asset: "美的集团, 比亚迪, 消费ETF" },
-                { id: "NO.04", title: "央行公开市场逆回购精准调节 维护流动性合理充裕", time: "07:10", tag: "货币政策", summary: "针对季末银行间资金面波动，央行开展适度规模逆回购操作，市场利率稳步回落至政策利率附近。", impact: "保障债市平稳运行，金融机构资金成本保持低位运行。", asset: "国债期货 (TL), 银行板块" },
-                { id: "NO.03", title: "中国前三季度高新技术产业投资保持两位数高速增长", time: "06:45", tag: "产业升级", summary: "国家统计局最新数据表明，高技术制造业和高技术服务业投资增长显著，自主可控与高端制造加速落地。", impact: "工业母机、机器人及国产软件供应链价值获得市场重新评估。", asset: "科创50ETF, 机器人板块" },
-                { id: "NO.02", title: "国内头部AI大模型实现全端部署 商业化落地步伐加快", time: "06:00", tag: "人工智能", summary: "多家科技巨头旗下大模型宣布在办公、医疗和工业设计领域实现大规模API接入，企业付费用户增长超预期。", impact: "推动国内软件SAAS企业估值重塑，算力租赁市场维持供不应求状态。", asset: "百度, 腾讯, 计算机ETF" },
-                { id: "NO.01", title: "宏观组合政策效果显现 核心经济指标展现回升向好态势", time: "05:15", tag: "宏观经济", summary: "最新公布的制造业PMI重返扩张区间，出口及风险偏好同步回暖，外资机构相继上调中国全年GDP增长预期。", impact: "极大提升权益市场风险偏好，离岸人民币汇率升值空间打开，吸引外资回流A股/港股。", asset: "沪深300指数, 恒生科技指数, FXI" }
+                { id: "NO.05", title: "全国多地出台促消费举措 聚焦绿色数字", time: "07:30", tag: "消费政策", summary: "相关部门出台一系列促消费组合拳，包括智能家电、新能源汽车专项补贴及发放地方消费券。", impact: "直接拉动终端零售额增长，利好白色家电及新能源整车龙头。", asset: "美的集团, 比亚迪" },
+                { id: "NO.04", title: "央行公开市场逆回购调节 维护流动性充裕", time: "07:10", tag: "货币政策", summary: "针对季末银行间资金面波动，央行开展适度规模逆回购操作，市场利率稳步回落至政策利率附近。", impact: "保障债市平稳运行，金融机构资金成本保持低位。", asset: "国债期货, 银行板块" },
+                { id: "NO.03", title: "高新技术产业投资保持两位数高速增长", time: "06:45", tag: "产业升级", summary: "数据显示高技术制造业和高技术服务业投资增长显著，自主可控与高端制造加速落地。", impact: "工业母机、机器人及国产软件供应链价值获得重估。", asset: "科创50ETF, 机器人板块" },
+                { id: "NO.02", title: "国内头部AI大模型全端部署 商业化加速", time: "06:00", tag: "人工智能", summary: "多家科技巨头旗下大模型宣布在办公、医疗和工业设计领域实现大规模API接入，用户增长超预期。", impact: "推动国内软件SAAS企业估值重塑，算力租赁维持供不应求。", asset: "百度, 计算机ETF" },
+                { id: "NO.01", title: "宏观组合政策效果显现 经济指标向好", time: "05:15", tag: "宏观经济", summary: "最新制造业PMI重返扩张区间，出口及风险偏好同步回暖，外资机构上调全年GDP预期。", impact: "极大提升权益市场风险偏好，离岸人民币汇率走强。", asset: "沪深300指数, 恒生科技" }
             ]
         };
     </script>
@@ -195,9 +193,10 @@
             }
         }
 
+        // ==================== 海报生成引擎（像素锁定，绝对防重叠） ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
-            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成 6 张 9:16 标准高清晰套图...</div>';
+            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成标准高清海报套图...</div>';
             document.getElementById('posterModal').classList.remove('hidden');
 
             const allNews = [
@@ -217,28 +216,28 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 扩充容器高度至 720px，严格采用绝对像素定位与防重叠隔离
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:720px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;";
+                // 严格锁定 375px × 720px 尺寸，使用绝对像素盒模型，防止任何挤压变形
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:720px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:sans-serif;";
 
                 let itemsHtml = group.map(item => `
-                    <div style="height:130px;border-bottom:1px solid #30363D;padding:6px 0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;display:flex;justify-content:space-between;line-height:14px;height:14px;margin-bottom:4px;">
+                    <div style="height:128px;border-bottom:1px solid #30363D;padding:4px 0;box-sizing:border-box;overflow:hidden;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:16px;height:16px;margin-bottom:2px;display:flex;justify-content:space-between;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;">${item.section}</span>
                         </div>
-                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:16px;height:16px;margin-bottom:6px;">${item.title}</div>
-                        <div style="font-size:10px;color:#9CA3AF;line-height:15px;height:30px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.summary}</div>
+                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;line-height:18px;height:18px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.title}</div>
+                        <div style="font-size:10px;color:#9CA3AF;line-height:16px;height:32px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.summary}</div>
                     </div>
                 `).join('');
 
                 wrapper.innerHTML = `
-                    <div style="height:40px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;">
+                    <div style="height:42px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;">
                         <div>
                             <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
                             <div style="font-size:13px;font-weight:bold;color:#FFF;margin-top:2px;line-height:14px;">每日财经看板</div>
                         </div>
                         <div style="font-size:9px;color:#8B949E;text-align:right;">全景套卡 (${idx + 1}/6)</div>
                     </div>
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;margin:6px 0;">${itemsHtml}</div>
+                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;margin:4px 0;">${itemsHtml}</div>
                     <div style="height:46px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:4px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
                         <div>
                             <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:14px;">长按识别二维码</div>
@@ -259,9 +258,9 @@
                 document.body.removeChild(wrapper);
             }
 
-            // 第 6 张末页
+            // 第 6 张星际背景末页
             const lastWrapper = document.createElement('div');
-            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:720px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:24px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;`;
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:720px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:24px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
             
             lastWrapper.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);">
@@ -269,7 +268,7 @@
                     <div style="font-size:9px;color:#E5E7EB;letter-spacing:1px;font-weight:bold;">END PAGE · (6/6)</div>
                 </div>
                 <div style="text-align:center;background:rgba(0,0,0,0.25);backdrop-filter:blur(2px);padding:25px 10px;border-radius:12px;">
-                    <div style="font-family:'Playfair Display', Georgia, 'Times New Roman', serif;font-size:38px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 0 12px rgba(255,255,255,0.9), 0 0 25px rgba(240,185,11,0.7);letter-spacing:1px;line-height:1.2;">God bless you</div>
+                    <div style="font-family:Georgia, serif;font-size:38px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 0 12px rgba(255,255,255,0.9), 0 0 25px rgba(240,185,11,0.7);letter-spacing:1px;line-height:1.2;">God bless you</div>
                     <div style="margin-top:10px;font-size:10px;color:#F0B90B;font-weight:600;letter-spacing:2px;text-shadow:0 1px 3px rgba(0,0,0,0.8);">✦ 愿智慧与财富同在 ✦</div>
                 </div>
                 <div style="text-align:center;font-size:9px;color:#E5E7EB;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:6px;border-radius:6px;letter-spacing:1px;">2026 FINANCIAL NEWS TERMINAL · ALL RIGHTS RESERVED</div>
