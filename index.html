@@ -88,7 +88,7 @@
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-900" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：海报下方附带网址二维码，扫码即可直接在手机上查看完整看板！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：长按识别海报底部二维码，即可在手机上完整浏览看板！</div>
         </div>
     </div>
 
@@ -192,7 +192,7 @@
             }
         }
 
-        // ==================== 海报生成引擎（已加高卡片安全距离、采用稳定二维码 API） ====================
+        // ==================== 海报生成引擎（已加高卡片至 142px，完美解决摘要下缘被截断问题） ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
             renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成标准高清海报套图...</div>';
@@ -217,14 +217,14 @@
                 const wrapper = document.createElement('div');
                 wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:720px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:sans-serif;";
 
-                // 卡片高度锁定 138px，消除文字上下压线
+                // 卡片高度锁定 142px，微调摘要字号与行高，彻底留出底线安全距离
                 let itemsHtml = group.map(item => `
-                    <div style="height:138px;border-bottom:1px solid #30363D;padding:5px 0;box-sizing:border-box;overflow:hidden;">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:16px;height:16px;margin-bottom:2px;display:flex;justify-content:space-between;">
+                    <div style="height:142px;border-bottom:1px solid #30363D;padding:4px 0;box-sizing:border-box;overflow:hidden;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:15px;height:15px;margin-bottom:2px;display:flex;justify-content:space-between;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;">${item.section}</span>
                         </div>
-                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;line-height:18px;height:18px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.title}</div>
-                        <div style="font-size:10px;color:#9CA3AF;line-height:16px;height:32px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.summary}</div>
+                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;line-height:17px;height:17px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.title}</div>
+                        <div style="font-size:9.5px;color:#9CA3AF;line-height:14.5px;height:29px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.summary}</div>
                     </div>
                 `).join('');
 
@@ -248,7 +248,6 @@
 
                 document.body.appendChild(wrapper);
 
-                // 使用极其稳健的在线二维码 API 生成可扫描二维码，避免离线库在隐藏 DOM 渲染失效
                 const qrContainer = wrapper.querySelector(`#qr-eq-${idx}`);
                 const cleanUrl = encodeURIComponent(window.location.origin + window.location.pathname);
                 qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:30px;height:30px;display:block;" crossorigin="anonymous" />`;
