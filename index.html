@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         .tab-active { border-bottom: 2px solid #F0B90B; color: #F0B90B; font-weight: bold; }
     </style>
 </head>
@@ -192,7 +192,7 @@
             }
         }
 
-        // ==================== 海报生成引擎（已加宽标题行高与安全 Padding，彻底解决粗体字被切边） ====================
+        // ==================== 💥 彻底打爆死高度的海报渲染引擎 ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
             renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成标准高清海报套图...</div>';
@@ -215,33 +215,34 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:760px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:sans-serif;";
+                // 海报总高度放大到 840px，绝对充裕的空间
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:840px;background-color:#0D1117;color:#FFF;padding:20px 16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;";
 
-                // 核心修复：放宽标题容器 padding 进和 line-height 到 22px，给加粗字体提供绝对充足的上下呼吸空间，绝不切字
+                // 给标题 24px 行高（比字号大一倍！），彻底告别切字
                 let itemsHtml = group.map(item => `
-                    <div style="border-bottom:1px solid #30363D;padding:8px 0 12px 0;box-sizing:border-box;margin-bottom:2px;display:flex;flex-direction:column;justify-content:flex-start;">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:14px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="border-bottom:1px solid #30363D;padding:12px 0 16px 0;box-sizing:border-box;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:16px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;">${item.section}</span>
                         </div>
-                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;line-height:22px;padding:2px 0;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        <div style="font-size:12px;font-weight:700;color:#FFFFFF;line-height:24px;margin-bottom:6px;word-break:break-all;">
                             ${item.title}
                         </div>
-                        <div style="font-size:9.5px;color:#9CA3AF;line-height:15px;word-break:break-all;">
+                        <div style="font-size:10px;color:#9CA3AF;line-height:16px;word-break:break-all;">
                             ${item.summary}
                         </div>
                     </div>
                 `).join('');
 
                 wrapper.innerHTML = `
-                    <div style="height:38px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;">
+                    <div style="height:40px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;">
                         <div>
                             <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
-                            <div style="font-size:13px;font-weight:bold;color:#FFF;margin-top:2px;line-height:13px;">每日财经看板</div>
+                            <div style="font-size:14px;font-weight:bold;color:#FFF;margin-top:2px;line-height:14px;">每日财经看板</div>
                         </div>
                         <div style="font-size:9px;color:#8B949E;text-align:right;">全景套卡 (${idx + 1}/6)</div>
                     </div>
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;margin:4px 0;">${itemsHtml}</div>
-                    <div style="height:44px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:4px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
+                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;margin:10px 0;">${itemsHtml}</div>
+                    <div style="height:48px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:4px 12px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
                         <div>
                             <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:14px;">长按识别二维码</div>
                             <div style="font-size:8px;color:#9CA3AF;line-height:12px;">扫码手机查看完整 20 条解读</div>
@@ -256,7 +257,8 @@
                 const cleanUrl = encodeURIComponent(window.location.origin + window.location.pathname);
                 qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:30px;height:30px;display:block;" crossorigin="anonymous" />`;
 
-                await new Promise(r => setTimeout(r, 400));
+                // 渲染等待时间增加到 600ms，确保字体 100% 准备就绪
+                await new Promise(r => setTimeout(r, 600));
                 const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0D1117', useCORS: true });
                 const img = document.createElement('img');
                 img.src = canvas.toDataURL('image/png');
@@ -267,7 +269,7 @@
 
             // 第 6 张星际背景末页
             const lastWrapper = document.createElement('div');
-            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:760px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:24px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:840px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:24px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
             
             lastWrapper.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);">
@@ -282,7 +284,7 @@
             `;
 
             document.body.appendChild(lastWrapper);
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 400));
             const lastCanvas = await html2canvas(lastWrapper, { scale: 2, useCORS: true });
             const lastImg = document.createElement('img');
             lastImg.src = lastCanvas.toDataURL('image/png');
