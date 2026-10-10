@@ -20,61 +20,323 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Generate Daily News and Update index.html
+      - name: Overwrite and Update index.html
         run: |
           python - << 'EOF'
-          import re
-          import json
           import datetime
 
           now = datetime.datetime.now()
           date_prefix = now.strftime("%m月%d日")
           now_str = now.strftime("%Y-%m-%d %H:%M (CST)")
 
-          latest_news = {
-              "global": [
-                  {"id": "NO.10", "title": f"{date_prefix}快讯：美联储降息预期升温 国际金价再创新高", "time": "07:45", "tag": "大宗商品", "summary": "最新通胀数据超预期回落，市场押注美联储将启动二次降息，现货黄金突破关口，避险与流动性预期共同推升资产价格。", "impact": "驱动抗通胀标的与黄金概念股，贵金属板块波动加大。", "asset": "现货黄金 / XAUUSD, GDX"},
-                  {"id": "NO.09", "title": f"{date_prefix}快讯：欧央行维持基调 评估欧洲经济衰退风险", "time": "07:30", "tag": "欧洲市场", "summary": "欧洲中央银行最新会议暗示通胀压力持续放缓，但工业产出疲软加剧了欧元区整体经济停滞的忧虑。", "impact": "欧元兑美元震荡，欧洲高股息防御性股票受资金青睐。", "asset": "欧元/美元 (EUR/USD), VGK"},
-                  {"id": "NO.08", "title": f"{date_prefix}快讯：中东能源运输通道安全引发原油震荡", "time": "07:10", "tag": "原油/能源", "summary": "主要海峡地缘局势不确定性增加，保险公司提高航运附加费，布伦特原油多空博弈高振幅走势。", "impact": "提高油气运输成本，对航运及炼化产业利润形成挤压。", "asset": "布伦特原油 (Brent), XLE"},
-                  {"id": "NO.07", "title": f"{date_prefix}快讯：微软与OpenAI联合发布下一代AI模型", "time": "06:50", "tag": "前沿科技", "summary": "新一代大模型在逻辑推理与复杂代码生成领域实现突破，算力需求提升超40%，云服务商加码数据中心。", "impact": "进一步夯实AI产业链底层逻辑，算力芯片与光模块维持强催化。", "asset": "MSFT, NVDA, 光模块ETF"},
-                  {"id": "NO.06", "title": f"{date_prefix}快讯：美股大盘高位震荡 科技巨头财报前夕谨慎", "time": "06:30", "tag": "美股动态", "summary": "标普500与纳斯达克在历史高位维持狭幅整理，交易员密切留意科技巨头季报现金流表现。", "impact": "短期避险资金流向公用事业及短期国债资产。", "asset": "标普500 (SPY), 纳指100 (QQQ)"},
-                  {"id": "NO.05", "title": f"{date_prefix}快讯：全球芯片巨头强劲财报巩固复苏信号", "time": "06:10", "tag": "半导体", "summary": "晶圆代工头部企业披露月度营收，高算力芯片产能保持满载，封测与先进封装产能持续紧张。", "impact": "确认科技硬件行业底部回升，半导体设备及材料端持续受益。", "asset": "SMH, 台积电 (TSM)"},
-                  {"id": "NO.04", "title": f"{date_prefix}快讯：日元汇率波动剧烈 日本央行加息预期分歧", "time": "05:55", "tag": "外汇市场", "summary": "日本工资增长数据强劲，引发对日本央行取消宽松政策的预期，日元对美元呈现V型走势。", "impact": "日元套利交易套现压力增加，对全球跨境资金产生扰动。", "asset": "日元/美元 (USD/JPY), EWJ"},
-                  {"id": "NO.03", "title": f"{date_prefix}快讯：新能源汽车渗透率破节点 原材料承压", "time": "05:40", "tag": "新能源", "summary": "全球主要市场电动汽车销量延续两位数增长，由于上游锂矿产能集中释放，现货供给过剩使得价格低位震荡。", "impact": "整车端成本下降利好毛利率，但上游采矿股票估值承压。", "asset": "LIT, 宁德时代, 雅化集团"},
-                  {"id": "NO.02", "title": f"{date_prefix}快讯：苹果公司推进硬件AI化 升级供应链预期", "time": "05:20", "tag": "消费电子", "summary": "苹果加码研发适配端侧大模型的下一代芯片，并增加高端散热及高频PCB板的采购份额。", "impact": "消费电子供应链迎换机周期重估，核心零部件供应商关注度拉升。", "asset": "AAPL, 立讯精密, 苹果概念板块"},
-                  {"id": "NO.01", "title": f"{date_prefix}快讯：美联储决议前夕 全球主要股市避险拉满", "time": "05:00", "tag": "宏观重磅", "summary": "全球投资者聚焦今夜美联储主席公开演讲，衍生品市场定价显示对降息路径争议达峰值，VIX指数拉升。", "impact": "权益类资产呈现防守态势，资金向短债与黄金聚集。", "asset": "VIX指数, 美国10年期国债, TLT"}
-              ],
-              "asia": [
-                  {"id": "NO.05", "title": f"{date_prefix} 亚太数字经济与跨境算力集群建设提速", "time": "07:20", "tag": "区域经济", "summary": "区域内数字基础设施投资保持强劲，跨境光缆与绿色电力供应成各方资本争夺焦点。", "impact": "利好本地电力设备及算力基建供应链。", "asset": "EWS, 亚太科技"},
-                  {"id": "NO.04", "title": f"{date_prefix} 韩国存储芯片出口强劲 驱动工业基本面企稳", "time": "07:00", "tag": "韩国市场", "summary": "海关最新统计显示存储芯片出口额延续高增势头，对整体工业出口形成强有力的基本面支撑。", "impact": "提振KOSPI指数及全球存储产业链。", "asset": "EWY, 三星电子"},
-                  {"id": "NO.03", "title": f"{date_prefix} 日本东京交易所治理改革延续 回购规模扩大", "time": "06:40", "tag": "日本市场", "summary": "治理优化政策持续深化，多家核心蓝筹企业发布大规模注销股票与提升分红比例计划。", "impact": "持续吸引海外长线价值资金流入日股。", "asset": "日经225 (NKY)"},
-                  {"id": "NO.02", "title": f"{date_prefix} 印度制造与服务业双PMI维持强劲扩张区间", "time": "06:15", "tag": "印度市场", "summary": "制造业扩张战略吸引全球电子组装巨头密集布局，本土基建投资与消费需求保持旺盛。", "impact": "印度权益市场估值维持相对溢价。", "asset": "INDA, EPI"},
-                  {"id": "NO.01", "title": f"{date_prefix} 亚太半导体产业链重组 2.5D/3D封装争夺白热化", "time": "05:30", "tag": "半导体", "summary": "中国台湾与日本等半导体产业带加速扩建先进封装工厂，各大设计厂商全力抢占远期产能。", "impact": "半导体测试及设备订单排期维持高位。", "asset": "TSMC, 日月光"}
-              ],
-              "china": [
-                  {"id": "NO.05", "title": f"{date_prefix} 全国多地加力促消费 聚焦绿色智能与数字终端", "time": "07:30", "tag": "消费政策", "summary": "相关部门协同推出促消费组合拳，智能家电与新能源汽车以旧换新补贴有效激活终端内需。", "impact": "直接拉动社会零售总额回暖，利好白色家电龙头。", "asset": "美的集团, 比亚迪"},
-                  {"id": "NO.04", "title": f"{date_prefix} 央行灵活开展公开市场操作 维护流动性充裕", "time": "07:10", "tag": "货币政策", "summary": "针对税期及资金面波动，央行开展适度规模逆回购投放，银行间市场利率平稳运行。", "impact": "保障债券市场平稳，金融机构资金成本低位波动。", "asset": "国债期货, 银行板块"},
-                  {"id": "NO.03", "title": f"{date_prefix} 高技术产业投资保持高速增长 实体经济升级加快", "time": "06:45", "tag": "产业升级", "summary": "高端装备制造与高技术服务业投资比重持续提升，工业母机与人形机器人商业化落地提速。", "impact": "硬科技与设备制造产业链受资本长期青睐。", "asset": "科创50ETF, 机器人板块"},
-                  {"id": "NO.02", "title": f"{date_prefix} 国内大模型商业化全面提速 企业级应用落地", "time": "06:00", "tag": "人工智能", "summary": "多模态大模型在政务、金融及工业设计领域实现大规模API接入，付费转化率超预期。", "impact": "推动软件及SaaS板块估值重塑。", "asset": "百度, 计算机ETF"},
-                  {"id": "NO.01", "title": f"{date_prefix} 宏观组合政策综合显现 核心经济指标展现回升向好", "time": "05:15", "tag": "宏观经济", "summary": "制造业景气度重返扩张区间，出口增速与市场风险偏好同步共振，外资机构看多中国资产。", "impact": "极大提振权益市场风险偏好，离岸人民币走强。", "asset": "沪深300, 恒生科技"}
-              ]
-          }
+          # 直接生成完整的最新 index.html 文件内容，彻底杜绝正则替换失效的问题
+          html_template = f'''<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>彭博财经终端 | 每日全球与国内焦点新闻看板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {{
+            darkMode: 'class',
+            theme: {{
+                extend: {{
+                    colors: {{
+                        bbGold: '#F0B90B',
+                        bbDark: '#0D1117',
+                        bbCard: '#161B22',
+                        bbBorder: '#30363D',
+                        bbTextMuted: '#8B949E'
+                    }}
+                }}
+            }}
+        }}
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+        .tab-active {{ border-bottom: 2px solid #F0B90B; color: #F0B90B; font-weight: bold; }}
+    </style>
+</head>
+<body class="bg-bbDark text-gray-100 min-h-screen pb-12" id="mainBody">
 
-          with open("index.html", "r", encoding="utf-8") as f:
-              html_content = f.read()
+    <!-- 顶栏 -->
+    <header class="sticky top-0 z-40 bg-bbDark/95 border-b border-bbBorder px-4 py-3 backdrop-blur-md flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+            <span class="bg-bbGold text-black text-xs font-black px-2 py-1 rounded tracking-wider">BLOOMBERG</span>
+            <span class="text-sm font-bold tracking-wider">财经焦点看板</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="toggleTheme()" class="text-gray-400 hover:text-bbGold text-sm p-1.5"><i class="fa-solid fa-moon" id="themeIcon"></i></button>
+            <button onclick="generateSixPosters()" class="bg-bbGold text-black text-xs font-bold px-3 py-1.5 rounded-full hover:bg-yellow-400 transition flex items-center gap-1">
+                <i class="fa-solid fa-images"></i> 生成朋友圈 6 图
+            </button>
+            <button onclick="copyWechatText()" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-blue-500 transition flex items-center gap-1">
+                <i class="fa-solid fa-terminal"></i> 复制终端文案
+            </button>
+        </div>
+    </header>
 
-          html_content = re.sub(r'更新时间: .*? \(CST\)', f'更新时间: {now_str}', html_content)
+    <!-- 状态与时间 -->
+    <div class="max-w-3xl mx-auto px-4 mt-4 flex justify-between items-center text-xs text-bbTextMuted">
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <span>终端实时同步中（今日自动更新）</span>
+        </div>
+        <div id="updateTime">更新时间: {now_str}</div>
+    </div>
 
-          js_data_str = f"const newsData = {json.dumps(latest_news, ensure_ascii=False, indent=12)};"
-          pattern = r'<!-- NEWS_DATA_START -->[\s\S]*?<!-- NEWS_DATA_END -->'
-          replacement = f'<!-- NEWS_DATA_START -->\n    <script>\n        {js_data_str}\n    </script>\n    <!-- NEWS_DATA_END -->'
+    <!-- 搜索 -->
+    <div class="max-w-3xl mx-auto px-4 mt-3">
+        <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-xs"></i>
+            <input type="text" id="searchInput" oninput="filterNews()" placeholder="搜索关键词（如：美联储、芯片、GDP）..." 
+                   class="w-full bg-bbCard border border-bbBorder rounded-lg pl-8 pr-4 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-bbGold">
+        </div>
+    </div>
 
-          new_html = re.sub(pattern, replacement, html_content)
+    <!-- Tabs -->
+    <div class="max-w-3xl mx-auto px-4 mt-4 border-b border-bbBorder flex space-x-6 text-sm">
+        <button onclick="switchTab('global')" id="tab-global" class="py-2 text-xs font-bold tracking-wider tab-active transition">彭博全球 Top 10</button>
+        <button onclick="switchTab('asia')" id="tab-asia" class="py-2 text-xs font-bold tracking-wider text-gray-400 transition">亚太焦点 Top 5</button>
+        <button onclick="switchTab('china')" id="tab-china" class="py-2 text-xs font-bold tracking-wider text-gray-400 transition">国内核心 Top 5</button>
+    </div>
+
+    <!-- 列表容器 -->
+    <main class="max-w-3xl mx-auto px-4 mt-4 space-y-4" id="newsContainer"></main>
+
+    <footer class="max-w-3xl mx-auto text-center mt-10 px-4 text-xs text-bbTextMuted space-y-1">
+        <p>免责声明：本看板内容基于 Bloomberg 及公开市场数据综合二次编译整理，仅供信息参考。</p>
+        <p>© 2026 Financial News Terminal. All rights reserved.</p>
+    </footer>
+
+    <!-- 海报弹窗 -->
+    <div id="posterModal" class="fixed inset-0 bg-black/85 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-bbCard border border-bbBorder rounded-xl max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-3 border-b border-bbBorder flex justify-between items-center">
+                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 9:16 等尺寸 6 张套图（含星际末页）</span>
+                <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-900" id="posterRenderArea"></div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：6 张海报尺寸完全一致，长按保存依次发送朋友圈！</div>
+        </div>
+    </div>
+
+    <!-- NEWS_DATA_START -->
+    <script>
+        const newsData = {{
+            global: [
+                {{ id: "NO.10", title: "{date_prefix} 实时终端：美联储降息预期再修正 金价冲高回落", time: "07:45", tag: "大宗商品", summary: "最新非农与通胀预期交织，衍生品市场对年内降息节奏博弈加剧，现货黄金在历史高位附近宽幅震荡。", impact: "驱动抗通胀标的与贵金属板块短期交投活跃。", "asset": "现货黄金 / XAUUSD, GDX" }},
+                {{ id: "NO.09", title: "{date_prefix} 实时终端：欧央行重申数据依赖 评估经济停滞", time: "07:30", tag: "欧洲市场", summary: "欧元区核心工业数据延续疲软，市场交易员正重新定价欧洲央行后续宽松货币政策的落地速度。", impact: "欧元汇率承压波动，防御型高股息板块受关注。", "asset": "EUR/USD, VGK" }},
+                {{ id: "NO.08", title: "{date_prefix} 实时终端：地缘物流溢价抬升 原油航运高位博弈", time: "07:10", tag: "原油/能源", summary: "关键运输通道通行成本上升，叠加主要产油国产量配额调整，国际原油期货维持高振幅箱体震荡。", impact: "推升全球大宗商品运输及炼化成本预期。", "asset": "布伦特原油 (Brent), XLE" }},
+                {{ id: "NO.07", title: "{date_prefix} 实时终端：科技巨头加码 AI 算力基建投资", time: "06:50", tag: "前沿科技", summary: "新一代大模型在多模态与长文本推理取得实质突破，北美及亚太云服务商持续上调资本开支指引。", impact: "算力芯片、光模块及液冷基建板块维持高景气。", asset: "MSFT, NVDA, 光模块ETF" }},
+                {{ id: "NO.06", title: "{date_prefix} 实时终端：美股核心资产盘整 盯紧财报现金流", time: "06:30", tag: "美股动态", summary: "标普与纳指处于历史高位震荡区间，华尔街机构建议投资者密切关注即将披露的龙头企业自由现金流。", impact: "短期资金在科技成长与防御资产间快速轮动。", asset: "SPY, QQQ" }},
+                {{ id: "NO.05", title: "{date_prefix} 实时终端：晶圆代工月度营收印证半导体复苏", time: "06:10", tag: "半导体", summary: "先进制程与 AI 芯片代工产能持续满载，封测与设备交货周期延长，印证全球硬件库存周期触底。", impact: "提振半导体设备、材料及封测环节估值。", asset: "SMH, 台积电 (TSM)" }},
+                {{ id: "NO.04", title: "{date_prefix} 实时终端：日元汇率剧烈波动 引发套利资金拆仓", time: "05:55", tag: "外汇市场", summary: "日本央行官员最新讲话引发市场对货币政策正常化的猜想，日元兑美元汇率出现阶段性快速反转。", impact: "对全球跨境跨市场套利资金流动形成短期扰动。", asset: "USD/JPY, EWJ"}},
+                {{ id: "NO.03", title: "{date_prefix} 实时终端：新能源汽车全球渗透率加速上行", time: "05:40", tag: "新能源", summary: "海外与国内新能源车销量维持稳健增长，上游电池材料在产能释放下保持供需相对平稳。", impact: "整车厂毛利率改善，上游采矿板块区间震荡。", asset: "LIT, 宁德时代" }},
+                {{ id: "NO.02", title: "{date_prefix} 实时终端：苹果产业链迎端侧 AI 换机潮预期", time: "05:20", tag: "消费电子", summary: "供应链消息指出苹果正加速推进适配端侧智能的硬件升级，拉动高端散热与高频PCB板需求。", impact: "消费电子核心零部件供应商估值迎来重估。", asset: "AAPL, 立讯精密" }},
+                {{ id: "NO.01", title: "{date_prefix} 实时终端：全球市场聚焦宏观决议 避险情绪升温", time: "05:00", tag: "宏观重磅", summary: "全球投资者目光锁定即将在今夜揭晓的重要宏观经济数据，市场波动率指数（VIX）呈现抬升迹象。", impact: "权益类资产短线趋于谨慎，资金向黄金和短债聚集。", asset: "VIX, 美国国债" }}
+            ],
+            asia: [
+                {{ id: "NO.05", title: "{date_prefix} 亚太要闻：东南亚数字算力中心集群建设提速", time: "07:20", tag: "区域经济", summary: "新加坡与马来西亚数据中心投资热度不减，跨境绿电与算力基础设施成为资本追逐新焦点。", impact: "利好亚太本地电力设备及算力基建供应链。", asset: "EWS, 亚太科技" }},
+                {{ id: "NO.04", title: "{date_prefix} 亚太要闻：韩国存储芯片出口维持强劲高增", time: "07:00", tag: "韩国市场", summary: "最新海关统计表明存储器出口额同比增幅显着，对韩国整体宏观工业基本面形成强支撑。", impact: "提振KOSPI指数及全球存储产业链信心。", asset: "EWY, 三星电子" }},
+                {{ id: "NO.03", title: "{date_prefix} 亚太要闻：日股治理改革持续 股票回购创新高", time: "06:40", tag: "日本市场", summary: "东京证券交易所持续推进企业治理优化，多家蓝筹公司加码股票注销与提高分红派息比例。", impact: "持续吸引海外长线机构资金配置日股蓝筹。", asset: "日经225 (NKY)" }},
+                {{ id: "NO.02", title: "{date_prefix} 亚太要闻：印度制造与服务业双PMI稳健扩张", time: "06:15", tag: "印度市场", summary: "本土制造扩张战略吸引全球电子巨头加速布局，基建及内需消费保持高景气度。", impact: "印度权益市场估值溢价维持相对高位。", asset: "INDA, EPI" }},
+                {{ id: "NO.01", title: "{date_prefix} 亚太要闻：先进制程与封装产能争夺白热化", time: "05:30", tag: "半导体", summary: "中国台湾与日本等半导体核心带加速扩建2.5D/3D封装工厂，各大设计厂全力抢占产能。", impact: "半导体封装测试及设备供应商订单饱满。", asset: "TSMC, 日月光" }}
+            ],
+            china: [
+                {{ id: "NO.05", title: "{date_prefix} 国内要闻：多地加力促消费 聚焦绿色智能家电", time: "07:30", tag: "消费政策", summary: "相关部门协同推出促消费组合拳，智能家电与汽车以旧换新补贴政策持续释放终端内需活力。", impact: "拉动社会零售总额回暖，利好白色家电龙头。", asset: "美的集团, 比亚迪" }},
+                {{ id: "NO.04", title: "{date_prefix} 国内要闻：央行灵活开展逆回购 维护流动性平稳", time: "07:10", tag: "货币政策", summary: "针对市场短期资金面波动，央行开展适度规模逆回购操作，银行间市场利率保持平稳运行。", impact: "保障债券市场平稳，金融机构资金成本低位。", asset: "国债期货, 银行板块" }},
+                {{ id: "NO.03", title: "{date_prefix} 国内要闻：高技术产业投资保持两位数高速增长", time: "06:45", tag: "产业升级", summary: "高端装备制造与高技术服务业投资比重持续提升，工业母机与人形机器人商业化落地提速。", impact: "硬科技与设备制造产业链受资金青睐。", asset: "科创50ETF, 机器人板块" }},
+                {{ id: "NO.02", title: "{date_prefix} 国内要闻：AI 大模型商业化提速 企业应用落地", time: "06:00", tag: "人工智能", summary: "多模态大模型在政务、金融及工业设计领域实现批量API接入，企业端付费转化率超预期。", impact: "推动软件板块估值重塑，算力租赁保持旺盛。", asset: "百度, 计算机ETF" }},
+                {{ id: "NO.01", title: "{date_prefix} 国内要闻：宏观政策效果显现 核心指标展现向好", time: "05:15", tag: "宏观经济", summary: "最新高频数据显示实体经济内生动能稳步修复，外资机构相继上调中国权益资产配置预期。", impact: "极大提振市场风险偏好，离岸人民币走强。", asset: "沪深300, 恒生科技" }}
+            ]
+        }};
+    </script>
+    <!-- NEWS_DATA_END -->
+
+    <script>
+        let currentTab = 'global';
+
+        function renderNews(tab = 'global', filterKeyword = '') {{
+            const container = document.getElementById('newsContainer');
+            container.innerHTML = '';
+            let list = newsData[tab] || [];
+
+            if (filterKeyword) {{
+                list = list.filter(item => item.title.includes(filterKeyword) || item.summary.includes(filterKeyword) || item.tag.includes(filterKeyword));
+            }}
+
+            if (list.length === 0) {{
+                container.innerHTML = `<div class="text-center py-12 text-gray-500 text-xs">没有找到符合关键词的新闻</div>`;
+                return;
+            }}
+
+            list.forEach((item) => {{
+                const card = document.createElement('div');
+                card.className = "bg-bbCard border border-bbBorder rounded-lg p-4 space-y-2.5 hover:border-bbGold/50 transition duration-150 shadow-sm";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center text-xs">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-black text-bbGold tracking-wider">${{item.id}}</span>
+                            <span class="bg-gray-800 text-gray-300 px-2 py-0.5 rounded text-[10px] font-medium border border-gray-700">${{item.tag}}</span>
+                        </div>
+                        <span class="text-bbTextMuted font-mono text-[11px]"><i class="fa-regular fa-clock"></i> ${{item.time}}</span>
+                    </div>
+                    <h3 class="text-sm font-bold leading-snug text-gray-100">${{item.title}}</h3>
+                    <p class="text-xs text-gray-300 leading-relaxed">${{item.summary}}</p>
+                    <div class="pt-2.5 border-t border-bbBorder/60 space-y-1.5 text-xs bg-black/20 p-2.5 rounded">
+                        <div class="text-gray-300"><span class="text-bbGold font-bold">📌 市场传导影响：</span> ${{item.impact}}</div>
+                        <div class="text-gray-300"><span class="text-blue-400 font-bold">💡 关联资产标的：</span> <span class="font-mono text-gray-200">${{item.asset}}</span></div>
+                    </div>
+                    <div class="pt-0.5 flex justify-between items-center text-[10px] text-bbTextMuted">
+                        <span>彭博财经 · 每日精编</span><span>来源: Bloomberg/公开数据</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            }});
+        }}
+
+        function switchTab(tab) {{
+            currentTab = tab;
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => btn.className = "py-2 text-xs font-bold tracking-wider text-gray-400 transition");
+            document.getElementById(`tab-${tab}`).className = "py-2 text-xs font-bold tracking-wider tab-active transition";
+            document.getElementById('searchInput').value = '';
+            renderNews(tab);
+        }}
+
+        function filterNews() {{
+            renderNews(currentTab, document.getElementById('searchInput').value.trim());
+        }}
+
+        function toggleTheme() {{
+            const body = document.getElementById('mainBody');
+            const icon = document.getElementById('themeIcon');
+            if (body.classList.contains('dark')) {{
+                body.classList.remove('dark');
+                icon.className = "fa-solid fa-sun text-yellow-500";
+            }} else {{
+                body.classList.add('dark');
+                icon.className = "fa-solid fa-moon";
+            }}
+        }}
+
+        // ==================== 海报生成引擎（像素级防重叠锁定） ====================
+        async function generateSixPosters() {{
+            const renderArea = document.getElementById('posterRenderArea');
+            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成标准高清海报套图...</div>';
+            document.getElementById('posterModal').classList.remove('hidden');
+
+            const allNews = [
+                ...newsData.global.map(i => ({{ ...i, section: '彭博全球 Top 10' }})),
+                ...newsData.asia.map(i => ({{ ...i, section: '亚太焦点 Top 5' }})),
+                ...newsData.china.map(i => ({{ ...i, section: '国内核心 Top 5' }}))
+            ];
+
+            const chunkSize = 4;
+            const chunks = [];
+            for (let i = 0; i < allNews.length; i += chunkSize) {{
+                chunks.push(allNews.slice(i, i + chunkSize));
+            }}
+
+            renderArea.innerHTML = '';
+
+            for (let idx = 0; idx < chunks.length; idx++) {{
+                const group = chunks[idx];
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:720px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:sans-serif;";
+
+                let itemsHtml = group.map(item => `
+                    <div style="height:128px;border-bottom:1px solid #30363D;padding:4px 0;box-sizing:border-box;overflow:hidden;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:16px;height:16px;margin-bottom:2px;display:flex;justify-content:space-between;">
+                            <span>${{item.id}} · ${{item.tag}}</span><span style="color:#6B7280;font-size:9px;">${{item.section}}</span>
+                        </div>
+                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;line-height:18px;height:18px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${{item.title}}</div>
+                        <div style="font-size:10px;color:#9CA3AF;line-height:16px;height:32px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${{item.summary}}</div>
+                    </div>
+                `).join('');
+
+                wrapper.innerHTML = `
+                    <div style="height:42px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;">
+                        <div>
+                            <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
+                            <div style="font-size:13px;font-weight:bold;color:#FFF;margin-top:2px;line-height:14px;">每日财经看板</div>
+                        </div>
+                        <div style="font-size:9px;color:#8B949E;text-align:right;">全景套卡 (${{idx + 1}}/6)</div>
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;margin:4px 0;">${{itemsHtml}}</div>
+                    <div style="height:46px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:4px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:14px;">长按识别二维码</div>
+                            <div style="font-size:8px;color:#9CA3AF;line-height:12px;">在线查看完整 20 条解读与标的</div>
+                        </div>
+                        <div id="qr-eq-${{idx}}" style="background:#FFF;padding:2px;border-radius:2px;"></div>
+                    </div>
+                `;
+
+                document.body.appendChild(wrapper);
+                new QRCode(wrapper.querySelector(`#qr-eq-${{idx}}`), {{ text: window.location.href, width: 34, height: 34 }});
+                await new Promise(r => setTimeout(r, 150));
+                const canvas = await html2canvas(wrapper, {{ scale: 2, backgroundColor: '#0D1117' }});
+                const img = document.createElement('img');
+                img.src = canvas.toDataURL('image/png');
+                img.style.cssText = "width:100%;border-radius:8px;border:1px solid #30363D;";
+                renderArea.appendChild(img);
+                document.body.removeChild(wrapper);
+            }}
+
+            // 第 6 张星际背景末页
+            const lastWrapper = document.createElement('div');
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:720px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:24px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
+            
+            lastWrapper.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);">
+                    <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;padding:2px 5px;border-radius:2px;">BLOOMBERG</div>
+                    <div style="font-size:9px;color:#E5E7EB;letter-spacing:1px;font-weight:bold;">END PAGE · (6/6)</div>
+                </div>
+                <div style="text-align:center;background:rgba(0,0,0,0.25);backdrop-filter:blur(2px);padding:25px 10px;border-radius:12px;">
+                    <div style="font-family:Georgia, serif;font-size:38px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 0 12px rgba(255,255,255,0.9), 0 0 25px rgba(240,185,11,0.7);letter-spacing:1px;line-height:1.2;">God bless you</div>
+                    <div style="margin-top:10px;font-size:10px;color:#F0B90B;font-weight:600;letter-spacing:2px;text-shadow:0 1px 3px rgba(0,0,0,0.8);">✦ 愿智慧与财富同在 ✦</div>
+                </div>
+                <div style="text-align:center;font-size:9px;color:#E5E7EB;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:6px;border-radius:6px;letter-spacing:1px;">2026 FINANCIAL NEWS TERMINAL · ALL RIGHTS RESERVED</div>
+            `;
+
+            document.body.appendChild(lastWrapper);
+            await new Promise(r => setTimeout(r, 200));
+            const lastCanvas = await html2canvas(lastWrapper, {{ scale: 2, useCORS: true }});
+            const lastImg = document.createElement('img');
+            lastImg.src = lastCanvas.toDataURL('image/png');
+            lastImg.style.cssText = "width:100%;border-radius:8px;border:1px solid #30363D;";
+            renderArea.appendChild(lastImg);
+            document.body.removeChild(lastWrapper);
+        }}
+
+        function copyWechatText() {{
+            const list = newsData[currentTab] || [];
+            const tabName = currentTab === 'global' ? '彭博全球 Top 10' : (currentTab === 'asia' ? '亚太焦点 Top 5' : '国内核心 Top 5');
+            let txt = `▍ BLOOMBERG 彭博财经终端 · ${{tabName}}\n--------------------------------\n\n`;
+            list.forEach(item => {{
+                txt += `◆ ${{item.id}} | ${{item.title}}\n▸ 简讯：${{item.summary}}\n▸ 影响：${{item.impact}}\n\n`;
+            }});
+            txt += `--- \n数据来源：Bloomberg 及公开数据综合编译`;
+            navigator.clipboard.writeText(txt).then(() => alert('✅ 彭博终端风格文案已成功复制！'));
+        }}
+
+        function closeModal(id) {{ document.getElementById(id).classList.add('hidden'); }}
+
+        renderNews('global');
+    </script>
+</body>
+</html>
+'''
 
           with open("index.html", "w", encoding="utf-8") as f:
-              f.write(new_html)
+              f.write(html_template)
 
-          print("成功写入当日最新财经资讯！")
+          print("成功完整重写 index.html！")
           EOF
 
       - name: Push to GitHub Pages
@@ -82,4 +344,4 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update daily news and layout [skip ci]" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Completely rewrite index.html with fresh daily content [skip ci]" && git push)
