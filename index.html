@@ -217,40 +217,40 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 彻底重新计算排版尺寸：固定卡片高度，给每条新闻 125px 的独立高度，并采用绝对安全的行距和内边距
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:667px;background-color:#0D1117;color:#FFF;padding:14px 16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;";
+                // 扩充容器高度至 720px，严格采用绝对像素定位与防重叠隔离
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:720px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;";
 
                 let itemsHtml = group.map(item => `
-                    <div style="height:124px;border-bottom:1px solid #30363D;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;padding:3px 0;">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;display:flex;justify-content:space-between;margin-bottom:3px;">
+                    <div style="height:130px;border-bottom:1px solid #30363D;padding:6px 0;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;display:flex;justify-content:space-between;line-height:14px;height:14px;margin-bottom:4px;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;">${item.section}</span>
                         </div>
-                        <div style="font-size:12px;font-weight:bold;color:#FFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;line-height:1.4;">${item.title}</div>
-                        <div style="font-size:10px;color:#9CA3AF;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:30px;">${item.summary}</div>
+                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:16px;height:16px;margin-bottom:6px;">${item.title}</div>
+                        <div style="font-size:10px;color:#9CA3AF;line-height:15px;height:30px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${item.summary}</div>
                     </div>
                 `).join('');
 
                 wrapper.innerHTML = `
-                    <div style="height:40px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:3px;">
+                    <div style="height:40px;border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;">
                         <div>
                             <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
-                            <div style="font-size:13px;font-weight:bold;color:#FFF;margin-top:2px;line-height:1.2;">每日财经看板</div>
+                            <div style="font-size:13px;font-weight:bold;color:#FFF;margin-top:2px;line-height:14px;">每日财经看板</div>
                         </div>
                         <div style="font-size:9px;color:#8B949E;text-align:right;">全景套卡 (${idx + 1}/6)</div>
                     </div>
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-evenly;margin:2px 0;">${itemsHtml}</div>
-                    <div style="height:48px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:4px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
+                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;margin:6px 0;">${itemsHtml}</div>
+                    <div style="height:46px;background:rgba(255,255,255,0.03);border:1px solid #30363D;padding:4px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
                         <div>
-                            <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:1.2;">长按识别二维码</div>
-                            <div style="font-size:8px;color:#9CA3AF;line-height:1.2;">在线查看完整 20 条解读与标的</div>
+                            <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:14px;">长按识别二维码</div>
+                            <div style="font-size:8px;color:#9CA3AF;line-height:12px;">在线查看完整 20 条解读与标的</div>
                         </div>
                         <div id="qr-eq-${idx}" style="background:#FFF;padding:2px;border-radius:2px;"></div>
                     </div>
                 `;
 
                 document.body.appendChild(wrapper);
-                new QRCode(wrapper.querySelector(`#qr-eq-${idx}`), { text: window.location.href, width: 36, height: 36 });
-                await new Promise(r => setTimeout(r, 120));
+                new QRCode(wrapper.querySelector(`#qr-eq-${idx}`), { text: window.location.href, width: 34, height: 34 });
+                await new Promise(r => setTimeout(r, 150));
                 const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0D1117' });
                 const img = document.createElement('img');
                 img.src = canvas.toDataURL('image/png');
@@ -259,9 +259,9 @@
                 document.body.removeChild(wrapper);
             }
 
-            // 第 6 张末页（完美加载本地 bg.jpg 原图）
+            // 第 6 张末页
             const lastWrapper = document.createElement('div');
-            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:667px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:24px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);`;
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:720px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:24px 20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;`;
             
             lastWrapper.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);">
@@ -269,7 +269,7 @@
                     <div style="font-size:9px;color:#E5E7EB;letter-spacing:1px;font-weight:bold;">END PAGE · (6/6)</div>
                 </div>
                 <div style="text-align:center;background:rgba(0,0,0,0.25);backdrop-filter:blur(2px);padding:25px 10px;border-radius:12px;">
-                    <div style="font-family:'Playfair Display', Georgia, 'Times New Roman', serif;font-size:40px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 0 12px rgba(255,255,255,0.9), 0 0 25px rgba(240,185,11,0.7);letter-spacing:1px;line-height:1.2;">God bless you</div>
+                    <div style="font-family:'Playfair Display', Georgia, 'Times New Roman', serif;font-size:38px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 0 12px rgba(255,255,255,0.9), 0 0 25px rgba(240,185,11,0.7);letter-spacing:1px;line-height:1.2;">God bless you</div>
                     <div style="margin-top:10px;font-size:10px;color:#F0B90B;font-weight:600;letter-spacing:2px;text-shadow:0 1px 3px rgba(0,0,0,0.8);">✦ 愿智慧与财富同在 ✦</div>
                 </div>
                 <div style="text-align:center;font-size:9px;color:#E5E7EB;background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);padding:6px;border-radius:6px;letter-spacing:1px;">2026 FINANCIAL NEWS TERMINAL · ALL RIGHTS RESERVED</div>
