@@ -192,7 +192,7 @@
             }
         }
 
-        // ==================== 黄金 3:4 比例朋友圈海报引擎 ====================
+        // ==================== 黄金 3:4 比例朋友圈海报引擎（精致紧凑上提版） ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
             renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成 3:4 高清朋友圈海报套图...</div>';
@@ -215,12 +215,12 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 💥 重点：尺寸设定为 375px x 500px，完美的 3:4 微信朋友圈图像比例！
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:500px;background-color:#0D1117;color:#FFF;padding:14px 16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;";
+                // 375px x 500px，顶部 Padding 控制为 12px，留白适中
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:500px;background-color:#0D1117;color:#FFF;padding:12px 16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;";
 
-                // 紧凑、工整的 4 条内容精编
+                // 4 条新闻紧凑排列，消除大空隙
                 let itemsHtml = group.map((item, index) => `
-                    <div style="padding:${index === 0 ? '0 0 6px 0' : '6px 0'}; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
+                    <div style="padding:5px 0; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
                         <div style="font-size:9.5px;color:#F0B90B;font-weight:700;line-height:13px;margin-bottom:2px;display:flex;justify-content:space-between;align-items:center;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:8.5px;font-weight:normal;">${item.section}</span>
                         </div>
@@ -234,8 +234,8 @@
                 `).join('');
 
                 wrapper.innerHTML = `
-                    <!-- 顶栏 Header -->
-                    <div style="border-bottom:1.5px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;margin-bottom:4px;">
+                    <!-- 顶栏 Header（贴合上方） -->
+                    <div style="border-bottom:1.5px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4px;margin-bottom:2px;">
                         <div>
                             <div style="background:#F0B90B;color:#000;font-size:7.5px;font-weight:900;display:inline-block;padding:1px 3px;border-radius:2px;">BLOOMBERG</div>
                             <div style="font-size:12px;font-weight:800;color:#FFF;margin-top:1px;line-height:12px;">每日财经看板</div>
@@ -243,11 +243,11 @@
                         <div style="font-size:8.5px;color:#6B7280;text-align:right;font-weight:600;">全景套卡 (${idx + 1}/6)</div>
                     </div>
 
-                    <!-- 4 条新闻主体区（精细贴合） -->
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;">${itemsHtml}</div>
+                    <!-- 4 条新闻主体区（已向上提，间距更自然紧凑） -->
+                    <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;padding-top:2px;">${itemsHtml}</div>
 
                     <!-- 底部二维码 Footer -->
-                    <div style="background:#161B22;border:1px solid #30363D;padding:4px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+                    <div style="background:#161B22;border:1px solid #30363D;padding:4px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;margin-top:2px;">
                         <div>
                             <div style="font-size:9.5px;color:#F0B90B;font-weight:700;line-height:13px;">长按识别二维码</div>
                             <div style="font-size:8px;color:#8B949E;line-height:11px;">扫码手机查看完整 20 条解读</div>
