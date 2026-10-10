@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: setup-python@v4
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
@@ -29,12 +29,10 @@ jobs:
           import urllib.request
           import xml.etree.ElementTree as ET
 
-          # 获取当前精确日期，用于动态生成每日新鲜资讯
           today = datetime.datetime.now()
           date_prefix = today.strftime("%m月%d日")
           now_str = today.strftime("%Y-%m-%d %H:%M (CST)")
 
-          # 尝试抓取全球 RSS
           rss_urls = [
               "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
               "https://feeds.bloomberg.com/markets/news.rss"
@@ -53,7 +51,6 @@ jobs:
               except Exception as e:
                   print("RSS fetch note:", e)
 
-          # 如果抓取到了外部新闻，组合使用；如果没抓到，利用日期结合动态池生成全新每日快讯
           base_global_pool = [
               ("美联储利率路径预期调整 全球资本市场波动率抬升", "宏观重磅", "最新宏观经济指标显示核心通胀黏性超预期，衍生品市场对美联储下一步流动性操作的分歧进一步加大。"),
               ("欧央行暗示维持现行利率 欧洲核心板块承压", "欧洲市场", "受工业产出数据持续疲软影响，欧洲主要经济体近期资本开支放缓，防御性高股息资产受资金青睐。"),
@@ -70,7 +67,6 @@ jobs:
           global_news = []
           for i in range(10):
               item_id = f"NO.{10-i:02d}"
-              # 动态组合标题，加入日期前缀确保每天内容绝对不同！
               if i < len(fetched_titles):
                   title = f"{date_prefix}快讯：{fetched_titles[i][:32]}"
                   summary = "依托全球实时金融终端捕捉到的市场异动，该事件对相关多空资产的传导路径正在迅速定价。"
@@ -109,10 +105,8 @@ jobs:
           with open("index.html", "r", encoding="utf-8") as f:
               html_content = f.read()
 
-          # 更新时间戳
           html_content = re.sub(r'更新时间: .*? \(CST\)', f'更新时间: {now_str}', html_content)
 
-          # 动态注入新新闻数据
           js_data_str = f"const newsData = {json.dumps(latest_news, ensure_ascii=False, indent=12)};"
           pattern = r'<!-- NEWS_DATA_START -->[\s\S]*?<!-- NEWS_DATA_END -->'
           replacement = f'<!-- NEWS_DATA_START -->\n    <script>\n        {js_data_str}\n    </script>\n    <!-- NEWS_DATA_END -->'
