@@ -84,11 +84,11 @@
     <div id="posterModal" class="fixed inset-0 bg-black/85 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-bbCard border border-bbBorder rounded-xl max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="p-3 border-b border-bbBorder flex justify-between items-center">
-                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 每页 4 条 · 自适应超清完美套图</span>
+                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 每页 4 条 · 尺寸完全一致的高清套图</span>
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-950" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：高度智能自适应，4条新闻字字清晰、永不切字！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：所有卡片高度自动对齐，发朋友圈大小完全一致！</div>
         </div>
     </div>
 
@@ -192,10 +192,10 @@
             }
         }
 
-        // ==================== ✨ 高度自适应、每页固定 4 条完美不切字引擎 ====================
+        // ==================== ✨ 高度自适应且末页动态对齐引擎 ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
-            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成自适应高清海报套图...</div>';
+            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成尺寸一致的高清海报套图...</div>';
             document.getElementById('posterModal').classList.remove('hidden');
 
             const allNews = [
@@ -211,14 +211,13 @@
             }
 
             renderArea.innerHTML = '';
+            let targetHeight = 0; // 用于动态记录新闻卡片的实际像素高度
 
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 💥 核心改进：取消固定 height，改用 height:auto 自动根据内容高度完美撑开，拒绝任何截断！
                 wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:auto;background-color:#0D1117;color:#FFF;padding:16px 18px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;";
 
-                // 4 条新闻采用标准美观的字号与舒适行高
                 let itemsHtml = group.map((item, index) => `
                     <div style="padding:8px 0; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
                         <div style="font-size:10px;color:#F0B90B;font-weight:700;line-height:14px;margin-bottom:2px;display:flex;justify-content:space-between;align-items:center;">
@@ -234,7 +233,6 @@
                 `).join('');
 
                 wrapper.innerHTML = `
-                    <!-- 顶栏 Header -->
                     <div style="border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;margin-bottom:8px;">
                         <div>
                             <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
@@ -242,11 +240,7 @@
                         </div>
                         <div style="font-size:9px;color:#6B7280;text-align:right;font-weight:600;">全景套卡 (${idx + 1}/${chunks.length + 1})</div>
                     </div>
-
-                    <!-- 4 条新闻主体区（完全自适应高度展开） -->
                     <div style="display:flex;flex-direction:column;">${itemsHtml}</div>
-
-                    <!-- 底部二维码 Footer -->
                     <div style="background:#161B22;border:1px solid #30363D;padding:6px 12px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;margin-top:12px;">
                         <div>
                             <div style="font-size:10px;color:#F0B90B;font-weight:700;line-height:14px;">长按识别二维码</div>
@@ -262,7 +256,13 @@
                 const cleanUrl = encodeURIComponent(window.location.origin + window.location.pathname);
                 qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:26px;height:26px;display:block;" crossorigin="anonymous" />`;
 
-                await new Promise(r => setTimeout(r, 700));
+                await new Promise(r => setTimeout(r, 600));
+                
+                // 记录第一张新闻卡片的实际渲染高度，让末页严格跟它保持一致像素
+                if (idx === 0) {
+                    targetHeight = wrapper.offsetHeight;
+                }
+
                 const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0D1117', useCORS: true });
                 const img = document.createElement('img');
                 img.src = canvas.toDataURL('image/png');
@@ -271,9 +271,9 @@
                 document.body.removeChild(wrapper);
             }
 
-            // 最后一张：星际背景末页
+            // 最后一张：星际背景末页（💥 严格锁定与前面新闻卡片完全相同的像素高度 targetHeight）
             const lastWrapper = document.createElement('div');
-            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:520px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:${targetHeight}px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
             
             lastWrapper.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
