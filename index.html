@@ -192,7 +192,7 @@
             }
         }
 
-        // ==================== 海报生成引擎（彻底解锁标题行高，绝不切字） ====================
+        // ==================== 海报生成引擎（已加宽标题行高与安全 Padding，彻底解决粗体字被切边） ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
             renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成标准高清海报套图...</div>';
@@ -217,14 +217,18 @@
                 const wrapper = document.createElement('div');
                 wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:760px;background-color:#0D1117;color:#FFF;padding:16px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:sans-serif;";
 
-                // 核心重构：给标题行（title）设置 line-height: 20px（充裕的垂直空间），去掉任何 height 限制
+                // 核心修复：放宽标题容器 padding 进和 line-height 到 22px，给加粗字体提供绝对充足的上下呼吸空间，绝不切字
                 let itemsHtml = group.map(item => `
-                    <div style="border-bottom:1px solid #30363D;padding-top:6px;padding-bottom:12px;box-sizing:border-box;margin-bottom:2px;">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:16px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="border-bottom:1px solid #30363D;padding:8px 0 12px 0;box-sizing:border-box;margin-bottom:2px;display:flex;flex-direction:column;justify-content:flex-start;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:14px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
                             <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;">${item.section}</span>
                         </div>
-                        <div style="font-size:11.5px;font-weight:bold;color:#FFFFFF;line-height:20px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.title}</div>
-                        <div style="font-size:9.5px;color:#9CA3AF;line-height:15px;word-break:break-all;">${item.summary}</div>
+                        <div style="font-size:11px;font-weight:bold;color:#FFFFFF;line-height:22px;padding:2px 0;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            ${item.title}
+                        </div>
+                        <div style="font-size:9.5px;color:#9CA3AF;line-height:15px;word-break:break-all;">
+                            ${item.summary}
+                        </div>
                     </div>
                 `).join('');
 
