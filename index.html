@@ -39,7 +39,7 @@
         <div class="flex items-center space-x-2">
             <button onclick="toggleTheme()" class="text-gray-400 hover:text-bbGold text-sm p-1.5"><i class="fa-solid fa-moon" id="themeIcon"></i></button>
             <button onclick="generateSixPosters()" class="bg-bbGold text-black text-xs font-bold px-3 py-1.5 rounded-full hover:bg-yellow-400 transition flex items-center gap-1 shadow-lg shadow-yellow-500/10">
-                <i class="fa-solid fa-images"></i> 生成朋友圈 3:4 海报
+                <i class="fa-solid fa-images"></i> 生成朋友圈高清海报
             </button>
             <button onclick="copyWechatText()" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-blue-500 transition flex items-center gap-1">
                 <i class="fa-solid fa-terminal"></i> 复制终端文案
@@ -84,11 +84,11 @@
     <div id="posterModal" class="fixed inset-0 bg-black/85 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-bbCard border border-bbBorder rounded-xl max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="p-3 border-b border-bbBorder flex justify-between items-center">
-                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 每页 4 条 · 3:4 黄金比例朋友圈海报</span>
+                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 每页 4 条 · 自适应超清完美套图</span>
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-950" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：标准 3:4 比例，每页 4 条清晰呈现！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：高度智能自适应，4条新闻字字清晰、永不切字！</div>
         </div>
     </div>
 
@@ -192,10 +192,10 @@
             }
         }
 
-        // ==================== ✨ 每页 4 条 + 严格 3:4 不切字排版引擎 ====================
+        // ==================== ✨ 高度自适应、每页固定 4 条完美不切字引擎 ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
-            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成 3:4 高清朋友圈海报套图...</div>';
+            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成自适应高清海报套图...</div>';
             document.getElementById('posterModal').classList.remove('hidden');
 
             const allNews = [
@@ -215,19 +215,19 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 严格锁定 375px × 500px（3:4 比例），上下内边距压缩为 10px，完美腾出空间装下 4 条
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:500px;background-color:#0D1117;color:#FFF;padding:10px 14px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;";
+                // 💥 核心改进：取消固定 height，改用 height:auto 自动根据内容高度完美撑开，拒绝任何截断！
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:auto;background-color:#0D1117;color:#FFF;padding:16px 18px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;";
 
-                // 4 条新闻在 500px 高度内的精准字号与安全边距
+                // 4 条新闻采用标准美观的字号与舒适行高
                 let itemsHtml = group.map((item, index) => `
-                    <div style="padding:2px 0; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
-                        <div style="font-size:8.5px;color:#F0B90B;font-weight:700;line-height:11px;margin-bottom:1px;display:flex;justify-content:space-between;align-items:center;">
-                            <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:7.5px;font-weight:normal;">${item.section}</span>
+                    <div style="padding:8px 0; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
+                        <div style="font-size:10px;color:#F0B90B;font-weight:700;line-height:14px;margin-bottom:2px;display:flex;justify-content:space-between;align-items:center;">
+                            <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;font-weight:normal;">${item.section}</span>
                         </div>
-                        <div style="font-size:10.5px;font-weight:700;color:#F3F4F6;line-height:15px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        <div style="font-size:12px;font-weight:700;color:#F3F4F6;line-height:18px;margin-bottom:3px;word-break:break-all;">
                             ${item.title}
                         </div>
-                        <div style="font-size:8.5px;color:#9CA3AF;line-height:12px;height:24px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;">
+                        <div style="font-size:9.5px;color:#9CA3AF;line-height:15px;word-break:break-all;">
                             ${item.summary}
                         </div>
                     </div>
@@ -235,24 +235,24 @@
 
                 wrapper.innerHTML = `
                     <!-- 顶栏 Header -->
-                    <div style="border-bottom:1.5px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:2px;margin-bottom:1px;">
+                    <div style="border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;margin-bottom:8px;">
                         <div>
-                            <div style="background:#F0B90B;color:#000;font-size:7px;font-weight:900;display:inline-block;padding:1px 3px;border-radius:2px;">BLOOMBERG</div>
-                            <div style="font-size:11px;font-weight:800;color:#FFF;margin-top:1px;line-height:10px;">每日财经看板</div>
+                            <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
+                            <div style="font-size:13px;font-weight:800;color:#FFF;margin-top:2px;line-height:12px;">每日财经看板</div>
                         </div>
-                        <div style="font-size:7.5px;color:#6B7280;text-align:right;font-weight:600;">全景套卡 (${idx + 1}/${chunks.length + 1})</div>
+                        <div style="font-size:9px;color:#6B7280;text-align:right;font-weight:600;">全景套卡 (${idx + 1}/${chunks.length + 1})</div>
                     </div>
 
-                    <!-- 4 条新闻主体区（完美容纳，间距均匀，字字完整不切字） -->
-                    <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;">${itemsHtml}</div>
+                    <!-- 4 条新闻主体区（完全自适应高度展开） -->
+                    <div style="display:flex;flex-direction:column;">${itemsHtml}</div>
 
                     <!-- 底部二维码 Footer -->
-                    <div style="background:#161B22;border:1px solid #30363D;padding:2px 8px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;margin-top:1px;">
+                    <div style="background:#161B22;border:1px solid #30363D;padding:6px 12px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;margin-top:12px;">
                         <div>
-                            <div style="font-size:8.5px;color:#F0B90B;font-weight:700;line-height:11px;">长按识别二维码</div>
-                            <div style="font-size:7px;color:#8B949E;line-height:9px;">扫码手机查看完整 20 条解读</div>
+                            <div style="font-size:10px;color:#F0B90B;font-weight:700;line-height:14px;">长按识别二维码</div>
+                            <div style="font-size:8.5px;color:#8B949E;line-height:12px;">扫码手机查看完整 20 条解读</div>
                         </div>
-                        <div id="qr-eq-${idx}" style="background:#FFF;padding:1px;border-radius:2px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;"></div>
+                        <div id="qr-eq-${idx}" style="background:#FFF;padding:2px;border-radius:3px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;"></div>
                     </div>
                 `;
 
@@ -260,33 +260,33 @@
 
                 const qrContainer = wrapper.querySelector(`#qr-eq-${idx}`);
                 const cleanUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-                qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:20px;height:20px;display:block;" crossorigin="anonymous" />`;
+                qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:26px;height:26px;display:block;" crossorigin="anonymous" />`;
 
                 await new Promise(r => setTimeout(r, 700));
                 const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0D1117', useCORS: true });
                 const img = document.createElement('img');
                 img.src = canvas.toDataURL('image/png');
-                img.style.cssText = "width:100%;border-radius:8px;border:1px solid #30363D;box-shadow:0 8px 20px rgba(0,0,0,0.4);";
+                img.style.cssText = "width:100%;border-radius:8px;border:1px solid #30363D;box-shadow:0 8px 20px rgba(0,0,0,0.4); margin-bottom: 12px;";
                 renderArea.appendChild(img);
                 document.body.removeChild(wrapper);
             }
 
-            // 最后一张：星际背景末页（严格 375px × 500px 比例）
+            // 最后一张：星际背景末页
             const lastWrapper = document.createElement('div');
-            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:500px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:14px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:520px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
             
             lastWrapper.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-                    <div style="background:#F0B90B;color:#000;font-size:7.5px;font-weight:900;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
-                    <div style="font-size:8px;color:#E5E7EB;letter-spacing:1px;font-weight:bold;">END PAGE · (${chunks.length + 1}/${chunks.length + 1})</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
+                    <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
+                    <div style="font-size:8.5px;color:#E5E7EB;letter-spacing:1px;font-weight:bold;">END PAGE · (${chunks.length + 1}/${chunks.length + 1})</div>
                 </div>
                 
                 <div style="text-align:center;padding:10px 0;">
-                    <div style="font-family:Georgia, serif;font-size:28px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 2px 10px rgba(0,0,0,0.9), 0 0 20px rgba(240,185,11,0.8);letter-spacing:0px;line-height:32px;white-space:nowrap;">God bless you</div>
-                    <div style="margin-top:6px;font-size:10px;color:#F0B90B;font-weight:600;letter-spacing:2px;text-shadow:0 2px 6px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.8);">✦ 愿智慧与财富同在 ✦</div>
+                    <div style="font-family:Georgia, serif;font-size:30px;font-style:italic;font-weight:700;color:#FFFFFF;text-shadow:0 2px 10px rgba(0,0,0,0.9), 0 0 20px rgba(240,185,11,0.8);letter-spacing:0px;line-height:34px;white-space:nowrap;">God bless you</div>
+                    <div style="margin-top:8px;font-size:10.5px;color:#F0B90B;font-weight:600;letter-spacing:2px;text-shadow:0 2px 6px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.8);">✦ 愿智慧与财富同在 ✦</div>
                 </div>
                 
-                <div style="text-align:center;font-size:8px;color:#E5E7EB;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:5px;border-radius:6px;letter-spacing:1px;border:1px solid rgba(255,255,255,0.15);">2026 FINANCIAL NEWS TERMINAL · ALL RIGHTS RESERVED</div>
+                <div style="text-align:center;font-size:8.5px;color:#E5E7EB;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:6px;border-radius:6px;letter-spacing:1px;border:1px solid rgba(255,255,255,0.15);">2026 FINANCIAL NEWS TERMINAL · ALL RIGHTS RESERVED</div>
             `;
 
             document.body.appendChild(lastWrapper);
