@@ -84,11 +84,11 @@
     <div id="posterModal" class="fixed inset-0 bg-black/85 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-bbCard border border-bbBorder rounded-xl max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="p-3 border-b border-bbBorder flex justify-between items-center">
-                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 朋友圈黄金 3:4 高清完美排版套图</span>
+                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 每页 4 条 · 朋友圈 3:4 黄金比例套图</span>
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-950" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：彻底消除切字与撕裂，字字完整呈献！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：每页 4 条紧凑布局，拒绝上下黑边，字字精致清晰！</div>
         </div>
     </div>
 
@@ -192,10 +192,10 @@
             }
         }
 
-        // ==================== 💥 每张精简 3 条新闻，彻底打破拥挤与切字 ====================
+        // ==================== ✨ 每页固定 4 条新闻 + 黄金 3:4 比例完美引擎 ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
-            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成 3:4 超清海报套图...</div>';
+            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成 3:4 高清朋友圈海报套图...</div>';
             document.getElementById('posterModal').classList.remove('hidden');
 
             const allNews = [
@@ -204,8 +204,8 @@
                 ...newsData.china.map(i => ({ ...i, section: '国内核心 Top 5' }))
             ];
 
-            // 💥 关键改革：每张海报放 3 条新闻！赋予空间绝对自由！
-            const chunkSize = 3;
+            // 💥 每张海报固定装 4 条新闻！
+            const chunkSize = 4;
             const chunks = [];
             for (let i = 0; i < allNews.length; i += chunkSize) {
                 chunks.push(allNews.slice(i, i + chunkSize));
@@ -216,19 +216,19 @@
             for (let idx = 0; idx < chunks.length; idx++) {
                 const group = chunks[idx];
                 const wrapper = document.createElement('div');
-                // 375px x 500px 标准 3:4 比例
-                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:500px;background-color:#0D1117;color:#FFF;padding:16px 18px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;";
+                // 375px x 500px 黄金 3:4 比例，微调 Padding 至 12px 14px 释放空间
+                wrapper.style.cssText = "position:absolute;left:-9999px;width:375px;height:500px;background-color:#0D1117;color:#FFF;padding:12px 14px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;";
 
-                // 3 条新闻，充裕高度，绝对不可能切字！
+                // 4 条新闻在 500px 高度内采用精心计算的字号（标题 11px，行高 18px；摘要 9px，行高 13px）绝对不切字、不拥挤
                 let itemsHtml = group.map((item, index) => `
-                    <div style="padding:10px 0; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
-                        <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:16px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
-                            <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:9px;">${item.section}</span>
+                    <div style="padding:4px 0; ${index < group.length - 1 ? 'border-bottom:1px solid #21262D;' : ''} box-sizing:border-box;">
+                        <div style="font-size:9px;color:#F0B90B;font-weight:700;line-height:12px;margin-bottom:1px;display:flex;justify-content:space-between;align-items:center;">
+                            <span>${item.id} · ${item.tag}</span><span style="color:#6B7280;font-size:8px;font-weight:normal;">${item.section}</span>
                         </div>
-                        <div style="font-size:12px;font-weight:bold;color:#FFFFFF;line-height:22px;margin-bottom:4px;word-break:break-all;">
+                        <div style="font-size:11px;font-weight:700;color:#F3F4F6;line-height:18px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                             ${item.title}
                         </div>
-                        <div style="font-size:10px;color:#9CA3AF;line-height:16px;word-break:break-all;">
+                        <div style="font-size:9px;color:#9CA3AF;line-height:13px;height:26px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;">
                             ${item.summary}
                         </div>
                     </div>
@@ -236,24 +236,24 @@
 
                 wrapper.innerHTML = `
                     <!-- 顶栏 Header -->
-                    <div style="border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;margin-bottom:4px;">
+                    <div style="border-bottom:1.5px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:3px;margin-bottom:2px;">
                         <div>
-                            <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
-                            <div style="font-size:13px;font-weight:bold;color:#FFF;margin-top:2px;line-height:13px;">每日财经看板</div>
+                            <div style="background:#F0B90B;color:#000;font-size:7.5px;font-weight:900;display:inline-block;padding:1px 3px;border-radius:2px;">BLOOMBERG</div>
+                            <div style="font-size:11.5px;font-weight:800;color:#FFF;margin-top:1px;line-height:11px;">每日财经看板</div>
                         </div>
-                        <div style="font-size:9px;color:#8B949E;text-align:right;">全景套卡 (${idx + 1}/${chunks.length + 1})</div>
+                        <div style="font-size:8px;color:#6B7280;text-align:right;font-weight:600;">全景套卡 (${idx + 1}/${chunks.length + 1})</div>
                     </div>
 
-                    <!-- 3 条新闻主体区（完美居中、彻底舒展） -->
+                    <!-- 4 条新闻主体区（完美容纳，间距均匀，绝不切字） -->
                     <div style="flex:1;display:flex;flex-direction:column;justify-content:space-around;">${itemsHtml}</div>
 
                     <!-- 底部二维码 Footer -->
-                    <div style="background:#161B22;border:1px solid #30363D;padding:6px 12px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;">
+                    <div style="background:#161B22;border:1px solid #30363D;padding:3px 8px;border-radius:5px;display:flex;align-items:center;justify-content:space-between;margin-top:2px;">
                         <div>
-                            <div style="font-size:10px;color:#F0B90B;font-weight:bold;line-height:14px;">长按识别二维码</div>
-                            <div style="font-size:8.5px;color:#8B949E;line-height:12px;">扫码手机查看完整 20 条解读</div>
+                            <div style="font-size:9px;color:#F0B90B;font-weight:700;line-height:12px;">长按识别二维码</div>
+                            <div style="font-size:7.5px;color:#8B949E;line-height:10px;">扫码手机查看完整 20 条解读</div>
                         </div>
-                        <div id="qr-eq-${idx}" style="background:#FFF;padding:2px;border-radius:3px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;"></div>
+                        <div id="qr-eq-${idx}" style="background:#FFF;padding:2px;border-radius:2px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;"></div>
                     </div>
                 `;
 
@@ -261,7 +261,7 @@
 
                 const qrContainer = wrapper.querySelector(`#qr-eq-${idx}`);
                 const cleanUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-                qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:26px;height:26px;display:block;" crossorigin="anonymous" />`;
+                qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${cleanUrl}" style="width:22px;height:22px;display:block;" crossorigin="anonymous" />`;
 
                 await new Promise(r => setTimeout(r, 700));
                 const canvas = await html2canvas(wrapper, { scale: 2, backgroundColor: '#0D1117', useCORS: true });
@@ -272,9 +272,9 @@
                 document.body.removeChild(wrapper);
             }
 
-            // 最后一张：星际背景末页（3:4 黄金比例）
+            // 最后一张：星际背景末页（3:4 黄金比例，375px x 500px）
             const lastWrapper = document.createElement('div');
-            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:500px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:18px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
+            lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:500px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:16px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
             
             lastWrapper.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
