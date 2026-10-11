@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>彭博财经终端 | 每日全球与国内焦点新闻看板</title>
+    
+    <!-- 💥 桌面快捷方式/PWA 淡金色图标配置 💥 -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='120' fill='%23E6C687'/><text x='50%' y='54%' dominant-baseline='central' text-anchor='middle' font-family='sans-serif' font-weight='900' font-size='300' fill='%230D1117'>彭</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='120' fill='%23E6C687'/><text x='50%' y='54%' dominant-baseline='central' text-anchor='middle' font-family='sans-serif' font-weight='900' font-size='300' fill='%230D1117'>彭</text></svg>">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -34,7 +39,6 @@
     <!-- 顶栏 -->
     <header class="sticky top-0 z-40 bg-bbDark/95 border-b border-bbBorder px-4 py-3 backdrop-blur-md flex justify-between items-center">
         <div class="flex items-center space-x-2">
-            <!-- 网页顶部 Logo：已更新为高雅的淡金色背景 + 深色文字 -->
             <span class="bg-[#E6C687] text-gray-950 text-xs font-black px-2 py-1 rounded tracking-wider shadow-sm">BLOOMBERG</span>
             <span class="text-sm font-bold tracking-wider">财经焦点看板</span>
         </div>
@@ -90,7 +94,7 @@
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-950" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：Logo 已更新为淡金色，卡片高度完美对齐！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：桌面图标与海报已更新为淡金色！</div>
         </div>
     </div>
 
@@ -237,7 +241,6 @@
                 wrapper.innerHTML = `
                     <div style="border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;margin-bottom:8px;">
                         <div>
-                            <!-- 海报内部顶栏 Logo：已更新为高雅的淡金色背景 + 深色文字 -->
                             <div style="background:#E6C687;color:#030712;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
                             <div style="font-size:13px;font-weight:800;color:#FFF;margin-top:2px;line-height:12px;">每日财经看板</div>
                         </div>
