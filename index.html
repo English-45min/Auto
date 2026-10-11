@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>彭博财经终端 | 每日全球与国内焦点新闻看板</title>
     
-    <!-- 💥 桌面快捷方式/PWA 图标：黑底、双行金字 BLOOMBERG NEWS 💥 -->
+    <!-- 💥 桌面快捷方式/Favicon：黑底、双行淡金字 BLOOMBERG NEWS（彻底强刷缓存） 💥 -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='120' fill='%230D1117'/><text x='50%' y='40%' dominant-baseline='central' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-weight='900' font-size='72' fill='%23E6C687' letter-spacing='4'>BLOOMBERG</text><text x='50%' y='68%' dominant-baseline='central' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-weight='900' font-size='96' fill='%23E6C687' letter-spacing='8'>NEWS</text></svg>">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='120' fill='%230D1117'/><text x='50%' y='40%' dominant-baseline='central' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-weight='900' font-size='72' fill='%23E6C687' letter-spacing='4'>BLOOMBERG</text><text x='50%' y='68%' dominant-baseline='central' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-weight='900' font-size='96' fill='%23E6C687' letter-spacing='8'>NEWS</text></svg>">
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='120' fill='%230D1117'/><text x='50%' y='40%' dominant-baseline='central' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-weight='900' font-size='72' fill='%23E6C687' letter-spacing='4'>BLOOMBERG</text><text x='50%' y='68%' dominant-baseline='central' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,sans-serif' font-weight='900' font-size='96' fill='%23E6C687' letter-spacing='8'>NEWS</text></svg>">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -44,8 +45,9 @@
         </div>
         <div class="flex items-center space-x-2">
             <button onclick="toggleTheme()" class="text-gray-400 hover:text-bbGold text-sm p-1.5"><i class="fa-solid fa-moon" id="themeIcon"></i></button>
+            <!-- 💥 按钮已更新为“生成高清海报” 💥 -->
             <button onclick="generateSixPosters()" class="bg-bbGold text-black text-xs font-bold px-3 py-1.5 rounded-full hover:bg-yellow-400 transition flex items-center gap-1 shadow-lg shadow-yellow-500/10">
-                <i class="fa-solid fa-images"></i> 生成朋友圈高清海报
+                <i class="fa-solid fa-images"></i> 生成高清海报
             </button>
             <button onclick="copyWechatText()" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-blue-500 transition flex items-center gap-1">
                 <i class="fa-solid fa-terminal"></i> 复制终端文案
@@ -94,7 +96,7 @@
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-950" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：桌面图标已更新为黑底双行金字！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：海报与图标均已全面同步！</div>
         </div>
     </div>
 
@@ -198,10 +200,10 @@
             }
         }
 
-        // ==================== ✨ 高度自适应且末页动态对齐引擎 ====================
+        // ==================== ✨ 自适应高清海报生成引擎 ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
-            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成尺寸一致的高清海报套图...</div>';
+            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成高清海报套图...</div>';
             document.getElementById('posterModal').classList.remove('hidden');
 
             const allNews = [
