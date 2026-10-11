@@ -12,6 +12,7 @@
                 extend: {
                     colors: {
                         bbGold: '#F0B90B',
+                        bbLightGold: '#E6C687',
                         bbDark: '#0D1117',
                         bbCard: '#161B22',
                         bbBorder: '#30363D',
@@ -33,7 +34,8 @@
     <!-- 顶栏 -->
     <header class="sticky top-0 z-40 bg-bbDark/95 border-b border-bbBorder px-4 py-3 backdrop-blur-md flex justify-between items-center">
         <div class="flex items-center space-x-2">
-            <span class="bg-bbGold text-black text-xs font-black px-2 py-1 rounded tracking-wider">BLOOMBERG</span>
+            <!-- 淡金色 Logo 样式 -->
+            <span class="bg-[#E6C687] text-gray-950 text-xs font-black px-2 py-1 rounded tracking-wider shadow-sm">BLOOMBERG</span>
             <span class="text-sm font-bold tracking-wider">财经焦点看板</span>
         </div>
         <div class="flex items-center space-x-2">
@@ -84,11 +86,11 @@
     <div id="posterModal" class="fixed inset-0 bg-black/85 z-50 hidden flex items-center justify-center p-4">
         <div class="bg-bbCard border border-bbBorder rounded-xl max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="p-3 border-b border-bbBorder flex justify-between items-center">
-                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 每页 4 条 · 尺寸完全一致的高清套图</span>
+                <span class="text-xs font-bold text-bbGold"><i class="fa-solid fa-circle-check"></i> 每页 4 条 · 尺寸一致的高清套图</span>
                 <button onclick="closeModal('posterModal')" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 overflow-y-auto flex-1 space-y-4 bg-gray-950" id="posterRenderArea"></div>
-            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：所有卡片高度自动对齐，发朋友圈大小完全一致！</div>
+            <div class="p-3 border-t border-bbBorder text-center text-xs text-gray-400">💡 提示：Logo 已更新为淡金色，卡片高度完美对齐！</div>
         </div>
     </div>
 
@@ -192,10 +194,10 @@
             }
         }
 
-        // ==================== ✨ 高度自适应且末页动态对齐引擎 ====================
+        // ==================== ✨ 淡金色 Logo + 自适应高清海报生成引擎 ====================
         async function generateSixPosters() {
             const renderArea = document.getElementById('posterRenderArea');
-            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成尺寸一致的高清海报套图...</div>';
+            renderArea.innerHTML = '<div class="text-center text-xs text-bbGold py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在生成淡金色 Logo 高清海报套图...</div>';
             document.getElementById('posterModal').classList.remove('hidden');
 
             const allNews = [
@@ -235,7 +237,8 @@
                 wrapper.innerHTML = `
                     <div style="border-bottom:2px solid #F0B90B;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:6px;margin-bottom:8px;">
                         <div>
-                            <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
+                            <!-- 海报内部顶栏 Logo 变更为高雅的淡金色 -->
+                            <div style="background:#E6C687;color:#030712;font-size:8px;font-weight:900;display:inline-block;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
                             <div style="font-size:13px;font-weight:800;color:#FFF;margin-top:2px;line-height:12px;">每日财经看板</div>
                         </div>
                         <div style="font-size:9px;color:#6B7280;text-align:right;font-weight:600;">全景套卡 (${idx + 1}/${chunks.length + 1})</div>
@@ -270,13 +273,13 @@
                 document.body.removeChild(wrapper);
             }
 
-            // 最后一张：星际背景末页（严格锁定与新闻卡片完全相同的像素高度）
+            // 最后一张：星际背景末页（淡金色 Logo + 严格像素高度对齐）
             const lastWrapper = document.createElement('div');
             lastWrapper.style.cssText = `position:absolute;left:-9999px;width:375px;height:${targetHeight}px;background-size:cover;background-position:center;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:20px;background-image:url('./bg.jpg'), linear-gradient(180deg, #1A1F2C 0%, #0D1117 100%);font-family:sans-serif;`;
             
             lastWrapper.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(6px);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-                    <div style="background:#F0B90B;color:#000;font-size:8px;font-weight:900;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
+                    <div style="background:#E6C687;color:#030712;font-size:8px;font-weight:900;padding:1px 4px;border-radius:2px;">BLOOMBERG</div>
                     <div style="font-size:8.5px;color:#E5E7EB;letter-spacing:1px;font-weight:bold;">END PAGE · (${chunks.length + 1}/${chunks.length + 1})</div>
                 </div>
                 
