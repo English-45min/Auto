@@ -2,9 +2,9 @@ name: Update Daily News
 
 on:
   schedule:
-    # 每天北京时间早上 8:00 运行 (UTC 0:00)
+    # 每天北京时间早上 8:00 自动运行 (UTC 0:00)
     - cron: '0 0 * * *'
-  workflow_dispatch: # 支持手动触发
+  workflow_dispatch: # 支持手动一键运行
 
 jobs:
   update-html:
@@ -23,13 +23,11 @@ jobs:
 
       - name: Run Update Script
         run: |
-          # 如果你的根目录有独立的 Python 脚本，可以在这里运行
-          # python update.py
-          echo "Running daily news update..."
+          python update.py
 
       - name: Push to GitHub Pages
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto refresh news and random seeding [skip ci]" && git pull origin main --rebase && git push origin main)
+          git add index.html
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto refresh daily news [skip ci]" && git pull origin main --rebase && git push origin main)
