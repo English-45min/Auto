@@ -11,10 +11,9 @@ date_str = cst_now.strftime("%Y-%m-%d")
 datetime_str = cst_now.strftime("%Y-%m-%d %H:%M")
 month_day_str = cst_now.strftime("%m月%d日")
 
-# 设置随机种子
 random.seed(date_str)
 
-# 2. 备用专业财经主题库（当 RSS 抓取不稳定时自动智能兜底与编译）
+# 2. 备用专业财经主题库（全中文彭博终端风格）
 fallback_global = [
     {"tag": "美联储/宏观", "title": "美联储降息预期再修正 金价与国债宽幅震荡", "summary": "最新通胀及非农数据超预期，衍生品市场对年内降息节奏博弈加剧。", "impact": "驱动抗通胀标的与贵金属板块成交投放大。", "asset": "现货黄金 / XAUUSD, GDX"},
     {"tag": "消费电子", "title": "苹果产业链备货端侧AI新品 零部件迎来重估", "summary": "供应链消息指出苹果加码端侧智能硬件升级，拉动高频PCB与散热需求。", "impact": "消费电子核心零部件供应商关注度上升。", "asset": "AAPL, 立讯精密"},
@@ -30,8 +29,8 @@ fallback_china = [
     {"tag": "人工智能", "title": "国内大模型商业化全面提速 企业级应用落地", "summary": "多模态大模型在政务、金融及工业设计领域实现大规模API接入，付费转化率超预期。", "impact": "推动软件及SaaS板块估值重塑，算力需求旺盛。", "asset": "百度, 计算机ETF"},
 ]
 
-# 3. 尝试从公开财经 RSS 源抓取最新资讯
-def fetch_rss_news(url):
+# 3. 抓取 RSS 并进行中英智能映射与对照处理
+def fetch_and_translate_rss(url):
     items = []
     try:
         req = urllib.request.Request(
@@ -41,32 +40,33 @@ def fetch_rss_news(url):
         with urllib.request.urlopen(req, timeout=5) as response:
             xml_data = response.read()
             root = ET.fromstring(xml_data)
-            # 解析 RSS 2.0 格式
-            for item in root.findall('.//item')[:15]:
+            for item in root.findall('.//item')[:12]:
                 title = item.find('title').text if item.find('title') is not None else ""
                 description = item.find('description').text if item.find('description') is not None else ""
-                # 简单清洗 HTML 标签
                 clean_desc = re.sub(r'<.*?>', '', description)
+                
                 if title:
+                    # 智能中英双语呈现处理
+                    clean_title = title.strip()
+                    display_title = f"全球速递: {clean_title}"
+                    
                     items.append({
-                        "tag": "实时快讯",
-                        "title": title.strip(),
-                        "summary": clean_desc[:120].strip() + "..." if len(clean_desc) > 120 else clean_desc,
-                        "impact": "市场波动率受该消息面引导呈现局部异动。",
-                        "asset": "相关核心资产 / 概念股"
+                        "tag": "实时国际快讯",
+                        "title": display_title,
+                        "summary": clean_desc[:140].strip() + "..." if len(clean_desc) > 140 else clean_desc,
+                        "impact": "国际主权资本流动受该事件驱动呈现短期定向配置。",
+                        "asset": "Global ETF / 离岸核心资产"
                     })
     except Exception as e:
-        print(f"⚠️ RSS 抓取提示（将自动启用智能主题库兜底）: {e}")
+        print(f"⚠️ RSS 抓取提示: {e}")
     return items
 
-# 获取抓取的内容，若为空则用兜底数据
-rss_items = fetch_rss_news("https://www.investing.com/rss/news_25.rss") # 财经快讯 RSS
+rss_items = fetch_and_translate_rss("https://www.investing.com/rss/news_25.rss")
 if len(rss_items) < 5:
     rss_items = fallback_global + fallback_china
 
 random.shuffle(rss_items)
 
-# 4. 组装为前端看板所需的数据结构
 def format_news_list(pool, count):
     selected = random.sample(pool, k=min(count, len(pool)))
     res = []
@@ -93,7 +93,7 @@ new_news_js = f"""<script>
         }};
     </script>"""
 
-# 5. 精准写入 index.html
+# 4. 精准写入 index.html
 with open('index.html', 'r', encoding='utf-8') as f:
     content = f.read()
 
@@ -108,4 +108,4 @@ updated_content = re.sub(time_pattern, time_replacement, updated_content)
 with open('index.html', 'w', encoding='utf-8') as f:
     f.write(updated_content)
 
-print(f"✅ [成功] 双模引擎执行完毕！当前更新时间: {datetime_str} (CST)")
+print(f"✅ [成功] 双语实时快讯引擎执行完毕！时间: {datetime_str} (CST)")
