@@ -3,8 +3,8 @@ import requests
 import feedparser
 
 # 从 GitHub Secrets 中自动读取你配置的机器人 Token 和聊天 ID
-TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN")
-TG_CHAT_ID = os.environ.get("TG_CHAT_ID")
+TG_BOT_TOKEN = 8971331728:AAELo50p62FjPpevQRuoWEjvT3JcniIIlbg("TG_BOT_TOKEN")
+TG_CHAT_ID = 8293527719 ("TG_CHAT_ID")
 
 # 你的 RSS 订阅源地址（你可以随时修改或添加更多）
 RSS_URLS = [
