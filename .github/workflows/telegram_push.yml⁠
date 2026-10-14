@@ -1,0 +1,23 @@
+name: Telegram Auto Push
+
+# 触发条件设置
+on:
+  schedule:
+    # 按照 cron 表达式设置定时（此处为每天 UTC 时间 01:00，即北京时间每天早上 09:00）
+    - cron: '0 1 * * *'
+  workflow_dispatch: # 允许你在 GitHub 网页上手动点击按钮触发测试
+
+jobs:
+  send_message:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Message to Telegram
+        run: |
+          # 组装你要推送的消息文本（支持 Markdown 格式）
+          TEXT="🌟 *GitHub 自动化消息推送通知*%0A%0A这是一条来自 GitHub Actions 的定时推送测试消息！%0A系统运行正常。"
+
+          # 调用 Telegram 官方 SendMessage API
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TG_CHAT_ID }}" \
+            -d "text=${TEXT}" \
+            -d "parse_mode=Markdown"
