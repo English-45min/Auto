@@ -8,9 +8,14 @@ TG_CHAT_ID = os.environ.get("TG_CHAT_ID")
 
 
 # 你的 RSS 订阅源地址（你可以随时修改或添加更多）
+# 将多个稳定的 RSSHub 节点全部加入列表中，增加容错率
 RSS_URLS = [
-    "https://rsshub.app/twitter/user/getodkn",
+    "https://rsshub.rssforever.com/twitter/user/getodkn",
+    "https://rsshub.pseudoyu.com/twitter/user/getodkn",
+    "https://rsshub.ktachibana.party/twitter/user/getodkn",
 ]
+
+
 
 def send_telegram_message(text):
     """调用 Telegram API 发送消息"""
