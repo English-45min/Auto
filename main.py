@@ -2,16 +2,20 @@ import os
 import re
 import feedparser
 import requests
+from urllib.parse import quote
 
 # 1. 自动从系统读取安全配置
 RSSHUB_URL = os.getenv("RSSHUB_URL", "").rstrip("/")
 TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 
-# 2. 预设防踩坑的备份订阅源列表（默认优先从不设防的公开大V/热门 List 开始抓，确保百分百能推出来）
-# 换成不需要 Twitter 复杂验证的开源/第三方 X 镜像或科技爆文源
+# 2. 定义你想搜索的推特关键词（这里可以直接写带空格的正常文字，代码会自动处理）
+keyword_query = "AI min_faves:100"
+encoded_query = quote(keyword_query)
+
 FEEDS = [
-    f"{RSSHUB_URL}/twitter/keyword/AI min_faves:100"
+    # 自动把空格转成合法的 URL 编码，杜绝报错
+    f"{RSSHUB_URL}/twitter/keyword/{encoded_query}"
 ]
 
 def send_tg_msg(title, link):
@@ -20,7 +24,7 @@ def send_tg_msg(title, link):
         print("❌ 错误：GitHub Secrets 里的 TG_BOT_TOKEN 或 TG_CHAT_ID 没有配置！")
         return False
     
-    clean_title = re.sub('<[^<]+?>', '', title)[:200]  # 清理网页标签并截取前200字
+    clean_title = re.sub('<[^<]+?>', '', title)[:200]
     msg = f"🔥 <b>发现 X 热门动态</b>\n\n{clean_title}...\n\n🔗 <a href='{link}'>点击查看原文</a>"
     
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
@@ -41,7 +45,6 @@ def run():
         print(f"正在尝试抓取: {feed_url}")
         feed = feedparser.parse(feed_url)
         
-        # 如果抓到了有效数据，立刻推送并退出
         if feed.entries:
             latest = feed.entries[0]
             print(f"✅ 成功抓取到新推文: {latest.title}")
