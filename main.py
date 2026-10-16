@@ -2,20 +2,15 @@ import os
 import re
 import feedparser
 import requests
-from urllib.parse import quote
 
-# 1. 自动从系统读取安全配置
+# 1. 读取配置
 RSSHUB_URL = os.getenv("RSSHUB_URL", "").rstrip("/")
 TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 
-# 2. 定义你想搜索的推特关键词（这里可以直接写带空格的正常文字，代码会自动处理）
-keyword_query = "AI min_faves:100"
-encoded_query = quote(keyword_query)
-
+# 2. X (Twitter) 搜索路由：加号代表空格，冒号保持原样
 FEEDS = [
-    # 自动把空格转成合法的 URL 编码，杜绝报错
-    f"{RSSHUB_URL}/twitter/keyword/{encoded_query}"
+    f"{RSSHUB_URL}/twitter/keyword/AI+min_faves:100"
 ]
 
 def send_tg_msg(title, link):
