@@ -1,52 +1,34 @@
 import os
-import re
-import feedparser
 import requests
 
 # 1. 读取配置
 RSSHUB_URL = os.getenv("RSSHUB_URL", "").rstrip("/")
-TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
-TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 
-# 2. X (Twitter) 搜索路由：加号代表空格，冒号保持原样
+# 2. 测试链接
 FEEDS = [
     f"{RSSHUB_URL}/twitter/keyword/AI+min_faves:100"
 ]
 
-def send_tg_msg(title, link):
-    """一键发送 Telegram 消息"""
-    if not TG_BOT_TOKEN or not TG_CHAT_ID:
-        print("❌ 错误：GitHub Secrets 里的 TG_BOT_TOKEN 或 TG_CHAT_ID 没有配置！")
-        return False
-    
-    clean_title = re.sub('<[^<]+?>', '', title)[:200]
-    msg = f"🔥 <b>发现 X 热门动态</b>\n\n{clean_title}...\n\n🔗 <a href='{link}'>点击查看原文</a>"
-    
-    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TG_CHAT_ID, "text": msg, "parse_mode": "HTML"}
-    
-    res = requests.post(url, json=payload, timeout=10)
-    print(f"👉 Telegram 推送结果: Status {res.status_code}")
-    return res.status_code == 200
-
 def run():
-    if not RSSHUB_URL:
-        print("❌ 错误：GitHub Secrets 里的 RSSHUB_URL 还没填！")
-        return
-
-    print(f"📡 准备敲响服务器大门: {RSSHUB_URL}")
+    print(f"📡 正在从 GitHub 访问服务器: {RSSHUB_URL}")
     
     for feed_url in FEEDS:
-        print(f"正在尝试抓取: {feed_url}")
-        feed = feedparser.parse(feed_url)
-        
-        if feed.entries:
-            latest = feed.entries[0]
-            print(f"✅ 成功抓取到新推文: {latest.title}")
-            send_tg_msg(latest.title, latest.link)
-            return
+        print(f"正在请求: {feed_url}")
+        try:
+            # 加上浏览器标识，防止被简单拦截
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            res = requests.get(feed_url, headers=headers, timeout=15)
             
-    print("⚠️ 提示：未抓取到内容。可能是 RSSHub 节点未开放或链接被拦截。")
+            print(f"🌐 HTTP 状态码: {res.status_code}")
+            print(f"📄 返回内容前 300 字符:\n{res.text[:300]}")
+            
+            if res.status_code == 200 and "<item>" in res.text:
+                print("✅ 验证成功：服务器完美响应了 XML 推文数据！")
+            else:
+                print("❌ 发现问题：服务器返回了错误状态码或非预期内容（如登录拦截页）。")
+                
+        except Exception as e:
+            print(f"❌ 请求发生网络异常: {e}")
 
 if __name__ == "__main__":
     run()
