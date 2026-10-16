@@ -2,29 +2,30 @@ name: Daily Real X Viral Push
 
 on:
   schedule:
-    # 北京时间每天早上 09:00 (UTC 01:00) 自动运行
-    - cron: '0 1 * * *'
-  workflow_dispatch: # 支持在 GitHub 界面上随时点击手动测试
+    # 定时任务：每隔 1 小时自动运行一次（你可以根据需要修改 cron 表达式）
+    - cron: '0 * * * *'
+  workflow_dispatch: # 允许你在 GitHub 网页上随时手动点击按钮运行一次
 
 jobs:
-  build_and_push:
+  run-script:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - name: 迁出代码
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: 安装 Python 环境
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: 安装依赖库
         run: |
-          python -m pip install --upgrade pip
-          pip install requests feedparser
+          pip install feedparser requests
 
-      - name: Run Fetch and Push Script
+      - name: 运行抓取并推送脚本
         env:
+          RSSHUB_URL: ${{ secrets.RSSHUB_URL }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        run: python fetch_x.py
+        run: |
+          python main.py
