@@ -9,11 +9,13 @@ TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 
 # 2. 预设防踩坑的备份订阅源列表（默认优先从不设防的公开大V/热门 List 开始抓，确保百分百能推出来）
+# 换成不需要 Twitter 复杂验证的开源/第三方 X 镜像或科技爆文源
 FEEDS = [
-    # 备选 1：Twitter 官方/大V 用户路由（不依赖严格搜索 Cookie，稳定性最高）
-    f"{RSSHUB_URL}/twitter/user/elonmusk", 
-    # 备选 2：你的关键词爆文搜索（如果你的 RSSHub 有 Cookie 会自动触发）
-    f"{RSSHUB_URL}/twitter/keyword/AI%20min_faves:100"
+    # 方案 1：全球科技爆文资讯（如 Hacker News 热门）
+    "https://news.ycombinator.com/rss",
+    
+    # 方案 2：利用第三方免 Cookie 的 RSSHub 公开路由节点
+    "https://rsshub.app/twitter/user/elonmusk"
 ]
 
 def send_tg_msg(title, link):
