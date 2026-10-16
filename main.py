@@ -9,7 +9,7 @@ TG_CHAT_ID = os.getenv("TG_CHAT_ID")
 
 # 你的 RSSHub 爆文订阅链接（这里以搜索 AI 且点赞大于 500 的推文为例）
 # 你可以改成任何你想要的关键词
-RSS_URL = f"{RSSHUB_BASE_URL}/twitter/keyword/AI min_faves:500"
+RSS_URL = f"{RSSHUB_BASE_URL}/twitter/keyword/AI%20min_faves:500"
 
 def send_telegram_message(text):
     """通过你的 Telegram Bot 发送消息"""
