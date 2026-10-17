@@ -1,9 +1,9 @@
 name: RSS-to-TG-Auto
 
 on:
+  workflow_dispatch: # 保留随时手动运行的按钮
   schedule:
-    - cron: '0 * * * *' # 每小时自动运行一次
-  workflow_dispatch: # 支持手动点击运行按钮
+    - cron: '0 */4 * * *' # 代表每隔 4 小时自动运行一次
 
 jobs:
   bot-run:
