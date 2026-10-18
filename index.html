@@ -62,7 +62,7 @@
             <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
             <span>终端实时同步中（自动化运行正常）</span>
         </div>
-        <div id="updateTime">更新时间: 2026-10-18 17:11 (CST)</div>
+        <div id="updateTime">更新时间: 2026-10-18 17:23 (CST)</div>
     </div>
 
     <!-- 搜索 -->
@@ -106,21 +106,32 @@
     <script>
         const newsData = {
             global: [
-                { id: "NO.05", title: "10月18日 焦点：海外央行警告：对冲基金频发操作或加剧全球债市剧烈波动", time: "08:00", tag: "实时快讯", summary: "高级官员发表最新讲话，提醒市场注意衍生品配置带来的潜在流动性风险。", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
-                { id: "NO.04", title: "10月18日 焦点：地缘博弈新动向：美方调整部分制裁政策引发市场关注", time: "08:00", tag: "实时快讯", summary: "最新政策调整直接牵动大宗商品与能源避险资金走向。", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
-                { id: "NO.03", title: "10月18日 焦点：伯克希尔最新加仓龙头科技公司 机构看好自由现金流", time: "08:00", tag: "实时快讯", summary: "华尔街长线资本对软件与科技整合板块表达强劲信心。", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
-                { id: "NO.02", title: "10月18日 焦点：消费巨头供应链调整：肯德基将在全美门店引入可口可乐", time: "08:00", tag: "实时快讯", summary: "时隔数十年首次更换核心饮料供应商，快消供应链格局发生改变。", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
-                { id: "NO.01", title: "10月18日 焦点：全球核心资产异动：机构调整隔夜避险与权益仓位", time: "08:00", tag: "实时快讯", summary: "大宗商品与债券收益率在关键技术位维持博弈。", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" }
+                { id: "NO.20", title: "10月18日 焦点：Why 对冲基金 could be making a 债券市场 shock more likely", time: "08:00", tag: "全球宏观", summary: "The Bank of England's deputy governor has warned that hedge funds' activities could raise the risk of a global bond market shock.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.19", title: "10月18日 焦点：特朗普 waives broad new 俄罗斯 制裁, Zelenskyy condemns it as 'wrong'", time: "08:00", tag: "全球宏观", summary: "Trump signed the Graham Bill, which targeted Russia over its invasion of Ukraine, into law in September.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.18", title: "10月18日 焦点：Software’s new consolidator gets big vote of confidence from Berkshire", time: "08:00", tag: "全球宏观", summary: "Less than four months into life as a public company, Bending Spoons got a big vote of confidence this week from Berkshire Hathaway.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.17", title: "10月18日 焦点：Brent oil touches $110 as Iran escalates Hormuz attacks, 乌克兰 vows to hit 俄罗斯 refineries", time: "08:00", tag: "全球宏观", summary: "U.S. crude oil prices rose sharply Friday as Iran escalated attacks in the Strait of Hormuz this week.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.16", title: "10月18日 焦点：特朗普's 俄罗斯 diesel deal may offer Putin more than money — and spell trouble for 乌克兰", time: "08:00", tag: "全球宏观", summary: "Trump's diesel deal may do little for Russia's finances, but it raises bigger questions about Ukraine's leverage, U.S. support and Putin's n...", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.15", title: "10月18日 焦点：Berkshire shares buck market sell-off, rally to highest since Buffett said he would step down as CEO", time: "08:00", tag: "全球宏观", summary: "Berkshire Hathaway shares are at their highest level since Warren Buffett told shareholders at the May 2025 annual meeting he planned to ste...", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.14", title: "10月18日 焦点：KFC to switch to Coca-Cola beverages in U.S. restaurants for the first time in decades", time: "08:00", tag: "全球宏观", summary: "KFC is switching from PepsiCo to Coca-Cola as its beverage supplier for U.S. restaurants.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.13", title: "10月18日 焦点：'Everyone laughed' when he started a pumpkin farm—now it brings in $2 million a year", time: "08:00", tag: "全球宏观", summary: "Kelly Schultz bought a pumpkin farm in 1996. He transformed it into a seasonal attraction that draws in 100,000 visitors each fall.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.12", title: "10月18日 焦点：5 midterm money takeaways: Democrats have candidate cash. Republicans have Elon Musk", time: "08:00", tag: "全球宏观", summary: "Democrats outraise Republicans in key Congress races as Elon Musk funds Ken Paxton in Texas and GOP groups aligned with Trump.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.11", title: "10月18日 焦点：'Dead money’ for a decade: Why this 对冲基金 approach may deliver an advantage over 债券市场", time: "08:00", tag: "全球宏观", summary: "Investors may want to rethink their bond allocation and opt for managed futures exposure.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.10", title: "10月18日 焦点：半导体 market to remain solid ‘at least through next year,’ South Korea finance minister says", time: "08:00", tag: "全球宏观", summary: "South Korea's finance minister said semiconductor growth can last at least through 2027 as supply remains tight despite a global chip sell-o...", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.09", title: "10月18日 焦点：特朗普's student loan overhaul could lead to more bankruptcy filings, former judge says", time: "08:00", tag: "全球宏观", summary: "After nearly three decades as a bankruptcy judge, Sarah Sharer Curley writes about the legal process in her new book, "The Price of Forgiven...", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.08", title: "10月18日 焦点：Airport attacks put aviation in crosshairs of geopolitical conflicts", time: "08:00", tag: "全球宏观", summary: "Deadly attacks at Riyadh’s main airport are disrupting airlines, closing airspace and raising new security questions for commercial aviation...", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.07", title: "10月18日 焦点：Investors are buying up vast tracts of timberland across U.S. in one of market's longest-term bets", time: "08:00", tag: "全球宏观", summary: "Timberland managers buying for pension funds and other institutional investors can wait decades for returns, but the market can also be a pr...", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.06", title: "10月18日 焦点：South Texas Latino voters who flipped for 特朗普 in 2024 are up for grabs in 2026", time: "08:00", tag: "全球宏观", summary: "Hispanic and Latino voters swung hard for President Donald Trump in 2024. But in the 2026 midterm election, Democrats are pushing to get the...", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.05", title: "10月18日 焦点：人工智能 stocks plunge. Inflation heats up. Where we're still finding opportunities", time: "08:00", tag: "全球宏观", summary: "The sinking AI trade rattled last week's market. But solid bank earnings and a rotation beyond tech gave us reasons for optimism.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.04", title: "10月18日 焦点：U.S. budget deficit swells to almost $2 trillion for fiscal 2026, up 12% in a single year", time: "08:00", tag: "全球宏观", summary: "The Treasury Department published the U.S. budget deficit for the 2026 fiscal year.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.03", title: "10月18日 焦点：Some companies give 人工智能 to everyone. This CEO is doing the opposite", time: "08:00", tag: "全球宏观", summary: "Paysend CEO Ben Chisell limits AI tools to top performers as other U.K. companies push broader workplace rollouts.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.02", title: "10月18日 焦点：Tesla unveils long-delayed Roadster developed with SpaceX, fueling merger speculation", time: "08:00", tag: "全球宏观", summary: "Elon Musk first debuted the Roadster refresh concept in 2017 but Tesla has since missed every targeted delivery date.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" },
+                { id: "NO.01", title: "10月18日 焦点：Prediction market odds on Tesla-SpaceX merger are above 50% for early 2027", time: "08:00", tag: "全球宏观", summary: "Kalshi odds for a Tesla-SpaceX merger rose above 50% for early 2027 as Barclays outlined how a deal could work.", impact: "真实市场资金流向受该权威报道引导产生即时盘面波动。", asset: "核心指数 / 概念标的" }
             ],
             asia: [
-                { id: "NO.03", title: "10月18日 焦点：澳洲主要矿业巨头最新季报出炉 铁矿石出货量稳健", time: "08:00", tag: "澳洲资源", summary: "上游采矿成本控制良好，全球工业需求复苏预期支撑大宗商品价格。", impact: "提振资源类股票与相关商品货币汇率。", asset: "EWA, 铁矿石期货" },
-                { id: "NO.02", title: "10月18日 焦点：东南亚数据中心与绿电项目获国际资本加码投资", time: "08:00", tag: "东南亚基建", summary: "算力需求外溢驱动新加坡及周边区域数字基础设施建设显著提速。", impact: "直接拉动本地电力设备与数字基建产业链。", asset: "EWS, 亚太科技" },
-                { id: "NO.01", title: "10月18日 焦点：亚太核心权益市场窄幅盘整 外资调仓迹象明显", time: "08:00", tag: "日韩市场", summary: "日本及韩国主要股指在关键均线附近换手，科技与金融板块表现分化。", impact: "对区域套利资金流向形成短期引导。", asset: "日经225, EWY" }
+                { id: "NO.01", title: "10月18日 提示：当前各接口正在同步最新海量快讯", time: "08:00", tag: "系统提示", summary: "坚持100%真实媒体报道原则，等待下一周期自动刷新。", "impact": "N/A", "asset": "N/A" }
             ],
             china: [
-                { id: "NO.03", title: "10月18日 焦点：地方专项债发行进度加快 重点支持重大基建与科技项目", time: "08:00", tag: "财政政策", summary: "资金加速向实体经济转化，项目开工率与实物工作量提速形成强支撑。", impact: "利好建筑工程、高端装备与基建产业链。", asset: "建筑ETF, 沪深300" },
-                { id: "NO.02", title: "10月18日 焦点：国产自主可控产业链提速 工业母机与半导体设备受关注", time: "08:00", tag: "硬科技", summary: "政策支持与下游厂商采购意愿提升，核心零组件国产化率稳步攀升。", impact: "强化硬科技与装备制造板块长期成长逻辑。", asset: "科创50, 半导体ETF" },
-                { id: "NO.01", title: "10月18日 焦点：银行间市场资金面维持平稳 机构配置长期国债情绪回升", time: "08:00", tag: "金融市场", summary: "央行公开市场灵活调节，流动性保持合理充裕，长端国债收益率低位盘整。", impact: "稳定债券市场预期，降低实体企业融资成本。", asset: "10年期国债, 银行板块" }
+                { id: "NO.01", title: "10月18日 提示：当前各接口正在同步最新海量快讯", time: "08:00", tag: "系统提示", summary: "坚持100%真实媒体报道原则，等待下一周期自动刷新。", "impact": "N/A", "asset": "N/A" }
             ]
         };
     </script>
