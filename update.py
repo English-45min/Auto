@@ -5,9 +5,9 @@
 功能：
 1. 抓取国际财经、亚太财经、国内财经新闻；
 2. 严格地域分类，杜绝任何国际、欧美、地缘政治新闻混入国内频道；
-3. 国内频道若新浪源不足 5 条，自动多路 RSS 补足；
-4. 去重并按重要性排序与倒序编号；
-5. 自动写入 index.html。
+3. 国内频道若新浪直播源不足 5 条，自动启用高稳定 RSS/自媒体备用源补足；
+4. 自动处理 HTTP 重定向，防止 308/301 报错；
+5. 去重并按重要性排序与倒序编号，安全写入 index.html。
 """
 
 import datetime
@@ -52,11 +52,12 @@ SINA_URL = (
     "?page=1&page_size=50&zhibo_id=152"
 )
 
-# 国内频道多路权威 RSS 备用源（优先提供带原文链接的正规财经媒体）
+# 国内频道多路稳定公开 RSS / 财经大厂与自媒体源（全部带原文 URL 链接）
 CHINA_RSS_FEEDS = [
-    ("财新网", "https://www.caixin.com/rss/finance.xml"),
-    ("证券时报", "https://www.stcn.com/rss/rss.xml"),
-    ("中国证券网", "https://www.cnstock.com/common/rss/"),
+    ("新浪财经焦点", "https://rss.sina.com.cn/roll/finance/hot_roll.xml"),
+    ("新浪股票要闻", "https://rss.sina.com.cn/finance/stock1.xml"),
+    ("凤凰财经", "https://finance.ifeng.com/rss/index.xml"),
+    ("华尔街见闻", "https://dedicated.wallstreetcn.com/rss.xml"),
 ]
 
 
@@ -128,6 +129,7 @@ def parse_date(value):
 
 
 def http_get(url, timeout=12):
+    """具有重定向追踪及现代 User-Agent 的 HTTP GET 请求"""
     request = urllib.request.Request(
         url,
         headers={
@@ -217,7 +219,13 @@ def translate_international_channels(items, channel_name):
 def parse_rss_xml(xml_bytes, source_name):
     items = []
     try:
-        root = ET.fromstring(xml_bytes)
+        # 兼容 gbk / utf-8 编码的 XML
+        try:
+            xml_str = xml_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            xml_str = xml_bytes.decode("gbk", errors="replace")
+            
+        root = ET.fromstring(xml_str)
     except ET.ParseError as exc:
         print(f"⚠️ RSS XML 解析失败 [{source_name}]: {exc}")
         return items
@@ -264,6 +272,7 @@ def fetch_rss_direct(source_name, rss_url):
     try:
         data = http_get(rss_url, timeout=12)
         items = parse_rss_xml(data, source_name)
+        print(f"✅ RSS [{source_name}]：获取 {len(items)} 条")
         return items
     except Exception as exc:
         print(f"⚠️ RSS [{source_name}] 抓取失败：{type(exc).__name__}: {exc}")
@@ -296,6 +305,7 @@ def fetch_rss2json(source_name, rss_url):
                     "source": source_name,
                     "url": item.get("link", ""),
                 })
+        print(f"✅ RSS 网关 [{source_name}]：获取 {len(results)} 条")
         return results
     except Exception as exc:
         return []
@@ -412,7 +422,6 @@ def fetch_sina_china():
         return []
 
 
-# 国内本土经济/宏观核心词汇
 CHINA_RELEVANCE_KEYWORDS = (
     "中国", "国内", "央行", "人民币", "a股", "沪指", "上证", "深证",
     "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "证券",
@@ -421,7 +430,6 @@ CHINA_RELEVANCE_KEYWORDS = (
     "进口", "房地产", "楼市", "地方债", "新能源", "海关", "企业", "市场", "公司"
 )
 
-# 严厉的海外/全球/跨国政治军事国家黑名单（任何带有这些词的新闻一律剔除出国内频道）
 CHINA_EXCLUDE_KEYWORDS = (
     "加拿大", "以色列", "加沙", "哈马斯", "巴勒斯坦", "乌克兰", "俄罗斯", "莫斯科", 
     "泽连斯基", "黎巴嫩", "叙利亚", "伊朗", "德黑兰", "红海危机", "胡塞武装",
@@ -435,11 +443,9 @@ def is_china_relevant(item):
     text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
     low = text.lower()
     
-    # 1. 命中任何海外政治军事、跨国能源或外国国家名称，直接一票否决！
     if any(ex.lower() in low for ex in CHINA_EXCLUDE_KEYWORDS):
         return False
         
-    # 2. 必须包含明确的中国本土经济/市场核心要素
     return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
 
 
@@ -448,13 +454,13 @@ def filter_china_news(items):
 
 
 def fetch_china_news():
-    # 1. 先抓取新浪财经快讯并进行最严格的过滤
+    # 1. 抓取新浪财经直播流并严格过滤
     items = filter_china_news(fetch_sina_china())
-    print(f"国内新闻（新浪源过滤后）：{len(items)} 条")
+    print(f"国内新闻（新浪直播源过滤后）：{len(items)} 条")
     
-    # 2. 如果因过滤导致不足 5 条，立刻从国内权威 RSS 补充，拉满 5 条
+    # 2. 不足 5 条时，启动全新强化的备用 RSS 补充
     if len(items) < CHINA_LIMIT:
-        print("ℹ️ 国内新闻未满 5 条，启动国内权威 RSS 备用源补充...")
+        print("ℹ️ 国内新闻未满 5 条，启动备用高稳定性 RSS 源补充...")
         rss_items = filter_china_news(collect_rss(CHINA_RSS_FEEDS))
         
         seen = {normalize_title(it["title"]) for it in items}
