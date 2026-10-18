@@ -461,9 +461,12 @@ def rank_news(items, limit, channel_tag, default_asset):
 
 def js_safe_json(value):
     """JSON 可直接放进 script 标签；转义 < 防止意外结束 script。"""
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).replace(
-        "</", "<\\/"
-    ).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        default=str,  # 将 datetime 等对象转换为字符串，避免 JSON 序列化报错
+    ).replace("</", "<\\/").replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
 def main():
