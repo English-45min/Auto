@@ -163,7 +163,6 @@ def translate_to_chinese(text):
 
     def translate_chunk(chunk):
         errors = []
-        # Google Translate 公共接口
         try:
             params = urllib.parse.urlencode({"client":"gtx", "sl":"auto", "tl":"zh-CN", "dt":"t", "q":chunk})
             raw = http_get("https://translate.googleapis.com/translate_a/single?" + params, timeout=18)
@@ -174,7 +173,6 @@ def translate_to_chinese(text):
             errors.append("Google 返回空结果")
         except Exception as exc:
             errors.append(f"Google {type(exc).__name__}: {exc}")
-        # 备用服务
         try:
             params = urllib.parse.urlencode({"q":chunk, "langpair":"en|zh-CN"})
             raw = http_get("https://api.mymemory.translated.net/get?" + params, timeout=18)
@@ -188,7 +186,6 @@ def translate_to_chinese(text):
         print("⚠️ 翻译失败，保留原文：" + "；".join(errors))
         return chunk
 
-    # 控制单次请求长度，避免长摘要触发 URL 过长或接口拒绝。
     chunks=[]
     remaining=text
     while len(remaining)>300:
@@ -207,7 +204,6 @@ def translate_to_chinese(text):
 
 
 def translate_international_channels(items, channel_name):
-    """仅翻译国际/亚太标题和摘要；国内新闻不经过此函数。"""
     title_count = 0
     for item in items:
         old_title = clean_text(item.get("title", ""))
@@ -232,7 +228,6 @@ def parse_rss_xml(xml_bytes, source_name):
         print(f"⚠️ RSS XML 解析失败 [{source_name}]: {exc}")
         return items
 
-    # 兼容 RSS 2.0 与 Atom
     for node in root.iter():
         tag = node.tag.rsplit("}", 1)[-1].lower()
         if tag not in ("item", "entry"):
@@ -283,7 +278,6 @@ def fetch_rss_direct(source_name, rss_url):
 
 
 def fetch_rss2json(source_name, rss_url):
-    """直接 RSS 失败时，可使用 rss2json 网关尝试一次。"""
     api_key = os.environ.get("RSS2JSON_API_KEY", "").strip()
     params = {"rss_url": rss_url}
     if api_key:
@@ -413,9 +407,9 @@ def fetch_sina_china():
         return []
 
 
-# ========================= 国内新闻过滤与安全黑名单 =========================
+# ========================= 国内新闻过滤与强力海外防火墙 =========================
 
-# 必须包含的国内市场核心关键词
+# 必须包含的中国本土经济/市场相关词汇
 CHINA_RELEVANCE_KEYWORDS = (
     "中国", "国内", "中国人民银行", "央行", "人民币", "A股", "沪指", "上证", "深证",
     "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "中信证券",
@@ -423,14 +417,16 @@ CHINA_RELEVANCE_KEYWORDS = (
     "国家统计局", "财政部", "商务部", "发改委", "工信部", "国务院", "证监会",
     "金融监管总局", "社融", "LPR", "中国GDP", "中国CPI", "中国PPI", "中国出口",
     "中国进口", "中国房地产", "中国楼市", "地方债", "新能源汽车", "中国上市公司",
-    "中国消费", "中国制造业PMI", "工业增加值", "中国零售总额", "中国外贸", "人民币汇率"
+    "中国消费", "中国制造业PMI", "工业增加值", "中国零售总额", "中国外贸", "人民币汇率",
+    "海关总署"
 )
 
-# 严厉的海外政治/军事/地缘冲突黑名单（绝不允许出现在国内板块）
+# 增强版的纯海外/欧美政治/地缘冲突绝对黑名单（拦截欧美政客、欧洲骚乱、对俄制裁等）
 CHINA_EXCLUDE_KEYWORDS = (
     "以色列", "加沙", "哈马斯", "巴勒斯坦", "乌克兰", "俄罗斯", "莫斯科", "泽连斯基",
     "中东", "黎巴嫩", "叙利亚", "伊朗", "德黑兰", "红海危机", "胡塞武装",
-    "白宫", "五角大楼", "北约", "欧盟委员会", "英国首相", "德国总理"
+    "白宫", "五角大楼", "北约", "欧盟", "欧洲", "法国", "巴黎", "德国", "英国",
+    "特朗普", "拜登", "贝森特", "美联储", "美国财政部", "制裁", "示威活动", "骚乱"
 )
 
 
@@ -438,11 +434,11 @@ def is_china_relevant(item):
     text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
     low = text.lower()
     
-    # 1. 如果命中海外政治、地缘冲突、中东战争等黑名单词汇，直接一票否决排除
+    # 1. 如果包含任何海外政客、欧美时政、欧洲骚乱或制裁黑名单词，直接拦截！
     if any(ex.lower() in low for ex in CHINA_EXCLUDE_KEYWORDS):
         return False
         
-    # 2. 必须包含明确的国内经济/市场关键词
+    # 2. 必须命中真正的中国本土核心词汇
     return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
 
 
@@ -450,7 +446,7 @@ def filter_china_news(items):
     kept = [item for item in items if is_china_relevant(item)]
     removed = len(items) - len(kept)
     if removed:
-        print(f"🧹 国内频道已严格过滤 {removed} 条海外无关或地缘政治新闻")
+        print(f"🧹 国内频道已严格过滤 {removed} 条海外/欧美/地缘时政新闻")
     return kept
 
 
