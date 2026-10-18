@@ -149,6 +149,58 @@ def http_get(url, timeout=12):
         return response.read()
 
 
+# ========================= 国际/亚太新闻中文翻译 =========================
+
+def translate_to_chinese(text):
+    """通过 Google Translate 公共接口翻译单条文本；失败时返回原文，不编造译文。"""
+    text = clean_text(text)
+    if not text:
+        return text
+
+    # 已含较多中文时不重复翻译。
+    chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
+    latin_chars = len(re.findall(r"[A-Za-z]", text))
+    if chinese_chars >= 8 and chinese_chars >= latin_chars:
+        return text
+
+    params = urllib.parse.urlencode({
+        "client": "gtx",
+        "sl": "auto",
+        "tl": "zh-CN",
+        "dt": "t",
+        "q": text,
+    })
+    url = "https://translate.googleapis.com/translate_a/single?" + params
+    try:
+        raw = http_get(url, timeout=15)
+        payload = json.loads(raw.decode("utf-8", errors="replace"))
+        translated = "".join(
+            part[0] for part in (payload[0] or [])
+            if isinstance(part, list) and part and isinstance(part[0], str)
+        ).strip()
+        return translated or text
+    except Exception as exc:
+        print(f"⚠️ 中文翻译暂不可用，保留原文：{type(exc).__name__}: {exc}")
+        return text
+
+
+def translate_international_channels(items, channel_name):
+    """只翻译国际/亚太新闻标题和摘要；来源、链接、时间及国内新闻不改动。"""
+    translated_count = 0
+    for item in items:
+        original_title = clean_text(item.get("title", ""))
+        original_summary = clean_text(item.get("summary", ""))
+        if original_title:
+            item["title"] = translate_to_chinese(original_title)
+        if original_summary:
+            item["summary"] = translate_to_chinese(original_summary)
+        if item.get("title") != original_title or item.get("summary") != original_summary:
+            translated_count += 1
+        time.sleep(0.12)
+    print(f"🌐 {channel_name}：已处理中文翻译 {translated_count}/{len(items)} 条")
+    return items
+
+
 # ========================= RSS 抓取 =========================
 
 def parse_rss_xml(xml_bytes, source_name):
@@ -461,12 +513,9 @@ def rank_news(items, limit, channel_tag, default_asset):
 
 def js_safe_json(value):
     """JSON 可直接放进 script 标签；转义 < 防止意外结束 script。"""
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        default=str,  # 将 datetime 等对象转换为字符串，避免 JSON 序列化报错
-    ).replace("</", "<\\/").replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).replace(
+        "</", "<\\/"
+    ).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
 def main():
@@ -491,6 +540,10 @@ def main():
     final_china = rank_news(
         raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业"
     )
+
+    # 国际和亚太频道只翻译标题、摘要；国内频道保持抓取到的中文原文。
+    final_global = translate_international_channels(final_global, "国际财经")
+    final_asia = translate_international_channels(final_asia, "亚太财经")
 
     print("-" * 58)
     print(f"频道 全球宏观：实际展示 {len(final_global)} 条")
