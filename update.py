@@ -321,7 +321,6 @@ def fetch_feed(source_name, url):
     items = fetch_rss_direct(source_name, url)
     if items:
         return items
-    # 直连没有抓到时尝试网关；如果网关也失败，返回空列表。
     return fetch_rss2json(source_name, url)
 
 
@@ -414,7 +413,9 @@ def fetch_sina_china():
         return []
 
 
-# 国内频道只保留与中国经济或中国市场明确相关的新闻，避免把海外数据混入国内频道。
+# ========================= 国内新闻过滤与安全黑名单 =========================
+
+# 必须包含的国内市场核心关键词
 CHINA_RELEVANCE_KEYWORDS = (
     "中国", "国内", "中国人民银行", "央行", "人民币", "A股", "沪指", "上证", "深证",
     "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "中信证券",
@@ -425,10 +426,23 @@ CHINA_RELEVANCE_KEYWORDS = (
     "中国消费", "中国制造业PMI", "工业增加值", "中国零售总额", "中国外贸", "人民币汇率"
 )
 
+# 严厉的海外政治/军事/地缘冲突黑名单（绝不允许出现在国内板块）
+CHINA_EXCLUDE_KEYWORDS = (
+    "以色列", "加沙", "哈马斯", "巴勒斯坦", "乌克兰", "俄罗斯", "莫斯科", "泽连斯基",
+    "中东", "黎巴嫩", "叙利亚", "伊朗", "德黑兰", "红海危机", "胡塞武装",
+    "白宫", "五角大楼", "北约", "欧盟委员会", "英国首相", "德国总理"
+)
+
 
 def is_china_relevant(item):
     text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
     low = text.lower()
+    
+    # 1. 如果命中海外政治、地缘冲突、中东战争等黑名单词汇，直接一票否决排除
+    if any(ex.lower() in low for ex in CHINA_EXCLUDE_KEYWORDS):
+        return False
+        
+    # 2. 必须包含明确的国内经济/市场关键词
     return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
 
 
@@ -436,12 +450,11 @@ def filter_china_news(items):
     kept = [item for item in items if is_china_relevant(item)]
     removed = len(items) - len(kept)
     if removed:
-        print(f"🧹 国内频道已过滤 {removed} 条与中国市场无明确关联的新闻")
+        print(f"🧹 国内频道已严格过滤 {removed} 条海外无关或地缘政治新闻")
     return kept
 
 
 def fetch_china_news():
-    # 新浪财经直播流可能混有海外宏观快讯，因此必须先按中国市场相关性过滤。
     items = filter_china_news(fetch_sina_china())
     if items:
         return items
@@ -527,5 +540,124 @@ def rank_news(items, limit, channel_tag, default_asset):
         item["_score"] = importance_score(item)
         deduped.append(item)
 
-    # 先按重要性，再按发布时间从新到旧；无时间的排在有时间的后面。
-    min_date = datetime.datetime
+    min_date = datetime.datetime.min.replace(tzinfo=BEIJING_TZ)
+    deduped.sort(
+        key=lambda item: (
+            item["_score"],
+            item.get("published") is not None,
+            item.get("published") or min_date,
+        ),
+        reverse=True,
+    )
+
+    selected = deduped[:limit]
+    total = len(selected)
+    output = []
+
+    for idx, item in enumerate(selected):
+        item.pop("_score", None)
+        item["id"] = f"NO.{total - idx:02d}"
+        item.setdefault("summary", "")
+        item.setdefault("time", "")
+        item.setdefault("impact", "")
+        item.setdefault("asset", default_asset)
+        output.append(item)
+
+    return output
+
+
+# ========================= 安全写入 HTML =========================
+
+def js_safe_json(value):
+    """JSON 可直接放进 script 标签；转义 < 防止意外结束 script。并加入 default=str 解决 datetime 序列化崩溃问题。"""
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str).replace(
+        "</", "<\\/"
+    ).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
+def main():
+    current = now_beijing()
+    datetime_str = current.strftime("%Y-%m-%d %H:%M:%S")
+
+    print("=" * 58)
+    print("开始抓取财经新闻")
+    print(f"北京时间：{datetime_str}")
+    print("=" * 58)
+
+    raw_global = collect_rss(RSS_FEEDS["global"])
+    raw_asia = collect_rss(RSS_FEEDS["asia"])
+    raw_china = fetch_china_news()
+
+    final_global = rank_news(
+        raw_global, GLOBAL_LIMIT, "全球宏观", "全球股指 / 美元 / 美债 / 大宗商品"
+    )
+    final_asia = rank_news(
+        raw_asia, ASIA_LIMIT, "亚太市场", "亚洲股指 / 港股 / 日股 / 汇率"
+    )
+    final_china = rank_news(
+        raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业"
+    )
+
+    # 国际和亚太频道只翻译标题、摘要；国内频道保持抓取到的中文原文。
+    final_global = translate_international_channels(final_global, "国际财经")
+    final_asia = translate_international_channels(final_asia, "亚太财经")
+
+    print("-" * 58)
+    print(f"频道 全球宏观：实际展示 {len(final_global)} 条")
+    print(f"频道 亚太市场：实际展示 {len(final_asia)} 条")
+    print(f"频道 国内核心：实际展示 {len(final_china)} 条")
+    print("-" * 58)
+
+    if not HTML_FILE.exists():
+        raise FileNotFoundError(
+            f"找不到 {HTML_FILE}。请确认 update.py 与 index.html 位于同一目录。"
+        )
+
+    content = HTML_FILE.read_text(encoding="utf-8")
+    pattern = r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->"
+
+    news_data = {
+        "global": final_global,
+        "asia": final_asia,
+        "china": final_china,
+    }
+
+    replacement = (
+        "<!-- NEWS_DATA_START -->\n"
+        "<script>\n"
+        f"const newsData = {js_safe_json(news_data)};\n"
+        "</script>\n"
+        "<!-- NEWS_DATA_END -->"
+    )
+
+    updated, count = re.subn(pattern, lambda _m: replacement, content, count=1, flags=re.DOTALL)
+    if count != 1:
+        raise RuntimeError(
+            "没有找到 NEWS_DATA_START / NEWS_DATA_END 标记。"
+            "请确认 index.html 中保留了这两个注释标记。"
+        )
+
+    time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
+    time_replacement = (
+        '<div id="updateTime" class="text-slate-400 mt-1 sm:mt-0">'
+        f"更新时间: {datetime_str} (北京时间)</div>"
+    )
+    updated, time_count = re.subn(
+        time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL
+    )
+    if time_count != 1:
+        print("⚠️ 没找到 updateTime 元素，新闻数据已写入，但更新时间未替换。")
+
+    HTML_FILE.write_text(updated, encoding="utf-8")
+
+    print("✅ 财经新闻更新完成")
+    print(f"更新时间：{datetime_str}")
+    print(f"文件位置：{HTML_FILE}")
+    print(f"全球宏观：{len(final_global)} 条")
+    print(f"亚太市场：{len(final_asia)} 条")
+    print(f"国内核心：{len(final_china)} 条")
+    print("=" * 58)
+
+
+if __name__ == "__main__":
+    main()
