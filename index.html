@@ -3,150 +3,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bloomberg 财经焦点看板</title>
+    <meta name="theme-color" content="#0b0f19">
+    <title>财经焦点看板｜国际・亚太・中国</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0b0f19; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .tab-active { border-bottom: 2px solid #f59e0b; color: #f59e0b; font-weight: bold; }
-        .tab-inactive { color: #94a3b8; }
-        .tab-inactive:hover { color: #cbd5e1; }
+        :root { color-scheme: dark; }
+        body {
+            background: #0b0f19;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+        }
+        .tab-active { border-bottom: 2px solid #f59e0b; color: #f59e0b; font-weight: 800; }
+        .tab-inactive { color: #94a3b8; border-bottom: 2px solid transparent; }
+        .tab-inactive:hover { color: #e2e8f0; }
+        .news-card { background: rgba(15, 23, 42, .92); border: 1px solid rgba(51, 65, 85, .55); }
+        .news-card:hover { border-color: rgba(148, 163, 184, .55); }
+        .news-title { overflow-wrap: anywhere; }
+        .source-link { color: #94a3b8; text-decoration: underline; text-underline-offset: 3px; }
+        .source-link:hover { color: #fbbf24; }
+        button:focus-visible, input:focus-visible, a:focus-visible {
+            outline: 2px solid #f59e0b; outline-offset: 3px;
+        }
     </style>
 </head>
-<body class="min-h-screen pb-12">
-    <!-- Header Navigation -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <span class="bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded text-xs tracking-wider">BLOOMBERG</span>
-                <span class="font-bold text-sm text-slate-200">财经焦点看板</span>
+<body class="min-h-screen pb-10">
+    <header class="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
+        <div class="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <div class="flex items-center gap-3">
+                <span class="rounded bg-amber-500 px-2 py-1 text-xs font-black tracking-wider text-slate-950">FINANCE</span>
+                <span class="text-sm font-bold text-slate-100 sm:text-base">财经焦点看板</span>
             </div>
-            <div class="flex items-center space-x-2">
-                <button onclick="alert('海报生成功能准备中')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1 transition">
-                    <span>生成高清海报</span>
-                </button>
-                <button onclick="copyTerminalText()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1 transition">
-                    <span>复制终端文案</span>
-                </button>
+            <div class="flex items-center gap-2">
+                <button id="posterButton" type="button" class="rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-400">打印 / 保存海报</button>
+                <button id="copyButton" type="button" class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-500">复制终端文案</button>
             </div>
         </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-4 mt-4">
-        <!-- Live Status Bar -->
-        <div class="flex flex-wrap items-center justify-between text-xs text-slate-400 mb-4 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/80">
-            <div class="flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>终端实时同步中（自动化运行正常）</span>
+    <main class="mx-auto mt-4 max-w-4xl px-4">
+        <section class="mb-4 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
+            <div class="flex flex-wrap items-center gap-2">
+                <span id="statusDot" class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                <span id="statusText">新闻数据已载入</span>
             </div>
-            <div id="updateTime" class="text-slate-400 mt-1 sm:mt-0">更新时间: 2026-10-18 19:11:52 (北京时间)</div>
+            <div id="updateTime" class="mt-2">更新时间：等待数据</div>
+            <div class="mt-2 text-slate-500">新闻来自公开 RSS / 新闻接口；重要性排序为关键词辅助判断，不构成投资建议。</div>
+        </section>
+
+        <section class="mb-4">
+            <label for="searchInput" class="sr-only">搜索财经新闻</label>
+            <input
+                type="search"
+                id="searchInput"
+                autocomplete="off"
+                placeholder="搜索关键词（如：美联储、芯片、GDP、人民币）..."
+                class="w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none"
+            >
+        </section>
+
+        <nav aria-label="新闻频道" class="mb-5 flex overflow-x-auto border-b border-slate-800 text-sm">
+            <button id="tab-global" type="button" data-tab="global" class="tab-active whitespace-nowrap px-4 py-3">国际财经 Top 10</button>
+            <button id="tab-asia" type="button" data-tab="asia" class="tab-inactive whitespace-nowrap px-4 py-3">亚太财经 Top 5</button>
+            <button id="tab-china" type="button" data-tab="china" class="tab-inactive whitespace-nowrap px-4 py-3">国内财经 Top 5</button>
+        </nav>
+
+        <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
+            <span id="channelCaption">国际财经</span>
+            <span id="resultCount">0 条新闻</span>
         </div>
 
-        <!-- Search Box -->
-        <div class="mb-4">
-            <input type="text" id="searchInput" oninput="filterNews()" placeholder="搜索关键词（如：美联储、芯片、GDP）..." class="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-amber-500 transition">
-        </div>
+        <section id="newsContainer" class="space-y-4" aria-live="polite">
+            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-8 text-center text-sm text-slate-400">正在载入新闻…</div>
+        </section>
 
-        <!-- Navigation Tabs -->
-        <div class="flex border-b border-slate-800 mb-6 text-sm">
-            <button id="tab-global" onclick="switchTab('global')" class="py-2.5 px-4 tab-active transition">彭博全球 Top 10</button>
-            <button id="tab-asia" onclick="switchTab('asia')" class="py-2.5 px-4 tab-inactive transition">亚太焦点 Top 5</button>
-            <button id="tab-china" onclick="switchTab('china')" class="py-2.5 px-4 tab-inactive transition">国内核心 Top 5</button>
-        </div>
-
-        <!-- News Cards Container -->
-        <div id="newsContainer" class="space-y-4">
-            <!-- Cards populated dynamically via JS -->
-        </div>
-
-        <!-- Footer -->
-        <footer class="mt-12 text-center text-xs text-slate-500 space-y-1">
-            <p>免责声明：本看板内容基于 Bloomberg 及公开市场数据综合二次编译整理，仅供信息参考。</p>
-            <p>© 2026 Financial News Terminal. All rights reserved.</p>
+        <footer class="mt-12 space-y-2 border-t border-slate-800 pt-5 text-center text-xs leading-relaxed text-slate-500">
+            <p>免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。</p>
+            <p>请以新闻原文、监管机构公告和实时市场数据为准。</p>
+            <p>© 2026 财经焦点看板</p>
         </footer>
     </main>
 
     <!-- NEWS_DATA_START -->
-<script>
-const newsData = {"global":[{"title":"韩国财政部长表示，半导体市场将“至少在明年之前”保持稳定","summary":"韩国财政部长表示，尽管全球芯片抛售，但由于供应仍然紧张，半导体增长至少可以持续到2027年。","tag":"全球宏观","time":"19:10","publishedAt":"2026-10-18 19:10:44","source":"CNBC World","url":"https://www.cnbc.com/2026/10/17/south-korea-semiconductor-outlook-lee-hyoung-il.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"特朗普的俄罗斯柴油协议可能给普京带来的不仅仅是金钱—并为乌克兰带来麻烦","summary":"特朗普的柴油协议可能对俄罗斯的财政状况没有多大帮助，但它对乌克兰的影响力、美国的支持和普京的下一步行动提出了更大的质疑。","tag":"全球宏观","time":"15:22","publishedAt":"2026-10-18 15:22:07","source":"CNBC World","url":"https://www.cnbc.com/2026/10/17/trump-diesel-russia-ukraine-war.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"为什么对冲基金可能会使债券市场更有可能受到冲击","summary":"英格兰银行副行长警告称，对冲基金的活动可能会增加全球债券市场冲击的风险。","tag":"全球宏观","time":"14:13","publishedAt":"2026-10-18 14:13:05","source":"CNBC World","url":"https://www.cnbc.com/2026/10/18/hedge-funds-bond-market-turmoil.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"特朗普放弃对俄罗斯的广泛新制裁，泽伦斯基谴责这是“错误的”","summary":"9月，特朗普签署了针对俄罗斯入侵乌克兰的格雷厄姆法案。","tag":"全球宏观","time":"03:35","publishedAt":"2026-10-18 03:35:18","source":"CNBC World","url":"https://www.cnbc.com/2026/10/17/trump-waives-russia-related-sanctions-tariffs-before-they-take-effect-.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"投资者正在购买美国各地的大片林地，这是市场上最长期的押注之一","summary":"购买养老基金和其他机构投资者的Timberland经理可以等待数十年才能获得回报，但市场也可能是一个利润陷阱。","tag":"全球宏观","time":"00:31","publishedAt":"2026-10-18 00:31:06","source":"CNBC World","url":"https://www.cnbc.com/2026/10/17/timberland-investing-returns-risk.html","impact":"关注业绩变化与市场预期之间的差异。","asset":"相关上市公司 / 行业指数"},{"title":"软件的新整合商获得了伯克希尔的大量信任投票","summary":"作为一家上市公司，成立不到四个月， Bending Spoons本周就获得了伯克希尔哈撒韦公司的大力信任。","tag":"全球宏观","time":"23:11","publishedAt":"2026-10-17 23:11:30","source":"CNBC World","url":"https://www.cnbc.com/2026/10/17/bending-spoons-wants-to-revive-software-castoffs-berkshire-investing.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"十年的“死钱” ：为什么这种对冲基金方法可能比债券更具优势","summary":"投资者可能希望重新考虑其债券配置，并选择管理期货敞口。","tag":"全球宏观","time":"23:00","publishedAt":"2026-10-17 23:00:01","source":"CNBC Finance","url":"https://www.cnbc.com/2026/10/17/dead-money-for-a-decade-hedge-fund-approach-that-may-trump-bonds.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"有些公司为每个人提供人工智能。这位首席执行官正在做相反的事情","summary":"Paysend首席执行官Ben Chisell将人工智能工具限制在表现最佳的公司，因为其他英国公司正在推动更广泛的工作场所推广。","tag":"全球宏观","time":"13:00","publishedAt":"2026-10-17 13:00:01","source":"CNBC World","url":"https://www.cnbc.com/2026/10/17/ai-workplace-tokenmaxxing-paysend.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"2026财年美国预算赤字飙升至近2万$ ，单年增长12%","summary":"财政部公布了2026财年的美国预算赤字。","tag":"全球宏观","time":"06:34","publishedAt":"2026-10-17 06:34:29","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/16/us-budget-deficit-2026.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"分析：为什么2万亿美元的赤字和5%的国债收益率正在成为美国最大的经济挑战","summary":"超过5%的国债收益率正在提高家庭和联邦政府的借贷成本，凸显了为2万亿美元赤字融资的挑战。","tag":"全球宏观","time":"06:33","publishedAt":"2026-10-17 06:33:05","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/15/treasury-yields-deficit-national-debt-ai.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"}],"asia":[{"title":"韩国财政部长表示，半导体市场将“至少在明年之前”保持稳定","summary":"韩国财政部长表示，尽管全球芯片抛售，但由于供应仍然紧张，半导体增长至少可以持续到2027年。","tag":"亚太市场","time":"19:10","publishedAt":"2026-10-18 19:10:44","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/17/south-korea-semiconductor-outlook-lee-hyoung-il.html","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"据英国《金融时报》报道，埃森哲希望以高达15亿美元的价格出售中国业务","summary":"该新闻未提供可用摘要，请查看原文。","tag":"亚太市场","time":"18:24","publishedAt":"2026-10-18 18:24:24","source":"CNA Business","url":"https://www.channelnewsasia.com/business/accenture-looks-sell-chinese-operations-up-15-billion-ft-reports-6469506","impact":"关注中国宏观政策、人民币汇率及相关市场表现。","asset":"A股 / 人民币 / 港股"},{"title":"据《每日电讯报》报道，微软退出与Nscale的英国数据中心交易","summary":"该新闻未提供可用摘要，请查看原文。","tag":"亚太市场","time":"18:01","publishedAt":"2026-10-18 18:01:16","source":"CNA Business","url":"https://www.channelnewsasia.com/business/microsoft-pulls-out-uk-data-center-deal-nscale-telegraph-reports-6469486","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"日本启动历史性的火星月球往返任务","summary":"携带MMX的旗舰H3火箭将于周二（ 10月20日）凌晨4点41分从种子岛航天中心发射升空。","tag":"亚太市场","time":"17:20","publishedAt":"2026-10-18 17:20:00","source":"CNA Asia","url":"https://www.channelnewsasia.com/east-asia/japan-launch-historic-round-trip-mission-mars-moon-6469436","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"},{"title":"失控的卡车在印度的印度教节日杀死了13人","summary":"据报道，这辆满载的卡车在周日凌晨（ 10月18日）失去控制，被击中的信徒聚集在中央邦中央邦瓜利奥尔的一座寺庙里。","tag":"亚太市场","time":"16:43","publishedAt":"2026-10-18 16:43:00","source":"CNA Asia","url":"https://www.channelnewsasia.com/asia/out-control-truck-kills-13-hindu-festival-in-india-6469411","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"相关市场指数 / 行业板块"}],"china":[]};
-</script>
-<!-- NEWS_DATA_END -->
+    <script>
+    /*
+      update.py 会自动替换本区域。
+      初始数据为空；不会用虚构新闻填充频道。
+    */
+    const newsData = {
+        "global": [],
+        "asia": [],
+        "china": []
+    };
+    </script>
+    <!-- NEWS_DATA_END -->
 
     <script>
-        let currentTab = 'global';
+    "use strict";
 
-        function renderNews(tabKey, filterQuery = '') {
-            const container = document.getElementById('newsContainer');
-            container.innerHTML = '';
-            
-            const list = newsData[tabKey] || [];
-            const filtered = list.filter(item => 
-                item.title.toLowerCase().includes(filterQuery.toLowerCase()) || 
-                item.summary.toLowerCase().includes(filterQuery.toLowerCase())
-            );
+    let currentTab = "global";
 
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="text-center py-12 text-slate-500 text-sm">暂未搜寻到相关新闻</div>`;
-                return;
-            }
+    const channelInfo = {
+        global: { title: "国际财经", limit: 10 },
+        asia: { title: "亚太财经", limit: 5 },
+        china: { title: "国内财经", limit: 5 }
+    };
 
-            filtered.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'bg-slate-900/90 border border-slate-800/80 rounded-xl p-4 sm:p-5 hover:border-slate-700 transition space-y-3';
-                card.innerHTML = `
-                    <div class="flex items-center justify-between text-xs">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-amber-500 font-bold tracking-wide">${item.id}</span>
-                            <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-[11px]">${item.tag}</span>
-                        </div>
-                        <span class="text-slate-500">${item.time}</span>
-                    </div>
-                    <h3 class="text-base sm:text-lg font-bold text-slate-100 leading-snug">${item.title}</h3>
-                    <p class="text-xs sm:text-sm text-slate-400 leading-relaxed">${item.summary}</p>
-                    <div class="bg-slate-950/60 rounded-lg p-3 text-xs space-y-1.5 border border-slate-800/50">
-                        <div class="text-slate-300"><span class="text-amber-500 font-medium">📌 市场传导影响：</span> ${item.impact}</div>
-                        <div class="text-slate-300"><span class="text-amber-500 font-medium">💡 关联资产标的：</span> ${item.asset}</div>
-                    </div>
-                    <div class="flex justify-between items-center text-[11px] text-slate-500 pt-1">
-                        <span>彭博财经 · 每日精编</span>
-                        <span>来源: Bloomberg/公开数据</span>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
+    function safeText(value, fallback = "") {
+        if (value === null || value === undefined) return fallback;
+        const text = String(value).trim();
+        return text || fallback;
+    }
+
+    // 使用 DOM 创建元素并通过 textContent 写入新闻内容，避免把新闻文本当作 HTML 执行。
+    function makeElement(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text !== undefined) element.textContent = text;
+        return element;
+    }
+
+    function getItems(tabKey) {
+        const value = window.newsData && window.newsData[tabKey];
+        return Array.isArray(value) ? value.filter(item => item && safeText(item.title)) : [];
+    }
+
+    function normalizeItem(item, index, total) {
+        const generatedNumber = total - index;
+        return {
+            id: safeText(item.id, `NO.${String(generatedNumber).padStart(2, "0")}`),
+            title: safeText(item.title, "无标题"),
+            summary: safeText(item.summary || item.desc || item.description, "暂无摘要，请打开新闻原文查看。"),
+            tag: safeText(item.tag, channelInfo[currentTab].title),
+            time: safeText(item.time, ""),
+            source: safeText(item.source, "来源未标注"),
+            url: safeText(item.url || item.link, ""),
+            impact: safeText(item.impact, "请结合新闻原文、官方数据及实时行情判断影响。"),
+            asset: safeText(item.asset, "相关市场 / 行业")
+        };
+    }
+
+    function makeNewsCard(item, index, total) {
+        const news = normalizeItem(item, index, total);
+        const card = makeElement("article", "news-card space-y-3 rounded-xl p-4 transition sm:p-5");
+
+        const top = makeElement("div", "flex items-center justify-between gap-3 text-xs");
+        const labels = makeElement("div", "flex min-w-0 flex-wrap items-center gap-2");
+        labels.appendChild(makeElement("span", "font-bold tracking-wide text-amber-500", news.id));
+        labels.appendChild(makeElement("span", "rounded bg-slate-800 px-2 py-1 text-[11px] text-slate-300", news.tag));
+        top.appendChild(labels);
+        top.appendChild(makeElement("time", "shrink-0 text-slate-500", news.time));
+        card.appendChild(top);
+
+        const title = makeElement("h2", "news-title text-base font-bold leading-snug text-slate-100 sm:text-lg", news.title);
+        if (news.url && /^https?:\/\//i.test(news.url)) {
+            const link = document.createElement("a");
+            link.href = news.url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.className = "hover:text-amber-300";
+            link.textContent = news.title;
+            title.textContent = "";
+            title.appendChild(link);
         }
+        card.appendChild(title);
 
-        function switchTab(tabKey) {
-            currentTab = tabKey;
-            ['global', 'asia', 'china'].forEach(key => {
-                const btn = document.getElementById(`tab-${key}`);
-                if (key === tabKey) {
-                    btn.className = 'py-2.5 px-4 tab-active transition';
-                } else {
-                    btn.className = 'py-2.5 px-4 tab-inactive transition';
-                }
-            });
-            const searchVal = document.getElementById('searchInput').value;
-            renderNews(tabKey, searchVal);
+        card.appendChild(makeElement("p", "text-sm leading-relaxed text-slate-400", news.summary));
+
+        const impactBox = makeElement("div", "space-y-2 rounded-lg border border-slate-800/70 bg-slate-950/60 p-3 text-xs leading-relaxed");
+        const impactRow = makeElement("div", "text-slate-300");
+        impactRow.appendChild(makeElement("span", "font-semibold text-amber-500", "📌 市场传导影响："));
+        impactRow.appendChild(document.createTextNode(news.impact));
+        impactBox.appendChild(impactRow);
+
+        const assetRow = makeElement("div", "text-slate-300");
+        assetRow.appendChild(makeElement("span", "font-semibold text-amber-500", "💡 关联资产标的："));
+        assetRow.appendChild(document.createTextNode(news.asset));
+        impactBox.appendChild(assetRow);
+        card.appendChild(impactBox);
+
+        const bottom = makeElement("div", "flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/70 pt-3 text-[11px] text-slate-500");
+        bottom.appendChild(makeElement("span", "", `来源：${news.source}`));
+
+        if (news.url && /^https?:\/\//i.test(news.url)) {
+            const sourceLink = document.createElement("a");
+            sourceLink.href = news.url;
+            sourceLink.target = "_blank";
+            sourceLink.rel = "noopener noreferrer";
+            sourceLink.className = "source-link";
+            sourceLink.textContent = "阅读原文 ↗";
+            bottom.appendChild(sourceLink);
+        } else {
+            bottom.appendChild(makeElement("span", "", "暂无原文链接"));
         }
+        card.appendChild(bottom);
 
-        function filterNews() {
-            const searchVal = document.getElementById('searchInput').value;
-            renderNews(currentTab, searchVal);
-        }
+        return card;
+    }
 
-        function copyTerminalText() {
-            const list = newsData[currentTab] || [];
-            let text = `【Bloomberg 财经焦点 - ${currentTab.toUpperCase()}】\n\n`;
-            list.forEach(i => {
-                text += `${i.id} | ${i.title}\n摘要：${i.summary}\n\n`;
-            });
-            navigator.clipboard.writeText(text).then(() => alert('已成功复制终端文案到剪贴板！'));
-        }
+    function renderNews(tabKey, filterQuery = "") {
+        const container = document.getElementById("newsContainer");
+        const caption = document.getElementById("channelCaption");
+        const resultCount = document.getElementById("resultCount");
+        const query = safeText(filterQuery).toLocaleLowerCase();
 
-        // Initial Load
-        document.addEventListener('DOMContentLoaded', () => {
-            renderNews('global');
+        container.replaceChildren();
+        caption.textContent = channelInfo[tabKey].title;
+
+        const original = getItems(tabKey);
+        const filtered = original.filter(item => {
+            const haystack = [
+                item.title, item.summary, item.desc, item.source, item.tag
+            ].map(value => safeText(value)).join(" ").toLocaleLowerCase();
+            return haystack.includes(query);
         });
+
+        resultCount.textContent = `${filtered.length} 条新闻`;
+
+        if (original.length === 0) {
+            const empty = makeElement("div", "rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-12 text-center");
+            empty.appendChild(makeElement("p", "text-sm font-semibold text-slate-300", `${channelInfo[tabKey].title}暂时没有可显示的新闻`));
+            empty.appendChild(makeElement("p", "mt-2 text-xs leading-relaxed text-slate-500", "请稍后重新运行 GitHub Actions，并检查 update.py 的抓取日志。此处不会用虚构内容补足数量。"));
+            container.appendChild(empty);
+            return;
+        }
+
+        if (filtered.length === 0) {
+            container.appendChild(makeElement("div", "rounded-xl border border-slate-800 bg-slate-900/60 px-5 py-10 text-center text-sm text-slate-500", "没有找到匹配的新闻，请尝试其他关键词。"));
+            return;
+        }
+
+        // 如果数据没有 id，前端按当前列表自动生成倒序编号，防止 undefined。
+        filtered.forEach((item, index) => {
+            container.appendChild(makeNewsCard(item, index, filtered.length));
+        });
+    }
+
+    function switchTab(tabKey) {
+        if (!channelInfo[tabKey]) return;
+        currentTab = tabKey;
+
+        Object.keys(channelInfo).forEach(key => {
+            const button = document.getElementById(`tab-${key}`);
+            button.classList.toggle("tab-active", key === tabKey);
+            button.classList.toggle("tab-inactive", key !== tabKey);
+            button.setAttribute("aria-current", key === tabKey ? "page" : "false");
+        });
+
+        renderNews(currentTab, document.getElementById("searchInput").value);
+    }
+
+    function filterNews() {
+        renderNews(currentTab, document.getElementById("searchInput").value);
+    }
+
+    async function copyTerminalText() {
+        const list = getItems(currentTab);
+        const lines = [`【${channelInfo[currentTab].title}】`, ""];
+        list.forEach((item, index) => {
+            const news = normalizeItem(item, index, list.length);
+            lines.push(`${news.id}｜${news.title}`);
+            lines.push(`摘要：${news.summary}`);
+            lines.push(`来源：${news.source}`);
+            if (news.url) lines.push(`原文：${news.url}`);
+            lines.push("");
+        });
+
+        const text = lines.join("\n");
+        try {
+            await navigator.clipboard.writeText(text);
+            alert("已复制当前频道的新闻文案。");
+        } catch (error) {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            const ok = document.execCommand("copy");
+            textarea.remove();
+            alert(ok ? "已复制当前频道的新闻文案。" : "复制失败，请检查浏览器剪贴板权限。");
+        }
+    }
+
+    function printPoster() {
+        window.print();
+    }
+
+    function updateStatus() {
+        const counts = Object.keys(channelInfo).map(key => getItems(key).length);
+        const total = counts.reduce((sum, count) => sum + count, 0);
+        const statusText = document.getElementById("statusText");
+        const dot = document.getElementById("statusDot");
+
+        if (total > 0) {
+            statusText.textContent = `新闻数据已载入：国际 ${counts[0]} 条 · 亚太 ${counts[1]} 条 · 国内 ${counts[2]} 条`;
+            dot.className = "h-2 w-2 rounded-full bg-emerald-500";
+        } else {
+            statusText.textContent = "当前页面没有载入新闻数据，请检查自动更新任务";
+            dot.className = "h-2 w-2 rounded-full bg-amber-500";
+        }
+
+        const timeElement = document.getElementById("updateTime");
+        if (timeElement && !timeElement.textContent.includes("北京时间")) {
+            timeElement.textContent = "更新时间：请查看 GitHub Actions 更新日志（北京时间）";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll("[data-tab]").forEach(button => {
+            button.addEventListener("click", () => switchTab(button.dataset.tab));
+        });
+        document.getElementById("searchInput").addEventListener("input", filterNews);
+        document.getElementById("copyButton").addEventListener("click", copyTerminalText);
+        document.getElementById("posterButton").addEventListener("click", printPoster);
+
+        updateStatus();
+        renderNews(currentTab);
+    });
     </script>
+
+    <style>
+        @media print {
+            body { background: #fff !important; color: #111827 !important; }
+            header, nav, #searchInput, #posterButton, #copyButton, footer { display: none !important; }
+            .news-card { background: #fff !important; color: #111827 !important; break-inside: avoid; }
+            .news-card * { color: #111827 !important; }
+        }
+    </style>
 </body>
 </html>
