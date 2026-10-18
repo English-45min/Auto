@@ -47,11 +47,11 @@ def fetch_rss(rss_url):
         print(f"⚠️ RSS抓取异常 [{rss_url}]: {e}")
     return items
 
-# 4. 联合拉取全球各大高频财经源（100% 避开 500 报错）
+# 4. 联合拉取全球高稳定高频财经源（100% 避开 422 错误）
 raw_items = []
 sources = [
     "https://www.cnbc.com/id/100003114/device/rss/rss.html",
-    "https://finance.yahoo.com/news/rssindex"
+    "https://www.cnbc.com/id/19832395/device/rss/rss.html"
 ]
 
 for src in sources:
@@ -80,7 +80,6 @@ for item in raw_items:
     }
     
     t_lower = (raw_t + cn_title).lower()
-    # 智能关键词归类
     if any(k in t_lower for k in ["china", "chinese", "beijing", "shanghai", "a-share", "pbc", "中国", "央行", "人民币"]):
         china_pool.append(news_obj)
     elif any(k in t_lower for k in ["asia", "japan", "tokyo", "hong kong", "korea", "taiwan", "asia-pacific", "日本", "亚太", "港股", "韩国"]):
@@ -151,4 +150,4 @@ updated_content = re.sub(time_pattern, time_replacement, updated_content)
 with open('index.html', 'w', encoding='utf-8') as f:
     f.write(updated_content)
 
-print(f"✅ [多源聚合智能分流版] 编译写入完成！时间: {datetime_str} (CST)")
+print(f"✅ [高稳定多源聚合版] 编译写入完成！时间: {datetime_str} (CST)")
