@@ -3,14 +3,14 @@ import json
 import re
 import urllib.request
 
-# 1. 北京时间初始化（精确到秒，确保版本唯一）
+# 1. 北京时间初始化（精确到秒）
 utc_now = datetime.datetime.now(datetime.timezone.utc)
 cst_now = utc_now + datetime.timedelta(hours=8)
 datetime_str = cst_now.strftime("%Y-%m-%d %H:%M:%S")
 month_day_str = cst_now.strftime("%m月%d日")
 
-# 2. 从开放高频财经电报流抓取当天最新真实快讯
-def fetch_real_today_telegraphs():
+# 2. 100% 真实高频公开财经电报流抓取（增加健壮性防错）
+def fetch_real_telegraphs():
     global_items = []
     asia_items = []
     china_items = []
@@ -21,11 +21,29 @@ def fetch_real_today_telegraphs():
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
         with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            feed_list = data.get('result', {}).get('data', {}).get('feed', [])
+            res_text = response.read().decode('utf-8')
+            data = json.loads(res_text)
+            
+            # 兼容性适配：确保安全获取结果
+            result_node = data.get('result', {})
+            if isinstance(result_node, str):
+                result_node = json.loads(result_node)
+                
+            data_node = result_node.get('data', {})
+            if isinstance(data_node, str):
+                data_node = json.loads(data_node)
+                
+            feed_list = data_node.get('feed', [])
+            if not isinstance(feed_list, list):
+                feed_list = []
             
             for feed in feed_list:
+                if not isinstance(feed, dict):
+                    continue
                 rich_text = feed.get('rich_text', '')
+                if not isinstance(rich_text, str):
+                    continue
+                    
                 clean_text = re.sub(r'<.*?>', '', rich_text).strip()
                 clean_text = re.sub(r'[\r\n\t]', ' ', clean_text)
                 
@@ -44,7 +62,7 @@ def fetch_real_today_telegraphs():
                     continue
                 seen_titles.add(title_str)
                 
-                # 精准归类
+                # 智能归类
                 if any(k in clean_text for k in ["A股", "央行", "证监会", "统计局", "发改委", "财政部", "沪指", "深成指", "国资委"]):
                     if len(china_items) < 10:
                         china_items.append({"title": title_str, "summary": summary_str[:120] + "...", "tag": "国内焦点"})
@@ -59,39 +77,35 @@ def fetch_real_today_telegraphs():
         
     return global_items, asia_items, china_items
 
-global_real, asia_real, china_real = fetch_real_today_telegraphs()
+global_real, asia_real, china_real = fetch_real_telegraphs()
 
-# 混合去重补齐（100% 真实，绝无硬编码模板）
-all_real_combined = global_real + asia_real + china_real
+# 保证配额 (10 / 5 / 5)
+all_combined = global_real + asia_real + china_real
 
-def ensure_real_quota(pool, target_count):
-    unique_pool = []
+def build_quota(pool, target_count):
+    unique = []
     seen = set()
-    
     for item in pool:
         if item['title'] not in seen:
             seen.add(item['title'])
-            unique_pool.append(item)
-            
-    if len(unique_pool) < target_count:
-        for item in all_real_combined:
+            unique.append(item)
+    if len(unique) < target_count:
+        for item in all_combined:
             if item['title'] not in seen:
                 seen.add(item['title'])
-                unique_pool.append(item)
-            if len(unique_pool) >= target_count:
+                unique.append(item)
+            if len(unique) >= target_count:
                 break
-                
-    return unique_pool[:target_count]
+    return unique[:target_count]
 
-final_global = ensure_real_quota(global_real, 10)
-final_asia = ensure_real_quota(asia_real, 5)
-final_china = ensure_real_quota(china_real, 5)
+final_global = build_quota(global_real, 10)
+final_asia = build_quota(asia_real, 5)
+final_china = build_quota(china_real, 5)
 
-# 3. 生成 JS
+# 3. 转化为 JS 结构
 def format_js(items_list):
     if not items_list:
         return f'{{ id: "NO.01", title: "{month_day_str} 焦点：当前正等待下一轮实时电报广播", time: "08:00", tag: "实时播报", summary: "坚持100%真实报道原则，等待刷新。", impact: "N/A", asset: "N/A" }}'
-        
     res = []
     total = len(items_list)
     for idx, item in enumerate(items_list):
@@ -117,7 +131,7 @@ new_news_js = f"""<script>
         }};
     </script>"""
 
-# 4. 写入文件并更新带秒的时间戳
+# 4. 精准写入 index.html
 with open('index.html', 'r', encoding='utf-8') as f:
     content = f.read()
 
@@ -125,8 +139,8 @@ pattern = r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->"
 replacement = f"<!-- NEWS_DATA_START -->\n    {new_news_js}\n    <!-- NEWS_DATA_END -->"
 updated_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
 
-time_pattern = r'<div id="updateTime">更新时间: .*?</div>'
-time_replacement = f'<div id="updateTime">更新时间: {datetime_str} (CST)</div>'
+time_pattern = r'<div id="updateTime".*?>.*?</div>'
+time_replacement = f'<div id="updateTime" class="text-slate-400 mt-1 sm:mt-0">更新时间: {datetime_str} (CST)</div>'
 updated_content = re.sub(time_pattern, time_replacement, updated_content)
 
 with open('index.html', 'w', encoding='utf-8') as f:
