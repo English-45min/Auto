@@ -152,52 +152,73 @@ def http_get(url, timeout=12):
 # ========================= 国际/亚太新闻中文翻译 =========================
 
 def translate_to_chinese(text):
-    """通过 Google Translate 公共接口翻译单条文本；失败时返回原文，不编造译文。"""
+    """翻译国际/亚太新闻。长文本分块，Google 失败时尝试备用接口。"""
     text = clean_text(text)
     if not text:
         return text
-
-    # 已含较多中文时不重复翻译。
     chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
     latin_chars = len(re.findall(r"[A-Za-z]", text))
     if chinese_chars >= 8 and chinese_chars >= latin_chars:
         return text
 
-    params = urllib.parse.urlencode({
-        "client": "gtx",
-        "sl": "auto",
-        "tl": "zh-CN",
-        "dt": "t",
-        "q": text,
-    })
-    url = "https://translate.googleapis.com/translate_a/single?" + params
-    try:
-        raw = http_get(url, timeout=15)
-        payload = json.loads(raw.decode("utf-8", errors="replace"))
-        translated = "".join(
-            part[0] for part in (payload[0] or [])
-            if isinstance(part, list) and part and isinstance(part[0], str)
-        ).strip()
-        return translated or text
-    except Exception as exc:
-        print(f"⚠️ 中文翻译暂不可用，保留原文：{type(exc).__name__}: {exc}")
-        return text
+    def translate_chunk(chunk):
+        errors = []
+        # Google Translate 公共接口
+        try:
+            params = urllib.parse.urlencode({"client":"gtx", "sl":"auto", "tl":"zh-CN", "dt":"t", "q":chunk})
+            raw = http_get("https://translate.googleapis.com/translate_a/single?" + params, timeout=18)
+            payload = json.loads(raw.decode("utf-8", errors="replace"))
+            result = "".join(part[0] for part in (payload[0] or []) if isinstance(part, list) and part and isinstance(part[0], str)).strip()
+            if result:
+                return result
+            errors.append("Google 返回空结果")
+        except Exception as exc:
+            errors.append(f"Google {type(exc).__name__}: {exc}")
+        # 备用服务
+        try:
+            params = urllib.parse.urlencode({"q":chunk, "langpair":"en|zh-CN"})
+            raw = http_get("https://api.mymemory.translated.net/get?" + params, timeout=18)
+            payload = json.loads(raw.decode("utf-8", errors="replace"))
+            result = clean_text((payload.get("responseData") or {}).get("translatedText", ""))
+            if result:
+                return html.unescape(result)
+            errors.append("备用接口返回空结果")
+        except Exception as exc:
+            errors.append(f"备用接口 {type(exc).__name__}: {exc}")
+        print("⚠️ 翻译失败，保留原文：" + "；".join(errors))
+        return chunk
+
+    # 控制单次请求长度，避免长摘要触发 URL 过长或接口拒绝。
+    chunks=[]
+    remaining=text
+    while len(remaining)>300:
+        cut=max(remaining.rfind("。",0,300), remaining.rfind(".",0,300), remaining.rfind(" ",0,300))
+        if cut < 80:
+            cut=300
+        chunks.append(remaining[:cut+1].strip())
+        remaining=remaining[cut+1:].strip()
+    if remaining:
+        chunks.append(remaining)
+    results=[]
+    for chunk in chunks:
+        results.append(translate_chunk(chunk))
+        time.sleep(0.15)
+    return " ".join(results).strip()
 
 
 def translate_international_channels(items, channel_name):
-    """只翻译国际/亚太新闻标题和摘要；来源、链接、时间及国内新闻不改动。"""
-    translated_count = 0
+    """仅翻译国际/亚太标题和摘要；国内新闻不经过此函数。"""
+    title_count = 0
     for item in items:
-        original_title = clean_text(item.get("title", ""))
-        original_summary = clean_text(item.get("summary", ""))
-        if original_title:
-            item["title"] = translate_to_chinese(original_title)
-        if original_summary:
-            item["summary"] = translate_to_chinese(original_summary)
-        if item.get("title") != original_title or item.get("summary") != original_summary:
-            translated_count += 1
-        time.sleep(0.12)
-    print(f"🌐 {channel_name}：已处理中文翻译 {translated_count}/{len(items)} 条")
+        old_title = clean_text(item.get("title", ""))
+        old_summary = clean_text(item.get("summary", ""))
+        if old_title:
+            item["title"] = translate_to_chinese(old_title)
+            if item["title"] != old_title:
+                title_count += 1
+        if old_summary:
+            item["summary"] = translate_to_chinese(old_summary)
+    print(f"🌐 {channel_name}：标题转为中文 {title_count}/{len(items)} 条")
     return items
 
 
@@ -393,19 +414,44 @@ def fetch_sina_china():
         return []
 
 
+# 国内频道只保留与中国经济或中国市场明确相关的新闻，避免把海外数据混入国内频道。
+CHINA_RELEVANCE_KEYWORDS = (
+    "中国", "国内", "中国人民银行", "央行", "人民币", "A股", "沪指", "上证", "深证",
+    "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "中信证券",
+    "中信建投", "国泰君安", "中金公司", "申万宏源", "证券时报", "中国证券",
+    "国家统计局", "财政部", "商务部", "发改委", "工信部", "国务院", "证监会",
+    "金融监管总局", "社融", "LPR", "中国GDP", "中国CPI", "中国PPI", "中国出口",
+    "中国进口", "中国房地产", "中国楼市", "地方债", "新能源汽车", "中国上市公司",
+    "中国消费", "中国制造业PMI", "工业增加值", "中国零售总额", "中国外贸", "人民币汇率"
+)
+
+
+def is_china_relevant(item):
+    text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
+    low = text.lower()
+    return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
+
+
+def filter_china_news(items):
+    kept = [item for item in items if is_china_relevant(item)]
+    removed = len(items) - len(kept)
+    if removed:
+        print(f"🧹 国内频道已过滤 {removed} 条与中国市场无明确关联的新闻")
+    return kept
+
+
 def fetch_china_news():
-    # 首选新浪财经直播接口
-    items = fetch_sina_china()
+    # 新浪财经直播流可能混有海外宏观快讯，因此必须先按中国市场相关性过滤。
+    items = filter_china_news(fetch_sina_china())
     if items:
         return items
 
-    # 新浪失败时，依次尝试国内财经 RSS。只收录确实抓到的新闻。
-    print("ℹ️ 新浪财经没有返回可用新闻，开始尝试国内财经 RSS 备用源。")
-    fallback_items = collect_rss(CHINA_RSS_FEEDS)
+    print("ℹ️ 新浪财经没有返回符合条件的国内新闻，尝试国内财经 RSS 备用源。")
+    fallback_items = filter_china_news(collect_rss(CHINA_RSS_FEEDS))
     if fallback_items:
         return fallback_items
 
-    print("⚠️ 国内财经频道没有抓到可用新闻；不会生成虚构新闻。")
+    print("⚠️ 没有抓到符合中国市场相关性规则的新闻；不会用海外新闻补足数量。")
     return []
 
 
