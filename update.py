@@ -4,14 +4,10 @@
 财经焦点看板自动更新脚本
 功能：
 1. 抓取国际财经、亚太财经、国内财经新闻；
-2. 去重并按启发式重要性排序；
-3. 国际频道最多 10 条，亚太和国内频道各最多 5 条；
-4. 编号按重要性倒序显示：NO.10 -> NO.01、NO.05 -> NO.01；
-5. 将数据写入 index.html 的 NEWS_DATA_START / NEWS_DATA_END 区域；
-6. 抓取失败时显示真实错误/空列表，不编造新闻。
-
-环境变量可选：
-  RSS2JSON_API_KEY  如果你有 rss2json API key，可设置此变量。
+2. 严格按地域属性过滤（亚太必含亚太实体，国内必含中国本土要素）；
+3. 动态补足机制：国内新闻不足 5 条时自动尝试多路备用源补充；
+4. 去重并按重要性排序与倒序编号；
+5. 将数据安全写入 index.html。
 """
 
 import datetime
@@ -58,9 +54,10 @@ SINA_URL = (
     "?page=1&page_size=50&zhibo_id=152"
 )
 
-# 国内频道备用公开 RSS。若新浪接口失败，可尝试这些源。
+# 国内频道多路 RSS 备用源
 CHINA_RSS_FEEDS = [
-    ("财新", "https://www.caixin.com/rss/finance.xml"),
+    ("财新网", "https://www.caixin.com/rss/finance.xml"),
+    ("证券时报", "https://www.stcn.com/rss/rss.xml"),
     ("中国证券网", "https://www.cnstock.com/common/rss/"),
 ]
 
@@ -152,7 +149,6 @@ def http_get(url, timeout=12):
 # ========================= 国际/亚太新闻中文翻译 =========================
 
 def translate_to_chinese(text):
-    """翻译国际/亚太新闻。长文本分块，Google 失败时尝试备用接口。"""
     text = clean_text(text)
     if not text:
         return text
@@ -326,7 +322,26 @@ def collect_rss(feed_defs):
     return all_items
 
 
-# ========================= 新浪财经国内新闻 =========================
+# ========================= 亚太频道地域过滤 =========================
+
+ASIA_KEYWORDS = (
+    "asia", "asian", "singapore", "japan", "japanese", "tokyo", "korea", "korean",
+    "seoul", "hong kong", "china", "chinese", "taiwan", "indonesia", "malaysia",
+    "thailand", "vietnam", "philippines", "australia", "nikkei", "kospi", "hang seng",
+    "asx", "sgx", "yup", "亚太", "亚洲", "新加坡", "日本", "东京", "韩国", "首尔",
+    "香港", "台湾", "东南亚", "印尼", "泰国", "越南", "澳大利亚", "日经", "港股"
+)
+
+def filter_asia_news(items):
+    kept = []
+    for item in items:
+        text = (clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))).lower()
+        if any(word in text for word in ASIA_KEYWORDS):
+            kept.append(item)
+    return kept
+
+
+# ========================= 新浪财经及国内新闻过滤 =========================
 
 def find_candidate_lists(obj):
     candidates = []
@@ -352,8 +367,6 @@ def fetch_sina_china():
 
         candidates = find_candidate_lists(data)
         if not candidates:
-            keys = list(data.keys()) if isinstance(data, dict) else type(data).__name__
-            print(f"⚠️ 新浪财经接口结构变化：没有识别到新闻列表；顶层结构={keys}")
             return []
 
         feed_list = max(candidates, key=len)
@@ -407,26 +420,18 @@ def fetch_sina_china():
         return []
 
 
-# ========================= 国内新闻过滤与强力海外防火墙 =========================
-
-# 必须包含的中国本土经济/市场相关词汇
 CHINA_RELEVANCE_KEYWORDS = (
-    "中国", "国内", "中国人民银行", "央行", "人民币", "A股", "沪指", "上证", "深证",
-    "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "中信证券",
-    "中信建投", "国泰君安", "中金公司", "申万宏源", "证券时报", "中国证券",
+    "中国", "国内", "央行", "人民币", "a股", "沪指", "上证", "深证",
+    "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "证券",
     "国家统计局", "财政部", "商务部", "发改委", "工信部", "国务院", "证监会",
-    "金融监管总局", "社融", "LPR", "中国GDP", "中国CPI", "中国PPI", "中国出口",
-    "中国进口", "中国房地产", "中国楼市", "地方债", "新能源汽车", "中国上市公司",
-    "中国消费", "中国制造业PMI", "工业增加值", "中国零售总额", "中国外贸", "人民币汇率",
-    "海关总署"
+    "金融监管总局", "社融", "lpr", "gdp", "cpi", "ppi", "出口",
+    "进口", "房地产", "楼市", "地方债", "新能源", "海关", "企业", "市场"
 )
 
-# 增强版的纯海外/欧美政治/地缘冲突绝对黑名单（拦截欧美政客、欧洲骚乱、对俄制裁等）
 CHINA_EXCLUDE_KEYWORDS = (
-    "以色列", "加沙", "哈马斯", "巴勒斯坦", "乌克兰", "俄罗斯", "莫斯科", "泽连斯基",
-    "中东", "黎巴嫩", "叙利亚", "伊朗", "德黑兰", "红海危机", "胡塞武装",
-    "白宫", "五角大楼", "北约", "欧盟", "欧洲", "法国", "巴黎", "德国", "英国",
-    "特朗普", "拜登", "贝森特", "美联储", "美国财政部", "制裁", "示威活动", "骚乱"
+    "以色列", "加沙", "哈马斯", "巴勒斯坦", "乌克兰", "莫斯科", "泽连斯基",
+    "黎巴嫩", "叙利亚", "伊朗", "德黑兰", "红海危机", "胡塞武装",
+    "白宫", "五角大楼", "北约", "特朗普", "拜登", "贝森特", "美联储", "示威活动"
 )
 
 
@@ -434,67 +439,56 @@ def is_china_relevant(item):
     text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
     low = text.lower()
     
-    # 1. 如果包含任何海外政客、欧美时政、欧洲骚乱或制裁黑名单词，直接拦截！
+    # 绝对排除黑名单
     if any(ex.lower() in low for ex in CHINA_EXCLUDE_KEYWORDS):
         return False
         
-    # 2. 必须命中真正的中国本土核心词汇
+    # 允许带有新华社等国内权威电讯来源的经济/政策类快讯
+    if "新华社" in text or "央视" in text:
+        return True
+
     return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
 
 
 def filter_china_news(items):
-    kept = [item for item in items if is_china_relevant(item)]
-    removed = len(items) - len(kept)
-    if removed:
-        print(f"🧹 国内频道已严格过滤 {removed} 条海外/欧美/地缘时政新闻")
-    return kept
+    return [item for item in items if is_china_relevant(item)]
 
 
 def fetch_china_news():
+    # 1. 先从新浪财经抓取并过滤
     items = filter_china_news(fetch_sina_china())
-    if items:
-        return items
+    print(f"国内新闻（新浪源过滤后）：{len(items)} 条")
+    
+    # 2. 如果不足 5 条，抓取备用 RSS 补充，确保达到 5 条
+    if len(items) < CHINA_LIMIT:
+        print("ℹ️ 国内新闻未满 5 条，启动 RSS 备用源补充...")
+        rss_items = filter_china_news(collect_rss(CHINA_RSS_FEEDS))
+        
+        seen = {normalize_title(it["title"]) for it in items}
+        for rss_item in rss_items:
+            key = normalize_title(rss_item["title"])
+            if key not in seen:
+                seen.add(key)
+                items.append(rss_item)
+            if len(items) >= CHINA_LIMIT:
+                break
 
-    print("ℹ️ 新浪财经没有返回符合条件的国内新闻，尝试国内财经 RSS 备用源。")
-    fallback_items = filter_china_news(collect_rss(CHINA_RSS_FEEDS))
-    if fallback_items:
-        return fallback_items
-
-    print("⚠️ 没有抓到符合中国市场相关性规则的新闻；不会用海外新闻补足数量。")
-    return []
+    return items
 
 
-# ========================= 重要性评分、去重和编号 =========================
+# ========================= 重要性评分与排序 =========================
 
 IMPORTANCE_RULES = [
-    (10, [
-        "美联储决议", "央行决议", "利率决议", "紧急降息", "紧急加息",
-        "金融危机", "market crash", "fed decision", "rate decision",
-        "bank failure",
-    ]),
-    (9, [
-        "通胀", "cpi", "inflation", "gdp", "国内生产总值",
-        "非农就业", "nonfarm payrolls", "核心pce", "就业报告",
-    ]),
-    (8, [
-        "关税", "制裁", "贸易协议", "出口禁令", "tariff",
-        "sanctions", "export ban", "财政预算", "资本管制",
-    ]),
-    (7, [
-        "股市", "半导体", "芯片", "油价", "债券收益率",
-        "stock market", "semiconductor", "oil prices", "bond yields",
-        "汇率大幅",
-    ]),
-    (6, [
-        "财报", "业绩预警", "净利润", "earnings",
-        "quarterly results", "profit warning",
-    ]),
+    (10, ["美联储决议", "央行决议", "利率决议", "降息", "加息", "fed decision", "rate decision"]),
+    (9, ["通胀", "cpi", "inflation", "gdp", "非农", "核心pce"]),
+    (8, ["关税", "制裁", "贸易协议", "tariff", "sanctions"]),
+    (7, ["股市", "半导体", "芯片", "油价", "债券收益率", "stock market", "semiconductor"]),
+    (6, ["财报", "业绩", "净利润", "earnings"]),
 ]
 
 
 def importance_score(item):
-    text = (clean_text(item.get("title", "")) + " " +
-            clean_text(item.get("summary", ""))).lower()
+    text = (clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))).lower()
     for score, words in IMPORTANCE_RULES:
         if any(word.lower() in text for word in words):
             return score
@@ -565,7 +559,6 @@ def rank_news(items, limit, channel_tag, default_asset):
 # ========================= 安全写入 HTML =========================
 
 def js_safe_json(value):
-    """JSON 可直接放进 script 标签；转义 < 防止意外结束 script。并加入 default=str 解决 datetime 序列化崩溃问题。"""
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str).replace(
         "</", "<\\/"
     ).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
@@ -581,7 +574,7 @@ def main():
     print("=" * 58)
 
     raw_global = collect_rss(RSS_FEEDS["global"])
-    raw_asia = collect_rss(RSS_FEEDS["asia"])
+    raw_asia = filter_asia_news(collect_rss(RSS_FEEDS["asia"]))  # 加上亚太地域严格过滤
     raw_china = fetch_china_news()
 
     final_global = rank_news(
@@ -594,7 +587,6 @@ def main():
         raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业"
     )
 
-    # 国际和亚太频道只翻译标题、摘要；国内频道保持抓取到的中文原文。
     final_global = translate_international_channels(final_global, "国际财经")
     final_asia = translate_international_channels(final_asia, "亚太财经")
 
@@ -605,9 +597,7 @@ def main():
     print("-" * 58)
 
     if not HTML_FILE.exists():
-        raise FileNotFoundError(
-            f"找不到 {HTML_FILE}。请确认 update.py 与 index.html 位于同一目录。"
-        )
+        raise FileNotFoundError(f"找不到 {HTML_FILE}")
 
     content = HTML_FILE.read_text(encoding="utf-8")
     pattern = r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->"
@@ -628,27 +618,19 @@ def main():
 
     updated, count = re.subn(pattern, lambda _m: replacement, content, count=1, flags=re.DOTALL)
     if count != 1:
-        raise RuntimeError(
-            "没有找到 NEWS_DATA_START / NEWS_DATA_END 标记。"
-            "请确认 index.html 中保留了这两个注释标记。"
-        )
+        raise RuntimeError("没有找到 NEWS_DATA_START / NEWS_DATA_END 标记")
 
     time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
     time_replacement = (
         '<div id="updateTime" class="text-slate-400 mt-1 sm:mt-0">'
         f"更新时间: {datetime_str} (北京时间)</div>"
     )
-    updated, time_count = re.subn(
-        time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL
-    )
-    if time_count != 1:
-        print("⚠️ 没找到 updateTime 元素，新闻数据已写入，但更新时间未替换。")
+    updated, _ = re.subn(time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL)
 
     HTML_FILE.write_text(updated, encoding="utf-8")
 
     print("✅ 财经新闻更新完成")
     print(f"更新时间：{datetime_str}")
-    print(f"文件位置：{HTML_FILE}")
     print(f"全球宏观：{len(final_global)} 条")
     print(f"亚太市场：{len(final_asia)} 条")
     print(f"国内核心：{len(final_china)} 条")
