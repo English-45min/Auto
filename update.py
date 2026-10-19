@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财经焦点看板自动更新脚本
-功能：
-1. 抓取国际财经、亚太财经、国内财经新闻；
-2. 严格地域分类，杜绝任何国际、欧美、地缘政治新闻混入国内频道；
-3. 国内频道若新浪直播源不足 5 条，自动启用高稳定 RSS/自媒体备用源补足；
-4. 自动处理 HTTP 重定向，防止 308/301 报错；
-5. 去重并按重要性排序与倒序编号，安全写入 index.html。
+财经焦点看板自动更新脚本（扩容版）
+容量调整：
+- 全球宏观：最多 20 条（NO.20 -> NO.01）
+- 亚太市场：最多 10 条（NO.10 -> NO.01）
+- 国内核心：最多 10 条（NO.10 -> NO.01）
 """
 
 import datetime
@@ -29,19 +27,24 @@ BEIJING_TZ = datetime.timezone(datetime.timedelta(hours=8))
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "index.html"
 
-GLOBAL_LIMIT = 10
-ASIA_LIMIT = 5
-CHINA_LIMIT = 5
+# 频道容量扩容设置
+GLOBAL_LIMIT = 20
+ASIA_LIMIT = 10
+CHINA_LIMIT = 10
 
 RSS_FEEDS = {
+    # 国际财经与重磅时政：CNBC、BBC 国际政经、路透等
     "global": [
         ("CNBC World", "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
         ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("CNBC Economy", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
+        ("BBC World News", "http://feeds.bbci.co.uk/news/world/rss.xml"),
     ],
+    # 亚太财经与时政：CNA 商业/亚洲/时政、CNBC Asia、日经亚洲
     "asia": [
         ("CNA Business", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"),
         ("CNA Asia", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
+        ("CNA World", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6311"),
         ("CNBC Asia", "https://www.cnbc.com/id/19832390/device/rss/rss.html"),
         ("Nikkei Asia", "https://asia.nikkei.com/rss/feed/nar"),
     ],
@@ -52,12 +55,12 @@ SINA_URL = (
     "?page=1&page_size=50&zhibo_id=152"
 )
 
-# 国内频道多路稳定公开 RSS / 财经大厂与自媒体源（全部带原文 URL 链接）
+# 国内频道多路备用公开 RSS（财新、华尔街见闻、凤凰财经、证券时报等权威政经源）
 CHINA_RSS_FEEDS = [
     ("新浪财经焦点", "https://rss.sina.com.cn/roll/finance/hot_roll.xml"),
-    ("新浪股票要闻", "https://rss.sina.com.cn/finance/stock1.xml"),
-    ("凤凰财经", "https://finance.ifeng.com/rss/index.xml"),
     ("华尔街见闻", "https://dedicated.wallstreetcn.com/rss.xml"),
+    ("凤凰财经", "https://finance.ifeng.com/rss/index.xml"),
+    ("证券时报", "https://www.stcn.com/rss/rss.xml"),
 ]
 
 
@@ -129,7 +132,6 @@ def parse_date(value):
 
 
 def http_get(url, timeout=12):
-    """具有重定向追踪及现代 User-Agent 的 HTTP GET 请求"""
     request = urllib.request.Request(
         url,
         headers={
@@ -219,7 +221,6 @@ def translate_international_channels(items, channel_name):
 def parse_rss_xml(xml_bytes, source_name):
     items = []
     try:
-        # 兼容 gbk / utf-8 编码的 XML
         try:
             xml_str = xml_bytes.decode("utf-8")
         except UnicodeDecodeError:
@@ -326,7 +327,7 @@ def collect_rss(feed_defs):
     return all_items
 
 
-# ========================= 亚太频道严格过滤 =========================
+# ========================= 亚太频道地域过滤 =========================
 
 ASIA_KEYWORDS = (
     "asia", "asian", "singapore", "japan", "japanese", "tokyo", "korea", "korean",
@@ -345,7 +346,7 @@ def filter_asia_news(items):
     return kept
 
 
-# ========================= 国内新闻过滤与全覆盖防泄漏拦截 =========================
+# ========================= 国内新闻过滤 =========================
 
 def find_candidate_lists(obj):
     candidates = []
@@ -427,15 +428,14 @@ CHINA_RELEVANCE_KEYWORDS = (
     "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "证券",
     "国家统计局", "财政部", "商务部", "发改委", "工信部", "国务院", "证监会",
     "金融监管总局", "社融", "lpr", "gdp", "cpi", "ppi", "出口",
-    "进口", "房地产", "楼市", "地方债", "新能源", "海关", "企业", "市场", "公司"
+    "进口", "房地产", "楼市", "地方债", "新能源", "海关", "企业", "市场", "公司",
+    "外交部", "会谈", "视察", "协议"
 )
 
+# 仅排除纯海外地方琐碎社会杂音
 CHINA_EXCLUDE_KEYWORDS = (
-    "加拿大", "以色列", "加沙", "哈马斯", "巴勒斯坦", "乌克兰", "俄罗斯", "莫斯科", 
-    "泽连斯基", "黎巴嫩", "叙利亚", "伊朗", "德黑兰", "红海危机", "胡塞武装",
-    "白宫", "五角大楼", "北约", "欧盟", "欧洲", "法国", "巴黎", "德国", "英国",
-    "特朗普", "拜登", "贝森特", "美联储", "美国财政部", "制裁", "示威活动", "骚乱",
-    "诺瓦克", "副总理"
+    "加拿大基地", "哈马斯", "巴勒斯坦", "红海危机", "胡塞武装",
+    "示威活动", "骚乱", "枪击", "火灾"
 )
 
 
@@ -454,13 +454,12 @@ def filter_china_news(items):
 
 
 def fetch_china_news():
-    # 1. 抓取新浪财经直播流并严格过滤
     items = filter_china_news(fetch_sina_china())
-    print(f"国内新闻（新浪直播源过滤后）：{len(items)} 条")
+    print(f"国内新闻（新浪源过滤后）：{len(items)} 条")
     
-    # 2. 不足 5 条时，启动全新强化的备用 RSS 补充
+    # 若抓到的新闻不足扩容后的 10 条，持续调用 RSS 源补齐
     if len(items) < CHINA_LIMIT:
-        print("ℹ️ 国内新闻未满 5 条，启动备用高稳定性 RSS 源补充...")
+        print(f"ℹ️ 国内新闻未满 {CHINA_LIMIT} 条，启动备用高稳定性 RSS 源补充...")
         rss_items = filter_china_news(collect_rss(CHINA_RSS_FEEDS))
         
         seen = {normalize_title(it["title"]) for it in items}
@@ -478,9 +477,9 @@ def fetch_china_news():
 # ========================= 重要性评分与排序 =========================
 
 IMPORTANCE_RULES = [
-    (10, ["央行决议", "利率决议", "降息", "加息"]),
-    (9, ["通胀", "cpi", "inflation", "gdp", "核心pce"]),
-    (8, ["关税", "贸易协议"]),
+    (10, ["美联储", "央行决议", "利率决议", "降息", "加息", "外交", "峰会", "总统", "总理"]),
+    (9, ["通胀", "cpi", "inflation", "gdp", "非农", "核心pce", "制裁", "关税"]),
+    (8, ["贸易协议", "选举", "大选", "会谈"]),
     (7, ["股市", "半导体", "芯片", "油价", "债券收益率"]),
     (6, ["财报", "业绩", "净利润"]),
 ]
@@ -568,7 +567,7 @@ def main():
     datetime_str = current.strftime("%Y-%m-%d %H:%M:%S")
 
     print("=" * 58)
-    print("开始抓取财经新闻")
+    print("开始抓取财经与时政焦点新闻（扩容版）")
     print(f"北京时间：{datetime_str}")
     print("=" * 58)
 
@@ -586,8 +585,8 @@ def main():
         raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业"
     )
 
-    final_global = translate_international_channels(final_global, "国际财经")
-    final_asia = translate_international_channels(final_asia, "亚太财经")
+    final_global = translate_international_channels(final_global, "国际财经与政经")
+    final_asia = translate_international_channels(final_asia, "亚太财经与政经")
 
     print("-" * 58)
     print(f"频道 全球宏观：实际展示 {len(final_global)} 条")
@@ -628,7 +627,7 @@ def main():
 
     HTML_FILE.write_text(updated, encoding="utf-8")
 
-    print("✅ 财经新闻更新完成")
+    print("✅ 财经/时政焦点新闻更新完成")
     print(f"更新时间：{datetime_str}")
     print(f"全球宏观：{len(final_global)} 条")
     print(f"亚太市场：{len(final_asia)} 条")
