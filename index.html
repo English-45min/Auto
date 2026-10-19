@@ -21,11 +21,13 @@
       </div>
     </div>
 
-    <!-- 2. 更新状态面板（仅保留北京时间） -->
+    <!-- 2. 更新状态面板 -->
     <div class="card border rounded-xl p-4 mb-4">
       <div class="flex items-center space-x-2">
         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <div id="updateTime" class="text-slate-300 font-medium text-sm">更新时间: 2026-10-19 10:19:23 (北京时间)</div>
+        <div id="updateTime" class="text-slate-300 font-medium text-sm">
+          更新时间: 正在加载...
+        </div>
       </div>
       <p class="text-xs text-slate-500 mt-2">
         新闻来自公开 RSS / 新闻接口；重要性排序为关键词辅助判断，不构成投资建议。
@@ -38,7 +40,7 @@
         class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition">
     </div>
 
-    <!-- 4. Tab 切换导航（国际 Top 20 / 亚太 Top 10 / 国内 Top 10） -->
+    <!-- 4. Tab 切换导航 -->
     <div class="flex border-b border-slate-800 mb-6">
       <button id="tab-global" onclick="switchTab('global')" class="py-3 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition">
         国际财经 Top 20
@@ -68,8 +70,12 @@
 
   </div>
 
-  <!-- 引入自动生成的独立数据文件 -->
-  <script src="news.js"></script>
+  <!-- Python 自动化脚本注入锚点 -->
+  <!-- NEWS_DATA_START -->
+  <script>
+    const newsData = { global: [], asia: [], china: [] };
+  </script>
+  <!-- NEWS_DATA_END -->
 
   <script>
     let currentTab = 'global';
