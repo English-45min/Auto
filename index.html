@@ -70,12 +70,8 @@
 
   </div>
 
-  <!-- Python 自动化脚本注入锚点，请务必保留 -->
-  <!-- NEWS_DATA_START -->
-  <script>
-    const newsData = { global: [], asia: [], china: [] };
-  </script>
-  <!-- NEWS_DATA_END -->
+  <!-- 引入自动生成的独立数据文件 -->
+  <script src="news.js"></script>
 
   <script>
     let currentTab = 'global';
@@ -142,7 +138,6 @@
       `).join('');
     }
 
-    // 从页面上同步更新时间（如果 update.py 写入了 updateTime 元素）
     window.addEventListener('DOMContentLoaded', () => {
       renderNews();
     });
