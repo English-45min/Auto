@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财经焦点看板自动更新脚本（扩容版）
-容量调整：
-- 全球宏观：最多 20 条（NO.20 -> NO.01）
-- 亚太市场：最多 10 条（NO.10 -> NO.01）
-- 国内核心：最多 10 条（NO.10 -> NO.01）
+财经与时政焦点看板自动更新脚本（扩容与时政增强版）
+功能：
+1. 扩容频道配额：国际 20 条、亚太 10 条、国内 10 条；
+2. 增强大国外交、地缘政经、重磅政策等时政关键词匹配；
+3. 更新 HTML 时，顶部区域仅保留北京时间 updateTime；
+4. 去重并按重要性倒序编号（NO.20 -> NO.01、NO.10 -> NO.01）。
 """
 
 import datetime
@@ -27,20 +28,20 @@ BEIJING_TZ = datetime.timezone(datetime.timedelta(hours=8))
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "index.html"
 
-# 频道容量扩容设置
+# 频道容量配额
 GLOBAL_LIMIT = 20
 ASIA_LIMIT = 10
 CHINA_LIMIT = 10
 
 RSS_FEEDS = {
-    # 国际财经与重磅时政：CNBC、BBC 国际政经、路透等
+    # 国际财经与重磅时政源
     "global": [
         ("CNBC World", "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
         ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("CNBC Economy", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
         ("BBC World News", "http://feeds.bbci.co.uk/news/world/rss.xml"),
     ],
-    # 亚太财经与时政：CNA 商业/亚洲/时政、CNBC Asia、日经亚洲
+    # 亚太财经与地缘政经源
     "asia": [
         ("CNA Business", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"),
         ("CNA Asia", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
@@ -55,7 +56,7 @@ SINA_URL = (
     "?page=1&page_size=50&zhibo_id=152"
 )
 
-# 国内频道多路备用公开 RSS（财新、华尔街见闻、凤凰财经、证券时报等权威政经源）
+# 国内多路权威政经 RSS 源
 CHINA_RSS_FEEDS = [
     ("新浪财经焦点", "https://rss.sina.com.cn/roll/finance/hot_roll.xml"),
     ("华尔街见闻", "https://dedicated.wallstreetcn.com/rss.xml"),
@@ -184,17 +185,17 @@ def translate_to_chinese(text):
         print("⚠️ 翻译失败，保留原文：" + "；".join(errors))
         return chunk
 
-    chunks=[]
-    remaining=text
-    while len(remaining)>300:
-        cut=max(remaining.rfind("。",0,300), remaining.rfind(".",0,300), remaining.rfind(" ",0,300))
+    chunks = []
+    remaining = text
+    while len(remaining) > 300:
+        cut = max(remaining.rfind("。", 0, 300), remaining.rfind(".", 0, 300), remaining.rfind(" ", 0, 300))
         if cut < 80:
-            cut=300
+            cut = 300
         chunks.append(remaining[:cut+1].strip())
-        remaining=remaining[cut+1:].strip()
+        remaining = remaining[cut+1:].strip()
     if remaining:
         chunks.append(remaining)
-    results=[]
+    results = []
     for chunk in chunks:
         results.append(translate_chunk(chunk))
         time.sleep(0.15)
@@ -429,10 +430,10 @@ CHINA_RELEVANCE_KEYWORDS = (
     "国家统计局", "财政部", "商务部", "发改委", "工信部", "国务院", "证监会",
     "金融监管总局", "社融", "lpr", "gdp", "cpi", "ppi", "出口",
     "进口", "房地产", "楼市", "地方债", "新能源", "海关", "企业", "市场", "公司",
-    "外交部", "会谈", "视察", "协议"
+    "外交部", "会谈", "视察", "协议", "峰会", "高层"
 )
 
-# 仅排除纯海外地方琐碎社会杂音
+# 仅排除无经济意义的民事或极端安全事故杂音
 CHINA_EXCLUDE_KEYWORDS = (
     "加拿大基地", "哈马斯", "巴勒斯坦", "红海危机", "胡塞武装",
     "示威活动", "骚乱", "枪击", "火灾"
@@ -457,7 +458,6 @@ def fetch_china_news():
     items = filter_china_news(fetch_sina_china())
     print(f"国内新闻（新浪源过滤后）：{len(items)} 条")
     
-    # 若抓到的新闻不足扩容后的 10 条，持续调用 RSS 源补齐
     if len(items) < CHINA_LIMIT:
         print(f"ℹ️ 国内新闻未满 {CHINA_LIMIT} 条，启动备用高稳定性 RSS 源补充...")
         rss_items = filter_china_news(collect_rss(CHINA_RSS_FEEDS))
@@ -474,14 +474,31 @@ def fetch_china_news():
     return items
 
 
-# ========================= 重要性评分与排序 =========================
+# ========================= 增强版时政与财经重要性评分 =========================
 
 IMPORTANCE_RULES = [
-    (10, ["美联储", "央行决议", "利率决议", "降息", "加息", "外交", "峰会", "总统", "总理"]),
-    (9, ["通胀", "cpi", "inflation", "gdp", "非农", "核心pce", "制裁", "关税"]),
-    (8, ["贸易协议", "选举", "大选", "会谈"]),
-    (7, ["股市", "半导体", "芯片", "油价", "债券收益率"]),
-    (6, ["财报", "业绩", "净利润"]),
+    # 10分最高优先级：大国领导人/高层外交、重大峰会、中央银行货币决议、战术停火/战略协议
+    (10, [
+        "美联储", "央行决议", "利率决议", "降息", "加息", "fed decision", "rate decision",
+        "外交", "峰会", "总统", "总理", "主席", "会谈", "白宫", "国情咨文", "summit", "president", "pm"
+    ]),
+    # 9分次高优先级：核心宏观经济指标、重磅关税/贸易制裁、大选/政局变动
+    (9, [
+        "通胀", "cpi", "inflation", "gdp", "非农", "核心pce", "制裁", "关税",
+        "tariff", "sanctions", "election", "大选", "地缘政治"
+    ]),
+    # 8分中高优先级：重大贸易协议、行业产业政策、国际组织声明
+    (8, [
+        "贸易协议", "政策支持", "产业政策", "un", "联合国", "opec", "欧佩克", "imf"
+    ]),
+    # 7分金融与资本市场：股市、半导体、能源与债市
+    (7, [
+        "股市", "半导体", "芯片", "油价", "债券收益率", "stock market", "semiconductor", "oil"
+    ]),
+    # 6分企业与微观：巨头财报与业绩
+    (6, [
+        "财报", "业绩", "净利润", "earnings"
+    ]),
 ]
 
 
@@ -567,7 +584,7 @@ def main():
     datetime_str = current.strftime("%Y-%m-%d %H:%M:%S")
 
     print("=" * 58)
-    print("开始抓取财经与时政焦点新闻（扩容版）")
+    print("开始抓取财经与时政焦点新闻（扩容与时政增强版）")
     print(f"北京时间：{datetime_str}")
     print("=" * 58)
 
@@ -618,9 +635,10 @@ def main():
     if count != 1:
         raise RuntimeError("没有找到 NEWS_DATA_START / NEWS_DATA_END 标记")
 
+    # 替换顶部时间节点，不包含任何具体的数量提示字符串
     time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
     time_replacement = (
-        '<div id="updateTime" class="text-slate-400 mt-1 sm:mt-0">'
+        '<div id="updateTime" class="text-slate-300 font-medium text-sm">'
         f"更新时间: {datetime_str} (北京时间)</div>"
     )
     updated, _ = re.subn(time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL)
