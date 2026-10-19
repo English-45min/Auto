@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财经与时政焦点看板自动更新脚本（生成独立 news.js 版）
+财经与时政焦点看板自动更新脚本（完整内嵌版）
 功能：
 1. 抓取国际财经/时政（20条）、亚太财经/时政（10条）、国内核心政经（10条）；
-2. 自动生成独立的数据文件 news.js 供前端调用；
-3. 更新 index.html 中的北京时间。
+2. 严格地域过滤，集成高稳定 RSS 备用源与多路 HTTP 重定向处理；
+3. 自动翻译国际/亚太新闻为中文；
+4. 按重要性与时政权重排序，并以单文件内嵌形式安全写入 index.html。
 """
 
 import datetime
@@ -177,7 +178,6 @@ def translate_to_chinese(text):
             errors.append("备用接口返回空结果")
         except Exception as exc:
             errors.append(f"备用接口 {type(exc).__name__}: {exc}")
-        print("⚠️ 翻译失败，保留原文：" + "；".join(errors))
         return chunk
 
     chunks = []
@@ -269,10 +269,8 @@ def fetch_rss_direct(source_name, rss_url):
     try:
         data = http_get(rss_url, timeout=12)
         items = parse_rss_xml(data, source_name)
-        print(f"✅ RSS [{source_name}]：获取 {len(items)} 条")
         return items
     except Exception as exc:
-        print(f"⚠️ RSS [{source_name}] 抓取失败：{type(exc).__name__}: {exc}")
         return []
 
 
@@ -302,7 +300,6 @@ def fetch_rss2json(source_name, rss_url):
                     "source": source_name,
                     "url": item.get("link", ""),
                 })
-        print(f"✅ RSS 网关 [{source_name}]：获取 {len(results)} 条")
         return results
     except Exception as exc:
         return []
@@ -437,10 +434,8 @@ CHINA_EXCLUDE_KEYWORDS = (
 def is_china_relevant(item):
     text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
     low = text.lower()
-    
     if any(ex.lower() in low for ex in CHINA_EXCLUDE_KEYWORDS):
         return False
-        
     return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
 
 
@@ -450,12 +445,8 @@ def filter_china_news(items):
 
 def fetch_china_news():
     items = filter_china_news(fetch_sina_china())
-    print(f"国内新闻（新浪源过滤后）：{len(items)} 条")
-    
     if len(items) < CHINA_LIMIT:
-        print(f"ℹ️ 国内新闻未满 {CHINA_LIMIT} 条，启动备用高稳定性 RSS 源补充...")
         rss_items = filter_china_news(collect_rss(CHINA_RSS_FEEDS))
-        
         seen = {normalize_title(it["title"]) for it in items}
         for rss_item in rss_items:
             key = normalize_title(rss_item["title"])
@@ -464,30 +455,17 @@ def fetch_china_news():
                 items.append(rss_item)
             if len(items) >= CHINA_LIMIT:
                 break
-
     return items
 
 
 # ========================= 重要性评分与排序 =========================
 
 IMPORTANCE_RULES = [
-    (10, [
-        "美联储", "央行决议", "利率决议", "降息", "加息", "fed decision", "rate decision",
-        "外交", "峰会", "总统", "总理", "主席", "会谈", "白宫", "国情咨文", "summit", "president", "pm"
-    ]),
-    (9, [
-        "通胀", "cpi", "inflation", "gdp", "非农", "核心pce", "制裁", "关税",
-        "tariff", "sanctions", "election", "大选", "地缘政治"
-    ]),
-    (8, [
-        "贸易协议", "政策支持", "产业政策", "un", "联合国", "opec", "欧佩克", "imf"
-    ]),
-    (7, [
-        "股市", "半导体", "芯片", "油价", "债券收益率", "stock market", "semiconductor", "oil"
-    ]),
-    (6, [
-        "财报", "业绩", "净利润", "earnings"
-    ]),
+    (10, ["美联储", "央行决议", "利率决议", "降息", "加シス", "外交", "峰会", "总统", "总理", "主席", "会谈", "白宫"]),
+    (9, ["通胀", "cpi", "inflation", "gdp", "非农", "核心pce", "制裁", "关税", "地缘政治"]),
+    (8, ["贸易协议", "政策支持", "产业政策", "联合国", "欧佩克"]),
+    (7, ["股市", "半导体", "芯片", "油价", "债券收益率"]),
+    (6, ["财报", "业绩", "净利润"]),
 ]
 
 
@@ -571,58 +549,52 @@ def main():
     datetime_str = current.strftime("%Y-%m-%d %H:%M:%S")
 
     print("=" * 58)
-    print("开始抓取财经与时政焦点新闻")
-    print(f"北京时间：{datetime_str}")
+    print(f"开始抓取财经与时政焦点新闻（北京时间：{datetime_str}）")
     print("=" * 58)
 
     raw_global = collect_rss(RSS_FEEDS["global"])
     raw_asia = filter_asia_news(collect_rss(RSS_FEEDS["asia"]))
     raw_china = fetch_china_news()
 
-    final_global = rank_news(
-        raw_global, GLOBAL_LIMIT, "全球宏观", "全球股指 / 美元 / 美债 / 大宗商品"
-    )
-    final_asia = rank_news(
-        raw_asia, ASIA_LIMIT, "亚太市场", "亚洲股指 / 港股 / 日股 / 汇率"
-    )
-    final_china = rank_news(
-        raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业"
-    )
+    final_global = rank_news(raw_global, GLOBAL_LIMIT, "全球宏观", "全球股指 / 美元 / 美债 / 大宗商品")
+    final_asia = rank_news(raw_asia, ASIA_LIMIT, "亚太市场", "亚洲股指 / 港股 / 日股 / 汇率")
+    final_china = rank_news(raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业")
 
     final_global = translate_international_channels(final_global, "国际财经与政经")
     final_asia = translate_international_channels(final_asia, "亚太财经与政经")
 
-    print("-" * 58)
-    print(f"频道 全球宏观：实际展示 {len(final_global)} 条")
-    print(f"频道 亚太市场：实际展示 {len(final_asia)} 条")
-    print(f"频道 国内核心：实际展示 {len(final_china)} 条")
-    print("-" * 58)
+    if not HTML_FILE.exists():
+        raise FileNotFoundError(f"找不到 {HTML_FILE}")
 
-    # 1. 独立生成 news.js 数据文件
+    content = HTML_FILE.read_text(encoding="utf-8")
     news_data = {
         "global": final_global,
         "asia": final_asia,
         "china": final_china,
     }
-    js_content = f"const newsData = {js_safe_json(news_data)};\n"
-    js_file = BASE_DIR / "news.js"
-    js_file.write_text(js_content, encoding="utf-8")
-    print(f"✅ 数据已成功写入 {js_file.name}")
 
-    # 2. 更新 index.html 中的更新时间显示
-    if HTML_FILE.exists():
-        content = HTML_FILE.read_text(encoding="utf-8")
-        time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
-        time_replacement = (
-            '<div id="updateTime" class="text-slate-300 font-medium text-sm">'
-            f"更新时间: {datetime_str} (北京时间)</div>"
-        )
-        updated, _ = re.subn(time_pattern, lambda _m: time_replacement, content, count=1, flags=re.DOTALL)
-        HTML_FILE.write_text(updated, encoding="utf-8")
+    pattern = r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->"
+    replacement = (
+        "<!-- NEWS_DATA_START -->\n"
+        "<script>\n"
+        f"const newsData = {js_safe_json(news_data)};\n"
+        "</script>\n"
+        "<!-- NEWS_DATA_END -->"
+    )
 
-    print("✅ 财经/时政焦点新闻看板更新完成")
-    print(f"更新时间：{datetime_str}")
-    print("=" * 58)
+    updated, count = re.subn(pattern, lambda _m: replacement, content, count=1, flags=re.DOTALL)
+    if count != 1:
+        raise RuntimeError("没有找到 NEWS_DATA_START / NEWS_DATA_END 标记")
+
+    time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
+    time_replacement = (
+        '<div id="updateTime" class="text-slate-300 font-medium text-sm">'
+        f"更新时间: {datetime_str} (北京时间)</div>"
+    )
+    updated, _ = re.subn(time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL)
+
+    HTML_FILE.write_text(updated, encoding="utf-8")
+    print(f"✅ 成功更新：全球宏观 {len(final_global)} 条 | 亚太市场 {len(final_asia)} 条 | 国内核心 {len(final_china)} 条")
 
 
 if __name__ == "__main__":
