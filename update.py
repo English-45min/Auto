@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财经与时政焦点看板自动更新脚本（扩容与时政增强版）
+财经与时政焦点看板自动更新脚本（生成独立 news.js 版）
 功能：
-1. 扩容频道配额：国际 20 条、亚太 10 条、国内 10 条；
-2. 增强大国外交、地缘政经、重磅政策等时政关键词匹配；
-3. 更新 HTML 时，顶部区域仅保留北京时间 updateTime；
-4. 去重并按重要性倒序编号（NO.20 -> NO.01、NO.10 -> NO.01）。
+1. 抓取国际财经/时政（20条）、亚太财经/时政（10条）、国内核心政经（10条）；
+2. 自动生成独立的数据文件 news.js 供前端调用；
+3. 更新 index.html 中的北京时间。
 """
 
 import datetime
@@ -28,20 +27,17 @@ BEIJING_TZ = datetime.timezone(datetime.timedelta(hours=8))
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "index.html"
 
-# 频道容量配额
 GLOBAL_LIMIT = 20
 ASIA_LIMIT = 10
 CHINA_LIMIT = 10
 
 RSS_FEEDS = {
-    # 国际财经与重磅时政源
     "global": [
         ("CNBC World", "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
         ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("CNBC Economy", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
         ("BBC World News", "http://feeds.bbci.co.uk/news/world/rss.xml"),
     ],
-    # 亚太财经与地缘政经源
     "asia": [
         ("CNA Business", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"),
         ("CNA Asia", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
@@ -56,7 +52,6 @@ SINA_URL = (
     "?page=1&page_size=50&zhibo_id=152"
 )
 
-# 国内多路权威政经 RSS 源
 CHINA_RSS_FEEDS = [
     ("新浪财经焦点", "https://rss.sina.com.cn/roll/finance/hot_roll.xml"),
     ("华尔街见闻", "https://dedicated.wallstreetcn.com/rss.xml"),
@@ -433,7 +428,6 @@ CHINA_RELEVANCE_KEYWORDS = (
     "外交部", "会谈", "视察", "协议", "峰会", "高层"
 )
 
-# 仅排除无经济意义的民事或极端安全事故杂音
 CHINA_EXCLUDE_KEYWORDS = (
     "加拿大基地", "哈马斯", "巴勒斯坦", "红海危机", "胡塞武装",
     "示威活动", "骚乱", "枪击", "火灾"
@@ -474,28 +468,23 @@ def fetch_china_news():
     return items
 
 
-# ========================= 增强版时政与财经重要性评分 =========================
+# ========================= 重要性评分与排序 =========================
 
 IMPORTANCE_RULES = [
-    # 10分最高优先级：大国领导人/高层外交、重大峰会、中央银行货币决议、战术停火/战略协议
     (10, [
         "美联储", "央行决议", "利率决议", "降息", "加息", "fed decision", "rate decision",
         "外交", "峰会", "总统", "总理", "主席", "会谈", "白宫", "国情咨文", "summit", "president", "pm"
     ]),
-    # 9分次高优先级：核心宏观经济指标、重磅关税/贸易制裁、大选/政局变动
     (9, [
         "通胀", "cpi", "inflation", "gdp", "非农", "核心pce", "制裁", "关税",
         "tariff", "sanctions", "election", "大选", "地缘政治"
     ]),
-    # 8分中高优先级：重大贸易协议、行业产业政策、国际组织声明
     (8, [
         "贸易协议", "政策支持", "产业政策", "un", "联合国", "opec", "欧佩克", "imf"
     ]),
-    # 7分金融与资本市场：股市、半导体、能源与债市
     (7, [
         "股市", "半导体", "芯片", "油价", "债券收益率", "stock market", "semiconductor", "oil"
     ]),
-    # 6分企业与微观：巨头财报与业绩
     (6, [
         "财报", "业绩", "净利润", "earnings"
     ]),
@@ -571,8 +560,6 @@ def rank_news(items, limit, channel_tag, default_asset):
     return output
 
 
-# ========================= 安全写入 HTML =========================
-
 def js_safe_json(value):
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str).replace(
         "</", "<\\/"
@@ -584,7 +571,7 @@ def main():
     datetime_str = current.strftime("%Y-%m-%d %H:%M:%S")
 
     print("=" * 58)
-    print("开始抓取财经与时政焦点新闻（扩容与时政增强版）")
+    print("开始抓取财经与时政焦点新闻")
     print(f"北京时间：{datetime_str}")
     print("=" * 58)
 
@@ -611,45 +598,30 @@ def main():
     print(f"频道 国内核心：实际展示 {len(final_china)} 条")
     print("-" * 58)
 
-    if not HTML_FILE.exists():
-        raise FileNotFoundError(f"找不到 {HTML_FILE}")
-
-    content = HTML_FILE.read_text(encoding="utf-8")
-    pattern = r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->"
-
+    # 1. 独立生成 news.js 数据文件
     news_data = {
         "global": final_global,
         "asia": final_asia,
         "china": final_china,
     }
+    js_content = f"const newsData = {js_safe_json(news_data)};\n"
+    js_file = BASE_DIR / "news.js"
+    js_file.write_text(js_content, encoding="utf-8")
+    print(f"✅ 数据已成功写入 {js_file.name}")
 
-    replacement = (
-        "<!-- NEWS_DATA_START -->\n"
-        "<script>\n"
-        f"const newsData = {js_safe_json(news_data)};\n"
-        "</script>\n"
-        "<!-- NEWS_DATA_END -->"
-    )
+    # 2. 更新 index.html 中的更新时间显示
+    if HTML_FILE.exists():
+        content = HTML_FILE.read_text(encoding="utf-8")
+        time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
+        time_replacement = (
+            '<div id="updateTime" class="text-slate-300 font-medium text-sm">'
+            f"更新时间: {datetime_str} (北京时间)</div>"
+        )
+        updated, _ = re.subn(time_pattern, lambda _m: time_replacement, content, count=1, flags=re.DOTALL)
+        HTML_FILE.write_text(updated, encoding="utf-8")
 
-    updated, count = re.subn(pattern, lambda _m: replacement, content, count=1, flags=re.DOTALL)
-    if count != 1:
-        raise RuntimeError("没有找到 NEWS_DATA_START / NEWS_DATA_END 标记")
-
-    # 替换顶部时间节点，不包含任何具体的数量提示字符串
-    time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
-    time_replacement = (
-        '<div id="updateTime" class="text-slate-300 font-medium text-sm">'
-        f"更新时间: {datetime_str} (北京时间)</div>"
-    )
-    updated, _ = re.subn(time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL)
-
-    HTML_FILE.write_text(updated, encoding="utf-8")
-
-    print("✅ 财经/时政焦点新闻更新完成")
+    print("✅ 财经/时政焦点新闻看板更新完成")
     print(f"更新时间：{datetime_str}")
-    print(f"全球宏观：{len(final_global)} 条")
-    print(f"亚太市场：{len(final_asia)} 条")
-    print(f"国内核心：{len(final_china)} 条")
     print("=" * 58)
 
 
