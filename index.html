@@ -2,309 +2,148 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0f19">
-  <meta name="description" content="国际、亚太与国内财经新闻焦点看板">
-  <title>财经焦点看板｜国际・亚太・中国</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>财经与时政焦点看板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root{color-scheme:dark;--bg:#0b0f19;--panel:#0f172a;--border:#263244;--text:#e2e8f0;--muted:#94a3b8;--amber:#f59e0b}
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif}
-    button,input{font:inherit}
-    button,a,input{ -webkit-tap-highlight-color:transparent }
-    button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
-    .header{position:sticky;top:0;z-index:10;border-bottom:1px solid #1e293b;background:rgba(15,23,42,.96);backdrop-filter:blur(12px)}
-    .header-inner,.main{width:min(100%,880px);margin:auto;padding-left:16px;padding-right:16px}
-    .header-inner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:12px;padding-bottom:12px}
-    .brand{display:flex;align-items:center;gap:12px;font-weight:750}
-    .badge{background:var(--amber);color:#111827;padding:8px 10px;border-radius:6px;font-size:12px;font-weight:900;letter-spacing:.06em}
-    .actions{display:flex;gap:8px}
-    .btn{border:0;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:750;cursor:pointer}
-    .btn-print{background:var(--amber);color:#111827}.btn-copy{background:#2563eb;color:white}
-    .main{padding-top:16px;padding-bottom:40px}
-    .status,.search,.empty,.news-card{border:1px solid var(--border);border-radius:18px;background:rgba(15,23,42,.72)}
-    .status{padding:14px 16px;color:var(--muted);font-size:13px;line-height:1.65;margin-bottom:16px}
-    .status-line{display:flex;align-items:center;gap:9px}
-    .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);flex:none}
-    .update-time{margin-top:3px}
-    .disclaimer-small{margin-top:8px;color:#64748b}
-    .search{width:100%;padding:15px 16px;background:var(--panel);color:var(--text);font-size:14px;margin-bottom:20px}
-    .search::placeholder{color:#64748b}
-    .tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);margin-bottom:18px;scrollbar-width:thin}
-    .tab{flex:1;white-space:nowrap;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);padding:14px 12px;font-size:14px;cursor:pointer}
-    .tab.active{border-bottom-color:var(--amber);color:var(--amber);font-weight:850}
-    .count-row{display:flex;justify-content:space-between;gap:10px;color:#64748b;font-size:13px;margin-bottom:12px}
-    .list{display:grid;gap:14px}
-    .news-card{padding:16px;background:rgba(15,23,42,.92)}
-    .news-top,.news-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-    .news-top{font-size:12px;color:#64748b;margin-bottom:12px}
-    .labels{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .news-id{color:var(--amber);font-weight:850}
-    .tag{padding:4px 8px;border-radius:6px;background:#1e293b;color:#cbd5e1;font-size:11px}
-    .news-title{font-size:17px;line-height:1.5;font-weight:800;margin:0 0 10px;overflow-wrap:anywhere}
-    .news-title a{color:var(--text);text-decoration:none}
-    .news-title a:hover{color:#fbbf24}
-    .summary{color:#94a3b8;font-size:14px;line-height:1.75;margin:0 0 14px;white-space:pre-wrap;overflow-wrap:anywhere}
-    .impact{border:1px solid rgba(51,65,85,.7);background:rgba(2,6,23,.5);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;display:grid;gap:7px;margin-bottom:14px}
-    .impact strong{color:var(--amber)}
-    .news-bottom{border-top:1px solid rgba(51,65,85,.7);padding-top:12px;font-size:11px;color:#64748b}
-    .source-link{color:#94a3b8;text-underline-offset:3px}
-    .source-link:hover{color:#fbbf24}
-    .empty{padding:38px 20px;text-align:center;color:#94a3b8;line-height:1.8}
-    .empty strong{display:block;color:#cbd5e1;margin-bottom:8px}
-    footer{margin-top:48px;padding-top:20px;border-top:1px solid var(--border);text-align:center;color:#64748b;font-size:12px;line-height:1.9}
-    footer p{margin:7px 0}
-    @media(min-width:640px){.main{padding-top:20px}.news-card{padding:20px}.tab{font-size:15px}.news-title{font-size:19px}}
-    @media(max-width:420px){.header-inner{gap:10px}.brand{gap:8px}.brand-name{font-size:14px}.btn{padding:10px 9px;font-size:11px}.tab{padding:13px 10px;font-size:13px}.news-title{font-size:16px}}
-    @media print{body{background:#fff;color:#111827}.header,.search,.tabs,footer{display:none!important}.main{width:100%;padding:0}.status{background:#fff;color:#374151}.news-card{break-inside:avoid;background:#fff;color:#111827;border-color:#d1d5db}.news-title a,.summary,.impact,.news-bottom,.news-top{color:#111827}.impact{background:#f9fafb}.list{gap:8px}}
+    body { background-color: #0b0f19; color: #cbd5e1; }
+    .card { background-color: #111827; border-color: #1e293b; }
+    .nav-tab-active { color: #f59e0b; border-bottom-color: #f59e0b; }
   </style>
 </head>
-<body>
-<header class="header">
-  <div class="header-inner">
-    <div class="brand"><span class="badge">FINANCE</span><span class="brand-name">财经焦点看板</span></div>
-    <div class="actions">
-      <button id="posterButton" class="btn btn-print" type="button">打印 / 保存海报</button>
-      <button id="copyButton" class="btn btn-copy" type="button">复制终端文案</button>
+<body class="min-h-screen pb-12">
+  <div class="max-w-4xl mx-auto px-4 pt-6">
+    
+    <!-- 1. 顶部 Header -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center space-x-3">
+        <span class="bg-amber-500 text-slate-950 font-bold px-2.5 py-1 rounded text-xs tracking-wider">FINANCE & POLITICS</span>
+        <h1 class="text-xl sm:text-2xl font-bold text-white">财经焦点看板</h1>
+      </div>
     </div>
+
+    <!-- 2. 更新状态面板（仅保留更新时间，已彻底删除数量提示） -->
+    <div class="card border rounded-xl p-4 mb-4">
+      <div class="flex items-center space-x-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <div id="updateTime" class="text-slate-300 font-medium text-sm">
+          更新时间: 正在加载...
+        </div>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">
+        新闻来自公开 RSS / 新闻接口；重要性排序为关键词辅助判断，不构成投资建议。
+      </p>
+    </div>
+
+    <!-- 3. 搜索框 -->
+    <div class="mb-6">
+      <input type="text" id="searchInput" placeholder="搜索关键词（如：美联储、外交、特朗普、GDP、人民币）..." 
+        class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition">
+    </div>
+
+    <!-- 4. Tab 切换导航（已更新为 Top 20 / Top 10） -->
+    <div class="flex border-b border-slate-800 mb-6">
+      <button id="tab-global" onclick="switchTab('global')" class="py-3 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition">
+        国际财经 Top 20
+      </button>
+      <button id="tab-asia" onclick="switchTab('asia')" class="py-3 px-4 font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition">
+        亚太财经 Top 10
+      </button>
+      <button id="tab-china" onclick="switchTab('china')" class="py-3 px-4 font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition">
+        国内财经 Top 10
+      </button>
+    </div>
+
+    <!-- 5. 新闻列表展现区 -->
+    <div class="flex justify-between items-center mb-4">
+      <span id="channelTitle" class="text-slate-400 font-medium">国际财经</span>
+      <span id="newsCount" class="text-xs text-slate-500">0 条新闻</span>
+    </div>
+
+    <div id="newsContainer" class="space-y-4"></div>
+
+    <!-- 6. 页脚免责声明 -->
+    <div class="mt-12 pt-6 border-t border-slate-800/60 text-center text-xs text-slate-500 space-y-2">
+      <p>免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。</p>
+      <p>请以新闻原文、监管机构公告和实时市场数据为准。</p>
+      <p>© 2026 财经焦点看板</p>
+    </div>
+
   </div>
-</header>
-<main class="main">
-  <section class="status" aria-live="polite">
-    <div class="status-line"><span id="statusDot" class="dot"></span><span id="statusText">正在读取新闻数据…</span></div>
-    <div id="updateTime" class="text-slate-300 font-medium text-sm">更新时间: 2026-10-19 09:49:47 (北京时间)</div>
-    <div class="disclaimer-small">新闻来自公开 RSS / 新闻接口；重要性排序为关键词辅助判断，不构成投资建议。</div>
-  </section>
-  <input id="searchInput" class="search" type="search" autocomplete="off" aria-label="搜索财经新闻" placeholder="搜索关键词（如：美联储、芯片、GDP、人民币）…">
-  <nav class="tabs" aria-label="新闻频道">
-    <button class="tab active" type="button" data-tab="global">国际财经 Top 10</button>
-    <button class="tab" type="button" data-tab="asia">亚太财经 Top 5</button>
-    <button class="tab" type="button" data-tab="china">国内财经 Top 5</button>
-  </nav>
-  <div class="count-row"><span id="channelCaption">国际财经</span><span id="resultCount">0 条新闻</span></div>
-  <section id="newsContainer" class="list" aria-live="polite"><div class="empty">正在载入新闻…</div></section>
-  <footer>
-    <p>免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。</p>
-    <p>请以新闻原文、监管机构公告和实时市场数据为准。</p>
-    <p>© 2026 财经焦点看板</p>
-  </footer>
-</main>
 
-<!-- NEWS_DATA_START -->
-<script>
-const newsData = {"global":[{"title":"特朗普表示，暂停对俄罗斯的制裁是为了保持和平谈判的进行","summary":"美国总统在制裁生效前两天阻止了对俄罗斯的多项制裁。","published":"2026-10-19 07:20:15+08:00","time":"07:20","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/c9p8gz7zx4peo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.20"},{"title":"法国各地发生骚乱后，马克龙呼吁“冷静和秩序”","summary":"法国总统埃马纽埃尔·马克龙（ Emmanuel Macron ）在广泛的骚乱和一些抢劫事件在巴黎继续发生后发表了全国讲话","published":"2026-10-19 04:33:21+08:00","time":"04:33","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cw240zl08dm5o?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.19"},{"title":"随着关键选举的临近，巴西看到亚马逊森林砍伐的创纪录下降","summary":"亚马逊雨林是应对气候变化的关键缓冲区，但在前总统贾尔·博尔索纳罗（ Jair Bolsonaro ）的领导下，森林砍伐已经扩大。","published":"2026-10-17 10:33:09+08:00","time":"10:33","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cqe8rzg6zl00o?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.18"},{"title":"乌克兰内部进攻将俄罗斯推回--Starlink发挥了关键作用","summary":"英国广播公司加入了乌克兰的维瓦尔第行动，因为它重新夺回了顿巴斯的关键领土，但乐观情绪因与特朗普总统的关系恶化而受到抑制。","published":"2026-10-17 00:00:30+08:00","time":"00:00","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cvx284w16z1po?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.17"},{"title":"2024年竞选特朗普的南德克萨斯州拉丁裔选民将在2026年争夺","summary":"2024年，西班牙裔和拉丁裔选民坚决支持唐纳德·特朗普总统。但在2026年的中期选举中，民主党人正在努力让他们回来。","published":"2026-10-14 22:25:40+08:00","time":"22:25","source":"CNBC World","url":"https://www.cnbc.com/2026/10/14/texas-latino-voters-midterm-election-trump.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.16"},{"title":"摩根大通阻止Muse、Instinct等外部人工智能代理直接访问账户","summary":"摩根大通(JPMorgan Chase)首席执行官杰米·戴蒙(Jamie Dimon)警告称，该行正在构建防御性工具。","published":"2026-10-14 04:48:37+08:00","time":"04:48","source":"CNBC Finance","url":"https://www.cnbc.com/2026/10/13/jpmorgan-ai-agents-account-access.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.15"},{"title":"威廉姆斯表示，美联储可能不必在2027年加息，与交易员不一致","summary":"纽约联储主席约翰·威廉姆斯（ John Williams ）预计，随着通胀压力的缓解， 2026年将再次加息，但2027年不会再加息。","published":"2026-10-14 03:46:12+08:00","time":"03:46","source":"CNBC Finance","url":"https://www.cnbc.com/2026/10/13/john-williams-fed-rate-hikes-2027.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.14"},{"title":"在与中国合作40年后， Visa获得了北京银行卡业务的绿灯","summary":"增量批准之际，美国和中国国家元首将于下个月举行今年的第三次会晤。","published":"2026-10-13 14:20:55+08:00","time":"14:20","source":"CNBC Finance","url":"https://www.cnbc.com/2026/10/13/visa-china-green-light-bank-card-business-.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.13"},{"title":"美联储的哈马克表示，可能需要更高的利率来避免“通货膨胀心态”占据主导地位","summary":"克利夫兰联储主席表示，需要收紧货币政策来降低通胀。","published":"2026-10-13 10:58:11+08:00","time":"10:58","source":"CNBC Finance","url":"https://www.cnbc.com/2026/10/12/beth-hammack-fed-inflation-policy.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.12"},{"title":"摩根大通看涨固定收益领域，暗示这是一代人一次的机会","summary":"为什么该公司的投资组合经理Priya Misra希望在高质量的公司中承担信用风险。","published":"2026-10-10 23:00:01+08:00","time":"23:00","source":"CNBC Finance","url":"https://www.cnbc.com/2026/10/10/jpmorgan-sees-once-in-a-generation-opportunity-in-fixed-income-space.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.11"},{"title":"钢铁老板表示，欧盟针对中国打击乌克兰的关税","summary":"乌克兰最大的钢铁公司之一的老板表示，该国已经“捆绑在一起” ，采取旨在遏制廉价进口的措施。","published":"2026-10-19 07:28:45+08:00","time":"07:28","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cwdd8z6gyy96o?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.10"},{"title":"我们从激烈的美国参议院中期辩论中学到了什么","summary":"随着11月3日选举的临近以及两党争夺国会控制权，出现了一些明确的主题。","published":"2026-10-17 03:09:37+08:00","time":"03:09","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cqly03y3zg7lo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.09"},{"title":"分析：每个人都预计美联储将在10月份维持利率。凯文·沃什（ Kevin Warsh ）可能会给我们所有人带来惊喜","summary":"投资者预计美联储将在10月暂停加息，但凯文·沃什（ Kevin Warsh ）拒绝传统的通信实践以及对通胀的持续担忧使这一决定变得不确定。","published":"2026-10-17 00:27:31+08:00","time":"00:27","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/16/kevin-warsh-fed-october-rate-hike-interest-rates-markets.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.08"},{"title":"英国经济8月份增长0.1% ，超出预期","summary":"英国正在努力应对由粘性通货膨胀和不断飙升的能源成本引发的生活成本危机。","published":"2026-10-15 16:44:17+08:00","time":"16:44","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/15/uk-gdp-august-2026-economy.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.07"},{"title":"高通胀如何成为美国的“现实”","summary":"美国通货膨胀率多年来一直居高不下，引发了美联储的担忧，即消费者可能会期待价格居高不下。","published":"2026-10-15 01:20:23+08:00","time":"01:20","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/14/high-inflation-fed-expectations.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.06"},{"title":"“哥斯拉厄尔尼诺现象”对菲律宾央行的通胀预测造成严重破坏","summary":"菲律宾央行在石油冲击之上对严重的厄尔尼诺现象进行政策设想，通货膨胀率达到三年高位。","published":"2026-10-14 12:24:28+08:00","time":"12:24","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/14/godzilla-el-nino-asia-inflation-philippines.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.05"},{"title":"最新的通胀数据预计将显示价格上涨正在加速","summary":"经济学家预计， 9月份的消费者价格指数本月将上涨0.6% ，同比上涨3.6%。","published":"2026-10-14 02:05:57+08:00","time":"02:05","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/13/september-consumer-price-index-inflation.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.04"},{"title":"国际货币基金组织警告称，由于债务、通胀风险恶化，债券收益率可能会出现“无序”飙升","summary":"国际货币基金组织表示，政府债券市场的风险已经恶化，收益率可能会急剧无序地跳升。","published":"2026-10-13 12:54:07+08:00","time":"12:54","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/13/treasury-yields-imf-debt-inflation-.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.03"},{"title":"根据预测市场，通货膨胀可能在2026年达到峰值，但仍将保持稳定","summary":"交易员认为，不包括食品和能源价格的核心通胀率今年将降至2.2%的可能性很小。","published":"2026-10-12 23:37:26+08:00","time":"23:37","source":"CNBC Finance","url":"https://www.cnbc.com/2026/10/12/inflation-will-remain-sticky-in-2026-according-to-prediction-markets.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.02"},{"title":"印度9月零售通胀率跃升至5.54% ，高于预期","summary":"印度通胀连续11个月飙升，提高了进一步加息的前景","published":"2026-10-12 18:49:24+08:00","time":"18:49","source":"CNBC Economy","url":"https://www.cnbc.com/2026/10/12/india-inflation-oil-energy-iran-war.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.01"}],"asia":[{"title":"黄总理将访问阿联酋卡塔尔，这是他上任以来首次访问中东","summary":"PMO表示，这些访问将为新加坡提供一个机会，就该地区最近的发展交换意见，并加强与两国在共同关心的领域的合作，例如能源安全和经济弹性。","published":"2026-10-17 17:00:00+08:00","time":"17:00","source":"CNA Asia","url":"https://www.channelnewsasia.com/singapore/lawrence-wong-qatar-uae-middle-east-visit-6468046","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.10"},{"title":"新加坡首相王毅拒绝将货币贬值作为提高竞争力的捷径","summary":"新加坡总理劳伦斯·黄（ Lawrence Wong ）反对削弱城市国家货币以提高竞争力的想法。","published":"2026-10-13 08:39:36+08:00","time":"08:39","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/13/singapore-pm-wong-rejects-weakening-currency-for-competitiveness.html","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.09"},{"title":"新加坡第三季度GDP增长从四年高位放缓但高于预期","summary":"GDP增长超过了路透社调查的经济学家对5%增长的预期。","published":"2026-10-15 10:32:42+08:00","time":"10:32","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/14/singapore-gdp-q3.html","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.08"},{"title":"亚洲国家应考虑对胡塞武装实施制裁","summary":"","published":null,"time":"","source":"Nikkei Asia","url":"https://asia.nikkei.com/opinion/asian-countries-should-consider-sanctions-on-the-houthis","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.07"},{"title":"日本的Daiichi Life单位餐桌将接管澳大利亚的挑战者","summary":"","published":"2026-10-19 05:48:12+08:00","time":"05:48","source":"CNA Business","url":"https://www.channelnewsasia.com/business/japans-daiichi-life-unit-tables-offer-take-over-australias-challenger-6470476","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.06"},{"title":"据首尔报纸报道，三星将为英伟达的下一代内存芯片使用台积电技术","summary":"","published":"2026-10-18 20:08:28+08:00","time":"20:08","source":"CNA Business","url":"https://www.channelnewsasia.com/business/samsung-use-tsmc-technology-nvidias-next-generation-memory-chips-seoul-newspaper-reports-6469576","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.05"},{"title":"日本启动历史性的火星月球往返任务","summary":"携带MMX的旗舰H3火箭将于周二（ 10月20日）凌晨4点41分从种子岛航天中心发射升空。","published":"2026-10-18 17:20:00+08:00","time":"17:20","source":"CNA Asia","url":"https://www.channelnewsasia.com/east-asia/japan-launch-historic-round-trip-mission-mars-moon-6469436","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.04"},{"title":"马来西亚国阵将于10月28日宣布马六甲民意调查候选人：国家主席","summary":"马六甲看守首席部长Ab Rauf Yusoh表示，候选人将负责继续执行联盟的任务，并确保在民意调查中获胜。","published":"2026-10-18 12:40:00+08:00","time":"12:40","source":"CNA Asia","url":"https://www.channelnewsasia.com/asia/malaysias-bn-announce-candidates-melaka-polls-oct-28-state-chairman-6469281","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.03"},{"title":"西方品牌在中国面临“二手”奢侈品热潮的压力","summary":"过去两年，法国奢侈品牌路易威登(Louis Vuitton)在中国大陆关闭了五家门店，其中包括上海的一家巧克力精品店，而巴黎百货商店老佛爷百货(Galeries Lafayette)则在5月关闭了其北京旗舰店。","published":"2026-10-18 11:40:00+08:00","time":"11:40","source":"CNA Asia","url":"https://www.channelnewsasia.com/east-asia/western-brands-under-pressure-pre-owned-luxury-booms-in-china-6469201","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.02"},{"title":"中国生产者价格上涨速度为2022年6月以来最快，超出预期","summary":"这一增长高于路透社调查的经济学家预期的4.5% ，也高于上个月的3.8%。","published":"2026-10-14 11:14:48+08:00","time":"11:14","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/14/producer-prices-in-china-rise-fastest-since-june-2022-on-fuel-costs.html","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.01"}],"china":[{"title":"分析：到2027年高油价将带来1,650亿美元额外汽油成本","summary":"假设霍尔木兹海峡于11月开始重开，到2027年伊朗战争对全球石油市场造成的冲击可能导致美国车主汽油账单增加1,650亿美元。媒体估计，海峡每关闭一个月，成本将增加约350亿至400亿美元；如果海峡明年4月重开，增加的总支出将达到至少3,500亿美元。霍尔木兹海峡重开将导致布伦特近月期货价格下跌，而油价需要数周时间才能完全反映这一降幅。通常情况下，原油价格上涨时，汽油和柴油价格上涨速度更快；原油价格下跌时，汽油和柴油价格下跌速度更慢，因此消费者需要更长时间才能完全受益。但最初的价格下跌并不意味着油价会迅速恢复到战前水平。原油供应和炼油产量可能需要数月才能恢复正常，而持续存在的地缘政治风险可能会使油价维持在高位。彭博新能源财经的基准情景假设海峡于11月开始重开，那么汽油零售价格可能要到2027年6月左右才能恢复至战前基准水平，柴油价格则要到8月左右。如果海峡于4月重开，油价到2028年将持续高企。Kpler数据显示，尽管霍尔木兹海峡持续受阻，但除伊朗外，海湾地区的石油贸易流在9月已恢复至冲突前水平的近80%。彭博新能源财经预计，在海峡关闭期间，海湾地区的石油出口将维持在当前水平，并在海峡重开后逐步恢复至100%。","published":"2026-10-19 09:34:54+08:00","time":"09:34","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.10"},{"title":"“木头姐”继续看好韩国半导体股：当前已进入买入区间","summary":"“木头姐”凯茜·伍德16日就近期因外资抛售而震荡的韩国股市表示：“外资并不是因为基本面恶化而撤离。我认为程序化交易的影响更大”。谈及韩国半导体股大跌，她表示：“现在确实是进入买入区间的合适时机。”当被问及外资流出的决定性原因时，伍德称：“今年6月存储芯片股价见顶回落时，韩元兑美元汇率也创下历史新高。这并不是市场本身存在任何基本面缺陷，而是股价下跌与汇率因素叠加，导致机械性的程序化交易激增。”对于近期存储芯片股的回调，伍德认为这是此前价格快速飙升引发的反作用，“由于存储芯片单价上涨过快，电子设备的零售销量大幅下降。这一因素已经反映在股价之中。”韩国Kospi指数今日开盘跌逾3%，随后回升，截至发稿微跌。","published":"2026-10-19 09:36:06+08:00","time":"09:36","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.09"},{"title":"PCB概念局部活跃 四会富仕涨超16%","summary":"PCB概念局部活跃，四会富仕涨超16%，迅捷兴、澳弘电子、生益科技、逸豪新材跟涨。消息面上，四会富仕发布2026年第三季度报告称，公司前三季度实现营业收入约20.90亿元，同比增长49.68%；归属于上市公司股东的净利润约2.64亿元，同比增长101.67%。","published":"2026-10-19 09:34:13+08:00","time":"09:34","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.08"},{"title":"在岸人民币兑美元开盘后15分钟基本持平 报6.6853。","summary":"在岸人民币兑美元开盘后15分钟基本持平 报6.6853。","published":"2026-10-19 09:45:07+08:00","time":"09:45","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.07"},{"title":"iPhoneDuo商家近百万元订单遭压价","summary":"苹果首款折叠屏iPhone Duo 近日刚开启预售，首发溢价行情快速降温，不少提前囤货的手机商家遭遇订单压价，陷入亏本风险。 郑州手机经销商许山提前锁定50台首批货源，这批机器总货款接近百万元，合计999950元。 他已经向上游支付了25000元订金，原本计划转手卖给同行赚取差价。按照最初约定，每台能赚取2000元利润，50台合计可赚10万元。 然而行情急转直下，原定收货的下家一夜之内两次下调接货报价，10月17日上午给出的3500价格已经低于许山原价加4000元进货成本。 按照最新报价，这批货全部出手将直接亏损2.5万元。进退两难之下，许山只能暂停收货，不再补齐尾款，转而拆分订单向多位老客户询价，分批寻找新买家，尽量降低损失。 与此同时，普通抢购用户也遭遇溢价缩水。有消费者抢到新机，原本打算加价6000元转手，结果二手收货商最高只给到加价3000元，首发万元溢价的行情也落空。 业内人士分析，折叠屏新机产能爬坡速度超出预期，市场溢价窗口期大幅缩短，盲目囤货的黄牛将面临较大亏损风险。","published":"2026-10-19 09:44:28+08:00","time":"09:44","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.06"},{"title":"A股DRG概念板块异动拉升","summary":"易联众、太极股份、久远银海触及涨停，国新健康、地纬智能、ST佳缘、万达信息跟涨。","published":"2026-10-19 09:42:00+08:00","time":"09:42","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.05"},{"title":"韩国央行表示，以3.190%的收益率出售91天期货币稳定债券。","summary":"韩国央行表示，以3.190%的收益率出售91天期货币稳定债券。","published":"2026-10-19 09:40:42+08:00","time":"09:40","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.04"},{"title":"尚太科技：当前负极材料行业整体处于供不应求阶段 需求端支撑充分","summary":"尚太科技在投资者关系活动中表示，目前公司各项在建项目的整体推进情况良好，建设进度均符合预期目标，部分生产线已具备按计划逐步投产的条件。产能消化方面，当前负极材料行业整体处于供不应求阶段，需求端支撑充分，公司现阶段因自有产能不足，通过外协及满负荷生产满足订单需求，为新增产能的消化提供了坚实基础，上述项目投产后的产能消化具备充分保障。","published":"2026-10-19 09:40:37+08:00","time":"09:40","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.03"},{"title":"创业板指跌1.00%，现报2744.581点；上证指数跌0.33%，现报3704.073点；深证成指跌0.31%，现报11765.473点。","summary":"创业板指跌1.00%，现报2744.581点；上证指数跌0.33%，现报3704.073点；深证成指跌0.31%，现报11765.473点。","published":"2026-10-19 09:38:49+08:00","time":"09:38","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.02"},{"title":"股票ETF上周净流入885亿元 为年内第四高","summary":"持续放量，使得上周股票ETF净流入额来到年内第四高的水平。Wind数据显示，上周股票ETF合计净流入884.93亿元，仅次于7月的 3周水平。4只股票ETF在上周净流入超过百亿，分别是沪深300ETF易方达（净流入196.92亿元）、沪深300ETF华泰柏瑞（净流入176.47亿元）、创业板ETF易方达（净流入111.83亿元）、科创50EFT华夏（净流入104.2亿元）。其中，上周五也是上周单日净流入最高，净流入250.39亿元，仅沪深300ETF华泰柏瑞（净流入129.95亿元）就贡献过半的净流入。","published":"2026-10-19 09:35:33+08:00","time":"09:35","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.01"}]};
-</script>
-<!-- NEWS_DATA_END -->
+  <!-- NEWS_DATA_START -->
+  <script>
+    const newsData = { global: [], asia: [], china: [] };
+  </script>
+  <!-- NEWS_DATA_END -->
 
-<script>
-"use strict";
-let currentTab = "global";
-let dataLoadedFromJson = false;
-const channelInfo = {
-  global: {title:"国际财经",limit:10},
-  asia: {title:"亚太财经",limit:5},
-  china: {title:"国内财经",limit:5}
-};
+  <script>
+    let currentTab = 'global';
 
-function safeText(value, fallback="") {
-  if (value === null || value === undefined) return fallback;
-  const text = String(value).trim();
-  return text || fallback;
-}
-function makeElement(tag, className, text) {
-  const el = document.createElement(tag);
-  if (className) el.className = className;
-  if (text !== undefined) el.textContent = text;
-  return el;
-}
-function getDataObject() {
-  // 同时兼容 window.newsData 和旧版顶层 const newsData。
-  if (window.newsData && typeof window.newsData === "object") return window.newsData;
-  try {
-    if (typeof newsData !== "undefined" && newsData && typeof newsData === "object") return newsData;
-  } catch (_) {}
-  return null;
-}
-function getItems(tabKey) {
-  const data = getDataObject();
-  const value = data && data[tabKey];
-  return Array.isArray(value) ? value.filter(item => item && safeText(item.title)) : [];
-}
-function normalizeItem(item,index,total) {
-  const number = total-index;
-  return {
-    id:safeText(item.id,`NO.${String(number).padStart(2,"0")}`),
-    title:safeText(item.title,"无标题"),
-    summary:safeText(item.summary || item.desc || item.description,"暂无摘要，请打开新闻原文查看。"),
-    tag:safeText(item.tag,channelInfo[currentTab].title),
-    time:safeText(item.time || item.published,""),
-    source:safeText(item.source,"来源未标注"),
-    url:safeText(item.url || item.link,""),
-    impact:safeText(item.impact,"请结合新闻原文、官方数据及实时行情判断影响。"),
-    asset:safeText(item.asset,"相关市场 / 行业")
-  };
-}
-function makeNewsCard(item,index,total) {
-  const news=normalizeItem(item,index,total);
-  const card=makeElement("article","news-card");
-  const top=makeElement("div","news-top");
-  const labels=makeElement("div","labels");
-  labels.appendChild(makeElement("span","news-id",news.id));
-  labels.appendChild(makeElement("span","tag",news.tag));
-  top.appendChild(labels);
-  top.appendChild(makeElement("time","",news.time));
-  card.appendChild(top);
-
-  const title=makeElement("h2","news-title");
-  if(news.url && /^https?:\/\//i.test(news.url)) {
-    const a=document.createElement("a");
-    a.href=news.url;a.target="_blank";a.rel="noopener noreferrer";a.textContent=news.title;
-    title.appendChild(a);
-  } else title.textContent=news.title;
-  card.appendChild(title);
-  card.appendChild(makeElement("p","summary",news.summary));
-
-  const impact=makeElement("div","impact");
-  const impactRow=makeElement("div","");
-  impactRow.appendChild(makeElement("strong","","📌 市场传导影响："));
-  impactRow.appendChild(document.createTextNode(news.impact));
-  impact.appendChild(impactRow);
-  const assetRow=makeElement("div","");
-  assetRow.appendChild(makeElement("strong","","💡 关联资产标的："));
-  assetRow.appendChild(document.createTextNode(news.asset));
-  impact.appendChild(assetRow);
-  card.appendChild(impact);
-
-  const bottom=makeElement("div","news-bottom");
-  bottom.appendChild(makeElement("span","",`来源：${news.source}`));
-  if(news.url && /^https?:\/\//i.test(news.url)) {
-    const a=document.createElement("a");
-    a.href=news.url;a.target="_blank";a.rel="noopener noreferrer";a.className="source-link";a.textContent="阅读原文 ↗";
-    bottom.appendChild(a);
-  } else bottom.appendChild(makeElement("span","","暂无原文链接"));
-  card.appendChild(bottom);
-  return card;
-}
-function renderNews(tabKey,filterQuery="") {
-  const container=document.getElementById("newsContainer");
-  const query=safeText(filterQuery).toLocaleLowerCase();
-  container.replaceChildren();
-  document.getElementById("channelCaption").textContent=channelInfo[tabKey].title;
-  const original=getItems(tabKey);
-  const filtered=original.filter(item=>{
-    const text=[item.title,item.summary,item.desc,item.description,item.source,item.tag]
-      .map(value=>safeText(value)).join(" ").toLocaleLowerCase();
-    return text.includes(query);
-  });
-  document.getElementById("resultCount").textContent=`${filtered.length} 条新闻`;
-  if(original.length===0) {
-    const box=makeElement("div","empty");
-    box.appendChild(makeElement("strong","",`${channelInfo[tabKey].title}暂时没有可显示的新闻`));
-    box.appendChild(makeElement("span","",dataLoadedFromJson
-      ?"新闻数据文件已读取，但该频道没有有效新闻。请检查 update.py 输出的频道键名及内容。"
-      :"暂未从页面内嵌数据或 news.json 读取到新闻。请检查 GitHub Actions 更新日志及 data/news.json。"));
-    container.appendChild(box);return;
-  }
-  if(filtered.length===0) {
-    container.appendChild(makeElement("div","empty","没有找到匹配的新闻，请尝试其他关键词。"));return;
-  }
-  filtered.forEach((item,index)=>container.appendChild(makeNewsCard(item,index,filtered.length)));
-}
-function switchTab(key) {
-  if(!channelInfo[key]) return;
-  currentTab=key;
-  document.querySelectorAll("[data-tab]").forEach(button=>{
-    button.classList.toggle("active",button.dataset.tab===key);
-    button.setAttribute("aria-current",button.dataset.tab===key?"page":"false");
-  });
-  renderNews(currentTab,document.getElementById("searchInput").value);
-}
-function updateStatus(message) {
-  const counts=Object.keys(channelInfo).map(key=>getItems(key).length);
-  const total=counts.reduce((sum,n)=>sum+n,0);
-  const statusText=document.getElementById("statusText");
-  const dot=document.getElementById("statusDot");
-  if(total>0) {
-    statusText.textContent=`新闻数据已载入：国际 ${counts[0]} 条 · 亚太 ${counts[1]} 条 · 国内 ${counts[2]} 条`;
-    dot.style.background="#10b981";
-  } else {
-    statusText.textContent=message || "尚未载入新闻数据";
-    dot.style.background="#f59e0b";
-  }
-}
-function updateTime(data) {
-  const el=document.getElementById("updateTime");
-  const time=data && (data.updated_at || data.updatedAt || data.update_time || data.updated);
-  if(time) el.textContent=`更新时间：${String(time)}（北京时间）`;
-  else if(el.textContent.includes("正在读取")) el.textContent="更新时间：请查看 GitHub Actions 更新日志（北京时间）";
-}
-async function loadNewsJson() {
-  const urls=["./data/news.json","./news.json"];
-  for(const path of urls) {
-    try {
-      const response=await fetch(`${path}${path.includes("?")?"&":"?"}t=${Date.now()}`,{cache:"no-store"});
-      if(!response.ok) continue;
-      const payload=await response.json();
-      const data=payload && (payload.newsData || payload.data || payload);
-      if(data && typeof data==="object" &&
-         (Array.isArray(data.global)||Array.isArray(data.asia)||Array.isArray(data.china))) {
-        const current=getDataObject() || {};
-        const currentCount=["global","asia","china"].reduce((sum,key)=>sum+(Array.isArray(current[key])?current[key].length:0),0);
-        const fetchedCount=["global","asia","china"].reduce((sum,key)=>sum+(Array.isArray(data[key])?data[key].length:0),0);
-        if(fetchedCount>0 && (currentCount===0 || fetchedCount>currentCount)) {
-          window.newsData=data;
-          dataLoadedFromJson=true;
-          updateTime(payload);
+    function switchTab(tab) {
+      currentTab = tab;
+      ['global', 'asia', 'china'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          btn.className = "py-3 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition";
+        } else {
+          btn.className = "py-3 px-4 font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-200 transition";
         }
-        return true;
-      }
-    } catch(error) {
-      // Try the next compatible JSON path.
-    }
-  }
-  return false;
-}
-async function copyTerminalText() {
-  const list=getItems(currentTab);
-  const lines=[`【${channelInfo[currentTab].title}】`,""];
-  list.forEach((item,index)=>{
-    const n=normalizeItem(item,index,list.length);
-    lines.push(`${n.id}｜${n.title}`,`摘要：${n.summary}`,`来源：${n.source}`);
-    if(n.url) lines.push(`原文：${n.url}`);
-    lines.push("");
-  });
-  const text=lines.join("\n");
-  try {
-    await navigator.clipboard.writeText(text);
-    alert("已复制当前频道的新闻文案。");
-  } catch(error) {
-    const textarea=document.createElement("textarea");
-    textarea.value=text;textarea.style.position="fixed";textarea.style.opacity="0";
-    document.body.appendChild(textarea);textarea.select();
-    const ok=document.execCommand("copy");textarea.remove();
-    alert(ok?"已复制当前频道的新闻文案。":"复制失败，请检查浏览器剪贴板权限。");
-  }
-}
-document.addEventListener("DOMContentLoaded",async()=>{
-  document.querySelectorAll("[data-tab]").forEach(button=>button.addEventListener("click",()=>switchTab(button.dataset.tab)));
-  document.getElementById("searchInput").addEventListener("input",()=>renderNews(currentTab,document.getElementById("searchInput").value));
-  document.getElementById("copyButton").addEventListener("click",copyTerminalText);
-  document.getElementById("posterButton").addEventListener("click",()=>window.print());
+      });
 
-  // 先显示内嵌数据；如果没有，再尝试读取 update.py 生成的 JSON。
-  renderNews(currentTab);
-  let counts=["global","asia","china"].reduce((sum,key)=>sum+getItems(key).length,0);
-  if(counts===0) {
-    const loaded=await loadNewsJson();
-    counts=["global","asia","china"].reduce((sum,key)=>sum+getItems(key).length,0);
-    if(!loaded && counts===0) {
-      updateStatus("没有读取到新闻数据：检查 data/news.json、news.json 和 GitHub Actions。");
+      const titleMap = { global: '国际财经', asia: '亚太财经', china: '国内财经' };
+      document.getElementById('channelTitle').textContent = titleMap[tab];
+      renderNews();
     }
-  }
-  updateStatus();
-  updateTime(getDataObject());
-  renderNews(currentTab,document.getElementById("searchInput").value);
-});
-</script>
+
+    function renderNews() {
+      const container = document.getElementById('newsContainer');
+      const searchKey = document.getElementById('searchInput').value.trim().toLowerCase();
+      let items = newsData[currentTab] || [];
+
+      if (searchKey) {
+        items = items.filter(item => 
+          (item.title && item.title.toLowerCase().includes(searchKey)) ||
+          (item.summary && item.summary.toLowerCase().includes(searchKey))
+        );
+      }
+
+      document.getElementById('newsCount').textContent = `${items.length} 条新闻`;
+
+      if (items.length === 0) {
+        container.innerHTML = `<div class="card border rounded-xl p-8 text-center text-slate-500">暂无相关新闻或数据加载中...</div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(item => `
+        <div class="card border rounded-xl p-5 space-y-3 hover:border-slate-700 transition">
+          <div class="flex justify-between items-center text-xs">
+            <div class="flex items-center space-x-2">
+              <span class="text-amber-500 font-bold">${item.id || ''}</span>
+              <span class="bg-slate-800 text-slate-400 px-2 py-0.5 rounded">${item.tag || ''}</span>
+            </div>
+            <span class="text-slate-500">${item.time || ''}</span>
+          </div>
+          
+          <h2 class="text-base sm:text-lg font-bold text-slate-100 leading-snug">${item.title || ''}</h2>
+          
+          ${item.summary ? `<p class="text-sm text-slate-400 leading-relaxed">${item.summary}</p>` : ''}
+          
+          <div class="bg-slate-900/60 rounded-lg p-3 text-xs space-y-1.5 border border-slate-800/50">
+            <div class="text-slate-400"><span class="text-red-400">📌 市场传导影响:</span> ${item.impact || '需结合原文与实时行情判断。'}</div>
+            <div class="text-slate-400"><span class="text-amber-400">💡 关联资产标的:</span> ${item.asset || '相关核心资产'}</div>
+          </div>
+          
+          <div class="flex justify-between items-center text-xs text-slate-500 pt-1">
+            <span>来源: ${item.source || '公开源'}</span>
+            ${item.url ? `<a href="${item.url}" target="_blank" class="text-slate-400 hover:text-amber-400 transition">阅读原文 ↗</a>` : '<span>暂无原文链接</span>'}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('searchInput').addEventListener('input', renderNews);
+    document.addEventListener('DOMContentLoaded', () => { renderNews(); });
+  </script>
 </body>
 </html>
