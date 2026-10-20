@@ -1,9 +1,11 @@
 name: Update Daily News
 
+Name: Update Daily News
+
 on:
   schedule:
-    # 每天北京时间早上 8:00 自动运行 (UTC 0:00)
-    - cron: '0 0 * * *'
+    # 每天北京时间早上 8:00 与下午 14:00 自动运行 (UTC 0:00 与 06:00)
+    - cron: '0 0,6 * * *'
   workflow_dispatch: # 支持手动一键运行
 
 jobs:
