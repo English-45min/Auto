@@ -42,7 +42,9 @@ RSS_FEEDS = {
         ("BBC World News", "http://feeds.bbci.co.uk/news/world/rss.xml"),
     ],
     # 亚太财经与时政源
-    "asia": [
+        "asia": [
+        ("Focus Taiwan", "https://focustaiwan.tw/rss/news.xml"),
+        ("Taipei Times", "https://www.taipeitimes.com/xml/index.rss"),
         ("CNA Business", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"),
         ("CNA Asia", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
         ("CNA World", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6311"),
