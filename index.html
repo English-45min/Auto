@@ -1,22 +1,163 @@
-<!DOCTYPE html> <html lang="zh-CN"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>财经与时政焦点看板</title> <script src="https://cdn.tailwindcss.com"></script> <style> body { background-color: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; } .tab-active { color: #f59e0b; border-bottom-color: #f59e0b; } .tab-inactive { color: #94a3b8; border-bottom-color: transparent; } .tab-inactive:hover { color: #cbd5e1; } </style> </head> <body class="min-h-screen flex flex-col justify-between antialiased">
-<!-- Header --> <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50"> <div class="max-w-4xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-2"> <div> <h1 class="text-xl font-bold text-amber-500 tracking-wide flex items-center gap-2"> <span>⚡</span> 财经与时政焦点看板 </h1> <p class="text-xs text-slate-400 mt-1">实时追踪全球宏观、亚太政经与国内核心动态</p> </div> <div id="updateTime" class="text-slate-400 text-xs font-mono bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700/50"> 更新时间: 正在加载... </div> </div> </header>
-<!-- Main Content --> <main class="max-w-4xl mx-auto px-4 py-6 flex-grow w-full">
-<!-- Tab Navigation --> <div class="flex border-b border-slate-800 mb-6 text-sm font-medium"> <button id="tab-global" onclick="switchTab('global')" class="py-3 px-5 border-b-2 font-bold transition-all duration-200 tab-active"> 国际财经 Top 20 </button> <button id="tab-asia" onclick="switchTab('asia')" class="py-3 px-5 border-b-2 font-bold transition-all duration-200 tab-inactive"> 亚太政经 Top 10 </button> <button id="tab-china" onclick="switchTab('china')" class="py-3 px-5 border-b-2 font-bold transition-all duration-200 tab-inactive"> 国内核心 Top 10 </button> </div>
-<!-- News List Container --> <div id="news-container" class="space-y-4"> <div class="text-center py-12 text-slate-500"> <p>数据加载中...</p> </div> </div>
-</main>
-<!-- Footer --> <footer class="border-t border-slate-800/80 bg-slate-900/40 py-6 text-center text-xs text-slate-500 mt-8 space-y-2"> <p>免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。</p> <p>请以新闻原文、监管机构公告和实时市场数据为准。</p> <p>© 2026 财经焦点看板</p> </footer>
-<!-- NEWS DATA PLACEHOLDER --> <!-- NEWS_DATA_START --> <script> const newsData = { global: [], asia: [], china: [] }; </script> <!-- NEWS_DATA_END -->
-<!-- Application Logic & Pull-to-Refresh --> <script> let currentTab = 'global';
-// 切换 Tab function switchTab(tabKey) { if (!newsData[tabKey]) return; currentTab = tabKey;
-const tabs = ['global', 'asia', 'china']; tabs.forEach(t => { const btn = document.getElementById(tab-${t}); if (btn) { if (t === tabKey) { btn.className = 'py-3 px-5 border-b-2 font-bold transition-all duration-200 tab-active'; } else { btn.className = 'py-3 px-5 border-b-2 font-bold transition-all duration-200 tab-inactive'; } } });
-renderNews(); }
-// 渲染新闻列表 function renderNews() { const container = document.getElementById('news-container'); const items = newsData[currentTab] || [];
-if (items.length === 0) { container.innerHTML = <div class="text-center py-12 text-slate-500 bg-slate-900/40 rounded-xl border border-slate-800/50"> <p>暂无相关新闻或数据更新中...</p> </div>; return; }
-container.innerHTML = items.map(item => ` <article class="bg-slate-900/90 border border-slate-800/80 rounded-xl p-5 hover:border-slate-700/80 transition-all duration-200 shadow-lg shadow-slate-950/20"> <div class="flex items-center justify-between text-xs text-slate-400 mb-2"> <div class="flex items-center gap-2"> <span class="bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5 rounded border border-amber-500/20"> ${item.id || 'NO.01'} </span> <span class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700/50"> {item.tag || '财经焦点'} </span> </div> <span class="font-mono text-slate-400">{item.time || ''}</span> </div>
-<h2 class="text-base sm:text-lg font-bold text-slate-100 leading-snug mb-3"> ${item.title || '无标题'} </h2>
-${item.summary ? <p class="text-sm text-slate-300 leading-relaxed mb-4 bg-slate-950/40 p-3 rounded-lg border border-slate-800/40"> ${item.summary} </p> : ''}
-<div class="space-y-1.5 text-xs text-slate-400 bg-slate-950/60 p-3 rounded-lg border border-slate-800/60 mb-4"> <div class="flex items-start gap-1.5"> <span class="shrink-0">📌 <strong class="text-slate-300">市场传导影响:</strong></span> <span class="text-slate-400">{item.impact || '需结合原文、官方数据及实时行情进一步判断影响。'}</span> </div> <div class="flex items-start gap-1.5"> <span class="shrink-0">💡 <strong class="text-slate-300">关联资产标的:</strong></span> <span class="text-amber-400/90">{item.asset || '宏观指标 / 权益市场'}</span> </div> </div>
-<div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-800/60"> <span>来源: <strong class="text-slate-300">${item.source || '官方渠道'}</strong></span> ${item.url ? <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-amber-400 hover:text-amber-300 flex items-center gap-1 transition"> 阅读原文 ↗ </a> : '<span class="text-slate-400">暂无原文链接</span>'} </div> </article> `).join(''); }
-// 初始化运行 document.addEventListener('DOMContentLoaded', () => { renderNews(); });
-// 移动端下拉刷新手势监听（忽略缓存强制刷新页面） let startY = 0; window.addEventListener('touchstart', (e) => { startY = e.touches[0].pageY; }, { passive: true });
-window.addEventListener('touchmove', (e) => { const y = e.touches[0].pageY; // 当页面位于最顶部且向下拖动超过 150px 时触发强制刷页面 if (window.scrollY === 0 && y - startY > 150) { location.reload(true); } }, { passive: true }); </script> </body> </html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>财经与时政焦点看板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b0f17; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .news-card { background: #131b2e; border: 1px solid #1e293b; transition: all 0.2s ease-in-out; }
+    .news-card:active { background: #1a243d; }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <!-- 头部 Header -->
+  <header class="sticky top-0 z-50 bg-[#0b0f17]/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+    <div class="max-w-3xl mx-auto flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <h1 class="text-base font-bold tracking-wide text-slate-100">TERMINAL // 财经焦点</h1>
+      </div>
+      <div id="updateTime" class="text-slate-400 font-medium text-xs">
+        更新时间: 加载中...
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 pt-4">
+
+    <!-- 频道切换 Tabs -->
+    <div class="flex border-b border-slate-800 mb-4 text-sm">
+      <button id="tab-global" onclick="switchTab('global')" class="py-2.5 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition focus:outline-none">
+        国际财经 Top 20
+      </button>
+      <button id="tab-asia" onclick="switchTab('asia')" class="py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none">
+        亚太市场 Top 10
+      </button>
+      <button id="tab-china" onclick="switchTab('china')" class="py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none">
+        国内核心 Top 10
+      </button>
+    </div>
+
+    <!-- 新闻列表容器 -->
+    <div id="news-container" class="space-y-3.5">
+      <!-- 动态插入新闻卡片 -->
+    </div>
+
+    <!-- 免责声明底部 -->
+    <footer class="mt-10 pt-6 border-t border-slate-800/60 text-center text-xs text-slate-500 leading-relaxed">
+      <p>免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。</p>
+      <p class="mt-1">请以新闻原文、监管机构公告和实时市场数据为准。</p>
+      <p class="mt-2 text-slate-600">© 2026 财经焦点看板</p>
+    </footer>
+
+  </main>
+
+  <!-- 静态数据嵌入区 (由 Python update.py 自动更新写入) -->
+  <!-- NEWS_DATA_START -->
+  <script>
+    const newsData = { "global": [], "asia": [], "china": [] };
+  </script>
+  <!-- NEWS_DATA_END -->
+
+  <!-- JS 交互逻辑与移动端手势 -->
+  <script>
+    let currentTab = 'global';
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const tabs = ['global', 'asia', 'china'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          btn.className = "py-2.5 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition focus:outline-none";
+        } else {
+          btn.className = "py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none";
+        }
+      });
+      renderNews();
+    }
+
+    function renderNews() {
+      const container = document.getElementById('news-container');
+      const items = (typeof newsData !== 'undefined' && newsData[currentTab]) ? newsData[currentTab] : [];
+
+      if (!items || items.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-500 text-sm">
+            暂无最新资讯，请稍后刷新或运行 GitHub Actions 更新
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = items.map((item, index) => {
+        const urlBtn = item.url ? `
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-0.5 transition">
+            阅读原文 ↗
+          </a>` : '<span class="text-xs text-slate-600">暂无原文链接</span>';
+
+        return `
+          <div class="news-card rounded-lg p-4 shadow-sm">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <div class="flex items-center space-x-2">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  ${item.id || ('NO.' + (index + 1))}
+                </span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">
+                  ${item.tag || '财经'}
+                </span>
+              </div>
+              <span class="font-mono text-slate-400">${item.time || ''}</span>
+            </div>
+
+            <h3 class="text-base font-bold text-slate-100 leading-snug mb-2">
+              ${item.title || ''}
+            </h3>
+
+            ${item.summary ? `
+              <p class="text-xs text-slate-300 leading-relaxed mb-3">
+                ${item.summary}
+              </p>` : ''}
+
+            <div class="bg-slate-900/60 rounded p-2.5 mb-3 text-xs space-y-1.5 border border-slate-800/80">
+              <div class="flex items-start text-slate-300">
+                <span class="text-red-400 font-bold shrink-0 mr-1.5">📌 市场传导影响:</span>
+                <span>${item.impact || '需结合原文、官方数据及实时行情进一步判断影响。'}</span>
+              </div>
+              <div class="flex items-start text-slate-300">
+                <span class="text-amber-400 font-bold shrink-0 mr-1.5">💡 关联资产标的:</span>
+                <span>${item.asset || '相关资产标的'}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 text-xs text-slate-500 border-t border-slate-800/40">
+              <span>来源: ${item.source || '官方/权威媒体'}</span>
+              ${urlBtn}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 页面初始化渲染
+    document.addEventListener('DOMContentLoaded', () => {
+      renderNews();
+    });
+
+    // 移动端下拉刷新手势监听（顶部向下拖拽 > 150px 时无视缓存刷新）
+    let startY = 0;
+    window.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].pageY;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      const y = e.touches[0].pageY;
+      if (window.scrollY === 0 && y - startY > 150) {
+        location.reload(true);
+      }
+    }, { passive: true });
+  </script>
+</body>
+</html>
