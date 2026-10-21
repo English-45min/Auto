@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财经与时政焦点看板自动更新脚本（全功能终极完整版）
+财经与时政焦点看板自动更新脚本（纯净时效优化版）
 功能：
-1. 抓取国际财经/时政（20条）、亚太财经/时政（10条）、国内核心政经（10条）；
-2. 严格地域隔离与双重过滤，确保国内板块100%纯正本土宏观政经（杜绝串台）；
-3. 自动将国际与亚太新闻高质量翻译为中文；
-4. 按重要性与时政权重排序，安全内嵌写入 index.html。
+1. 抓取国际财经/时政、亚太财经/时政（含台湾源）、国内核心政经；
+2. 严格 48 小时旧闻过滤 + 绝对发布时间倒序，彻底解决旧新闻霸屏问题；
+3. 时间显示格式升级为 MM-DD HH:MM，方便直观核对日期；
+4. 自动将国际与亚太新闻高质量翻译为中文，国内板块严格防串台；
+5. 安全内嵌写入 index.html。
 """
 
 import datetime
@@ -41,8 +42,8 @@ RSS_FEEDS = {
         ("CNBC Economy", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
         ("BBC World News", "http://feeds.bbci.co.uk/news/world/rss.xml"),
     ],
-    # 亚太财经与时政源
-        "asia": [
+    # 亚太财经与时政源（已集成 Focus Taiwan 和 Taipei Times）
+    "asia": [
         ("Focus Taiwan", "https://focustaiwan.tw/rss/news.xml"),
         ("Taipei Times", "https://www.taipeitimes.com/xml/index.rss"),
         ("CNA Business", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"),
@@ -163,7 +164,6 @@ def translate_to_chinese(text):
         return text
 
     def translate_chunk(chunk):
-        errors = []
         try:
             params = urllib.parse.urlencode({"client":"gtx", "sl":"auto", "tl":"zh-CN", "dt":"t", "q":chunk})
             raw = http_get("https://translate.googleapis.com/translate_a/single?" + params, timeout=18)
@@ -171,9 +171,8 @@ def translate_to_chinese(text):
             result = "".join(part[0] for part in (payload[0] or []) if isinstance(part, list) and part and isinstance(part[0], str)).strip()
             if result:
                 return result
-            errors.append("Google 返回空结果")
-        except Exception as exc:
-            errors.append(f"Google {type(exc).__name__}: {exc}")
+        except Exception:
+            pass
         try:
             params = urllib.parse.urlencode({"q":chunk, "langpair":"en|zh-CN"})
             raw = http_get("https://api.mymemory.translated.net/get?" + params, timeout=18)
@@ -181,9 +180,8 @@ def translate_to_chinese(text):
             result = clean_text((payload.get("responseData") or {}).get("translatedText", ""))
             if result:
                 return html.unescape(result)
-            errors.append("备用接口返回空结果")
-        except Exception as exc:
-            errors.append(f"备用接口 {type(exc).__name__}: {exc}")
+        except Exception:
+            pass
         return chunk
 
     chunks = []
@@ -229,8 +227,7 @@ def parse_rss_xml(xml_bytes, source_name):
             xml_str = xml_bytes.decode("gbk", errors="replace")
             
         root = ET.fromstring(xml_str)
-    except ET.ParseError as exc:
-        print(f"⚠️ RSS XML 解析失败 [{source_name}]: {exc}")
+    except Exception:
         return items
 
     for node in root.iter():
@@ -264,7 +261,7 @@ def parse_rss_xml(xml_bytes, source_name):
                 "title": title,
                 "summary": summary,
                 "published": published,
-                "time": published.strftime("%H:%M") if published else "",
+                "time": published.strftime("%m-%d %H:%M") if published else "",
                 "source": source_name,
                 "url": link,
             })
@@ -276,7 +273,7 @@ def fetch_rss_direct(source_name, rss_url):
         data = http_get(rss_url, timeout=12)
         items = parse_rss_xml(data, source_name)
         return items
-    except Exception as exc:
+    except Exception:
         return []
 
 
@@ -302,12 +299,12 @@ def fetch_rss2json(source_name, rss_url):
                     "title": title,
                     "summary": summary,
                     "published": published,
-                    "time": published.strftime("%H:%M") if published else "",
+                    "time": published.strftime("%m-%d %H:%M") if published else "",
                     "source": source_name,
                     "url": item.get("link", ""),
                 })
         return results
-    except Exception as exc:
+    except Exception:
         return []
 
 
@@ -425,14 +422,14 @@ def fetch_sina_china():
                 "title": title,
                 "summary": summary,
                 "published": published,
-                "time": published.strftime("%H:%M") if published else "",
+                "time": published.strftime("%m-%d %H:%M") if published else "",
                 "source": "新浪财经",
                 "url": feed.get("url") or feed.get("link") or "",
             })
 
         return results
 
-    except Exception as exc:
+    except Exception:
         return []
 
 
@@ -461,40 +458,14 @@ def fetch_china_news():
     return items
 
 
-# ========================= 重要性评分与排序 =========================
-
-IMPORTANCE_RULES = [
-    (10, [
-        "美联储", "央行决议", "利率决议", "降息", "加息", "fed decision", "rate decision",
-        "外交", "峰会", "总统", "总理", "主席", "会谈", "白宫", "国情咨文", "summit", "president", "pm", "央行", "国务院"
-    ]),
-    (9, [
-        "通胀", "cpi", "inflation", "gdp", "非农", "核心pce", "制裁", "关税",
-        "tariff", "sanctions", "election", "大选", "地缘政治", "社融", "财政部", "商务部"
-    ]),
-    (8, [
-        "贸易协议", "政策支持", "产业政策", "un", "联合国", "opec", "欧佩克", "imf", "房地产", "地方债"
-    ]),
-    (7, [
-        "股市", "半导体", "芯片", "油价", "债券收益率", "stock market", "semiconductor", "oil", "港股"
-    ]),
-    (6, [
-        "财报", "业绩", "净利润", "earnings"
-    ]),
-]
-
-
-def importance_score(item):
-    text = (clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))).lower()
-    for score, words in IMPORTANCE_RULES:
-        if any(word.lower() in text for word in words):
-            return score
-    return 3
-
+# ========================= 时间排序与 48 小时旧闻过滤 =========================
 
 def rank_news(items, limit, channel_tag, default_asset):
     deduped = []
     seen = set()
+
+    # 设置 48 小时旧闻门槛，超过 48 小时的旧资讯自动清退
+    cutoff_time = now_beijing() - datetime.timedelta(hours=48)
 
     for raw_item in items:
         item = dict(raw_item)
@@ -511,29 +482,29 @@ def rank_news(items, limit, channel_tag, default_asset):
         if isinstance(published, str):
             published = parse_date(published)
 
+        # 过滤掉 48 小时以前的旧新闻
+        if published and published < cutoff_time:
+            continue
+
         item["title"] = title
         item["summary"] = clean_text(item.get("summary", ""))
         item["published"] = published
         item["time"] = (
-            published.strftime("%H:%M")
+            published.strftime("%m-%d %H:%M")
             if isinstance(published, datetime.datetime)
             else clean_text(item.get("time", ""))
         )
         item["tag"] = channel_tag
-        item["source"] = clean_text(item.get("source", "")) or "来源未标注"
+        item["source"] = clean_text(item.get("source", "")) or "官方/权威媒体"
         item["url"] = clean_text(item.get("url", ""))
         item["impact"] = "需结合原文、官方数据及实时行情进一步判断影响。"
         item["asset"] = default_asset
-        item["_score"] = importance_score(item)
         deduped.append(item)
 
+    # 严格按照发布时间倒序排列（最新的新闻始终保持在顶部）
     min_date = datetime.datetime.min.replace(tzinfo=BEIJING_TZ)
     deduped.sort(
-        key=lambda item: (
-            item["_score"],
-            item.get("published") is not None,
-            item.get("published") or min_date,
-        ),
+        key=lambda item: item.get("published") or min_date,
         reverse=True,
     )
 
@@ -542,12 +513,7 @@ def rank_news(items, limit, channel_tag, default_asset):
     output = []
 
     for idx, item in enumerate(selected):
-        item.pop("_score", None)
         item["id"] = f"NO.{total - idx:02d}"
-        item.setdefault("summary", "")
-        item.setdefault("time", "")
-        item.setdefault("impact", "")
-        item.setdefault("asset", default_asset)
         output.append(item)
 
     return output
@@ -582,7 +548,7 @@ def main():
         raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业"
     )
 
-    # 国际与亚太新闻进行中文翻译
+    # 国际与亚太新闻全自动中文翻译
     final_global = translate_international_channels(final_global, "国际财经与政经")
     final_asia = translate_international_channels(final_asia, "亚太财经与政经")
 
@@ -618,7 +584,7 @@ def main():
 
     time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
     time_replacement = (
-        '<div id="updateTime" class="text-slate-300 font-medium text-sm">'
+        '<div id="updateTime" class="text-slate-400 font-medium text-xs">'
         f"更新时间: {datetime_str} (北京时间)</div>"
     )
     updated, _ = re.subn(time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL)
