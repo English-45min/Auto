@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财经与时政焦点看板自动更新脚本（纯净时效优化版）
+财经与时政焦点看板自动更新脚本（纯净时效与国内防串台拦截完全版）
 功能：
 1. 抓取国际财经/时政、亚太财经/时政（含台湾源）、国内核心政经；
-2. 严格 48 小时旧闻过滤 + 绝对发布时间倒序，彻底解决旧新闻霸屏问题；
-3. 时间显示格式升级为 MM-DD HH:MM，方便直观核对日期；
-4. 自动将国际与亚太新闻高质量翻译为中文，国内板块严格防串台；
-5. 安全内嵌写入 index.html。
+2. 严格 48 小时旧闻过滤 + 绝对发布时间倒序，确保资讯绝对新鲜；
+3. 国内新闻频道增加涉外/国际新闻硬拦截检测机制，彻底杜绝串台；
+4. 时间显示格式为 MM-DD HH:MM，方便直观核对日期；
+5. 自动将国际与亚太新闻高质量翻译为中文，安全内嵌写入 index.html。
 """
 
 import datetime
@@ -342,7 +342,7 @@ def filter_asia_news(items):
     return kept
 
 
-# ========================= 国内新闻严格防串台过滤 =========================
+# ========================= 国内新闻严格防串台与国际新闻拦截检测 =========================
 
 CHINA_RELEVANCE_KEYWORDS = (
     "中国", "国内", "央行", "人民币", "a股", "沪指", "上证", "深证",
@@ -352,10 +352,13 @@ CHINA_RELEVANCE_KEYWORDS = (
     "地方债", "新能源", "海关", "A股市场", "深交所", "上交所"
 )
 
+# 国际新闻硬拦截黑名单（只要媒体在报道以下国际涉外/地缘政治内容，坚决拦截不让其上线）
 CHINA_EXCLUDE_KEYWORDS = (
-    "美联储主席", "美国大选", "白宫", "五角大楼", "乌克兰", "俄罗斯", "莫斯科",
-    "泽连斯基", "加沙", "哈马斯", "巴勒斯坦", "黎巴嫩", "叙利亚", "伊朗",
-    "法国", "德国", "英国首相", "欧洲央行行长拉加德"
+    "美联储", "美国大选", "白宫", "五角大楼", "欧洲央行", "英国首相", "日本首相",
+    "泽连斯基", "普京", "拜登", "特朗普", "马斯克", "拉加德",
+    "乌克兰", "俄罗斯", "莫斯科", "加沙", "哈马斯", "巴勒斯坦", "黎巴嫩",
+    "叙利亚", "伊朗", "以色列", "红海", "中东局势", "朝鲜半岛",
+    "华尔街股市", "标普500", "纳斯达克指数", "欧洲股市"
 )
 
 def find_candidate_lists(obj):
@@ -436,8 +439,13 @@ def fetch_sina_china():
 def is_china_relevant(item):
     text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
     low = text.lower()
-    if any(ex.lower() in low for ex in CHINA_EXCLUDE_KEYWORDS):
-        return False
+    
+    # 1. 拦截检测：当媒体在报道国际新闻或涉外内容时，直接一票否决拦截
+    for ex in CHINA_EXCLUDE_KEYWORDS:
+        if ex.lower() in low:
+            return False
+            
+    # 2. 必须命中至少一个国内核心宏观政经词汇
     return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
 
 
@@ -464,7 +472,7 @@ def rank_news(items, limit, channel_tag, default_asset):
     deduped = []
     seen = set()
 
-    # 设置 48 小时旧闻门槛，超过 48 小时的旧资讯自动清退
+    # 设置 48 小时门槛，自动清退过期旧闻
     cutoff_time = now_beijing() - datetime.timedelta(hours=48)
 
     for raw_item in items:
@@ -501,7 +509,7 @@ def rank_news(items, limit, channel_tag, default_asset):
         item["asset"] = default_asset
         deduped.append(item)
 
-    # 严格按照发布时间倒序排列（最新的新闻始终保持在顶部）
+    # 严格按照发布时间倒序排列（最新发布的永远在最上面）
     min_date = datetime.datetime.min.replace(tzinfo=BEIJING_TZ)
     deduped.sort(
         key=lambda item: item.get("published") or min_date,
