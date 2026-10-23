@@ -168,7 +168,6 @@ def get_response(url, timeout=15, headers=None):
     }
 
     request_headers.update(headers or {})
-
     request = Request(url, headers=request_headers)
 
     with urlopen(request, timeout=timeout) as response:
@@ -186,19 +185,17 @@ def get(url, timeout=20, headers=None):
 
 
 # ============================================================
-# 4. Google News 链接解析
+# 4. Google News 链接解析与备用搜索
 # ============================================================
 
 def is_google_news_url(url):
     """判断链接是否属于 Google News 中转地址。"""
     try:
         host = (urlparse(url).hostname or "").lower()
-
         return (
             host == "news.google.com"
             or host.endswith(".news.google.com")
         )
-
     except Exception:
         return False
 
@@ -207,25 +204,191 @@ def is_http_url(url):
     """只允许 HTTP/HTTPS 地址。"""
     try:
         parsed = urlparse(url)
-
         return (
             parsed.scheme in ("http", "https")
             and bool(parsed.hostname)
         )
-
     except Exception:
         return False
 
 
+def make_search_url(title):
+    """
+    根据新闻标题生成备用搜索入口。
+
+    中文标题优先使用百度搜索；
+    英文标题使用 Bing 搜索。
+    该地址是搜索入口，不冒充媒体原文。
+    """
+    title = clean(title)
+
+    if not title:
+        return ""
+
+    query = quote(title)
+
+    if chinese(title):
+        return "https://www.baidu.com/s?wd=" + query
+
+    return "https://www.bing.com/search?q=" + query
+
+
+def _extract_google_rpc_url(article_id, page_url, page):
+    """
+    尝试通过 Google News 页面中的文章参数解析真实文章地址。
+
+    Google News 内部接口并非稳定公开 API。
+    如果页面结构或接口变化，函数会返回空字符串，
+    后续仍会保留备用搜索入口。
+    """
+    sig_match = re.search(
+        r'data-n-a-sg=["\']([^"\']+)["\']',
+        page,
+    )
+    ts_match = re.search(
+        r'data-n-a-ts=["\']([^"\']+)["\']',
+        page,
+    )
+    id_match = re.search(
+        r'data-n-a-id=["\']([^"\']+)["\']',
+        page,
+    )
+
+    if not sig_match or not ts_match:
+        return ""
+
+    if id_match:
+        article_id = html.unescape(id_match.group(1))
+
+    signature = html.unescape(sig_match.group(1))
+
+    try:
+        timestamp = int(ts_match.group(1))
+    except (TypeError, ValueError):
+        return ""
+
+    inner = [
+        "garturlreq",
+        [
+            [
+                "X", "X", ["X", "X"], None, None,
+                1, 1, "US:en", None, 1, None, None,
+                None, None, None, 0, 1,
+            ],
+            "X", "X", 1, [1, 1, 1], 1, 1, None,
+            0, 0, None, 0,
+        ],
+        article_id,
+        timestamp,
+        signature,
+    ]
+
+    rpc_payload = json.dumps(
+        [[[
+            "Fbv4je",
+            json.dumps(inner, separators=(",", ":")),
+            None,
+            "generic",
+        ]]],
+        separators=(",", ":"),
+    )
+
+    rpc_url = (
+        "https://news.google.com/"
+        "_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je"
+    )
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36"
+        ),
+        "Accept": "*/*",
+        "Origin": "https://news.google.com",
+        "Referer": page_url,
+        "Content-Type": (
+            "application/x-www-form-urlencoded;charset=UTF-8"
+        ),
+    }
+
+    request = Request(
+        rpc_url,
+        data=urlencode({
+            "f.req": rpc_payload,
+        }).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+    with urlopen(request, timeout=10) as response:
+        response_text = response.read().decode(
+            "utf-8",
+            errors="replace",
+        )
+
+    # Google 接口响应通常在前面带有防止 JSON 劫持的前缀。
+    # 先尝试解析整个响应；失败后再尝试查找 JSON 数组。
+    candidates = []
+
+    try:
+        candidates.append(json.loads(response_text))
+    except Exception:
+        pass
+
+    for match in re.finditer(r"\[\s*\[.*?\]\s*\]", response_text, re.S):
+        try:
+            candidates.append(json.loads(match.group(0)))
+        except Exception:
+            continue
+
+    for frames in candidates:
+        if not isinstance(frames, list):
+            continue
+
+        for frame in frames:
+            if not isinstance(frame, list) or len(frame) < 3:
+                continue
+
+            if frame[0] != "wrb.fr" or frame[1] != "Fbv4je":
+                continue
+
+            if not frame[2]:
+                continue
+
+            try:
+                result = json.loads(frame[2])
+            except (ValueError, TypeError):
+                continue
+
+            if (
+                isinstance(result, list)
+                and len(result) > 1
+                and result[0] == "garturlres"
+            ):
+                candidate = html.unescape(
+                    str(result[1])
+                ).strip()
+
+                if (
+                    is_http_url(candidate)
+                    and not is_google_news_url(candidate)
+                ):
+                    return candidate
+
+    return ""
+
+
 def extract_article_url(url):
     """
-    尝试从 Google News 中转地址提取真实文章地址。
+    尽可能从 Google News 中转地址提取真实媒体文章地址。
 
-    处理策略：
-    1. 先检查 URL 中是否存在明确的目标地址参数。
-    2. 再尝试跟随 HTTP 跳转。
-    3. 最后检查返回页面的 canonical 或 og:url。
-    4. 如果无法确定真实目标，则返回空字符串。
+    尝试顺序：
+    1. 检查 URL 参数中的目标地址。
+    2. 尝试普通 HTTP 跳转。
+    3. 检查页面中的 canonical / og:url。
+    4. 尝试 Google News 内部文章解析接口。
+
+    无法可靠确认原文时返回空字符串，不伪造文章地址。
     """
     if not url or not is_http_url(url):
         return ""
@@ -233,7 +396,7 @@ def extract_article_url(url):
     if not is_google_news_url(url):
         return url
 
-    # 部分中转链接会直接带有目标 URL 参数。
+    # 第一步：检查 URL 中是否存在明确的目标地址参数。
     try:
         query = parse_qs(urlparse(url).query)
 
@@ -250,14 +413,25 @@ def extract_article_url(url):
     except Exception:
         pass
 
-    # 尝试让标准 HTTP 客户端跟随重定向。
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml,"
+            "q=0.9,*/*;q=0.8"
+        ),
+        "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8",
+        "Cookie": "CONSENT=YES+cb; SOCS=CAI",
+    }
+
     try:
+        # 第二步：尝试跟随重定向。
         body, final_url = get_response(
             url,
-            timeout=6,
-            headers={
-                "Accept": "text/html,application/xhtml+xml,*/*",
-            },
+            timeout=8,
+            headers=headers,
         )
 
         if (
@@ -266,13 +440,12 @@ def extract_article_url(url):
         ):
             return final_url
 
-        # 只提取页面明确标注的 canonical / og:url。
-        # 不猜测文章网址，也不将来源主页冒充原文。
-        page = body[:500000].decode(
+        page = body[:900000].decode(
             "utf-8",
             errors="replace",
         )
 
+        # 第三步：检查页面中的 canonical / og:url。
         patterns = [
             r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)',
             r'<meta[^>]+property=["\']og:url["\'][^>]+content=["\']([^"\']+)',
@@ -297,6 +470,76 @@ def extract_article_url(url):
             ):
                 return candidate
 
+        # 第四步：尝试通过文章 ID 请求 Google News 页面，
+        # 再尝试解析 Google News 内部跳转信息。
+        parsed = urlparse(url)
+        article_id = parsed.path.rstrip("/").split("/")[-1]
+
+        if not article_id:
+            return ""
+
+        page_url = (
+            "https://news.google.com/rss/articles/"
+            + article_id
+        )
+
+        page_body, page_final = get_response(
+            page_url,
+            timeout=10,
+            headers=headers,
+        )
+
+        if (
+            is_http_url(page_final)
+            and not is_google_news_url(page_final)
+        ):
+            return page_final
+
+        page = page_body[:900000].decode(
+            "utf-8",
+            errors="replace",
+        )
+
+        # 页面上可能直接出现可用的媒体链接。
+        for pattern in patterns:
+            match = re.search(
+                pattern,
+                page,
+                flags=re.I,
+            )
+
+            if not match:
+                continue
+
+            candidate = html.unescape(match.group(1)).strip()
+
+            if (
+                is_http_url(candidate)
+                and not is_google_news_url(candidate)
+            ):
+                return candidate
+
+        # 最后尝试 Google News 内部解析接口。
+        try:
+            resolved = _extract_google_rpc_url(
+                article_id,
+                page_url,
+                page,
+            )
+
+            if (
+                resolved
+                and is_http_url(resolved)
+                and not is_google_news_url(resolved)
+            ):
+                return resolved
+
+        except Exception as error:
+            print(
+                "[INFO] Google News 内部解析接口不可用：",
+                type(error).__name__,
+            )
+
     except Exception as error:
         print(
             "[INFO] Google News 原文解析未成功：",
@@ -306,28 +549,22 @@ def extract_article_url(url):
     return ""
 
 
-def make_search_url(title):
-    """
-    为无法解析的新闻生成备用搜索入口。
-
-    这不是原文地址，而是按新闻标题搜索媒体报道的入口。
-    """
-    query = quote((title or "").strip())
-
-    if not query:
-        return ""
-
-    return "https://www.google.com/search?q=" + query
-
-
 def prepare_article_links(item):
     """
-    规范化新闻链接，并保留备用入口。
+    规范化新闻链接，并生成备用搜索入口。
 
-    url：优先使用解析成功的原文链接。
-    originalUrl：采集时获得的原始链接。
-    searchUrl：备用搜索入口。
-    linkStatus：用于区分真实原文与中转链接。
+    url：
+        已解析时使用原文地址；
+        未解析时保留原始 Google News 链接。
+
+    originalUrl：
+        RSS 中采集到的原始链接。
+
+    searchUrl：
+        根据新闻标题生成的备用搜索地址。
+
+    linkStatus：
+        说明链接当前的解析状态。
     """
     original_url = (item.get("url") or "").strip()
     title = item.get("title", "")
@@ -351,11 +588,10 @@ def prepare_article_links(item):
         item["url"] = resolved
         item["linkStatus"] = "已解析原文链接"
     else:
-        # 不能确认原文地址时，不伪造媒体链接。
-        # 保留原链接供用户自行尝试，并提供备用搜索入口。
+        # 不把搜索页伪装成原文，也不删除原始中转链接。
         item["url"] = original_url
         item["linkStatus"] = "Google News 中转链接"
-    
+
     return item
 
 
@@ -493,8 +729,8 @@ def parse_date(value):
         except Exception:
             pass
 
-    # 不把无法解析的时间默认为“刚刚”。
-    # 否则旧新闻会被误认为最新新闻。
+    # 不把无法解析的时间默认为“刚刚”，
+    # 避免旧新闻被误认为最新新闻。
     return None
 
 
@@ -956,7 +1192,8 @@ def build(channel, cache, budget):
             "channel": channel,
         }
 
-        # 新增：尝试把 Google News 中转链接解析为原文链接。
+        # 尝试解析 Google News 中转链接。
+        # 无法解析时仍会生成 searchUrl 作为备用搜索入口。
         prepare_article_links(news_item)
 
         # 使用最终 URL 作为缓存标识的一部分。
