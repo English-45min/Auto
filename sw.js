@@ -1,4 +1,4 @@
-const CACHE_NAME = 'terminal-news-v2';
+const CACHE_NAME = 'terminal-news-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html'
