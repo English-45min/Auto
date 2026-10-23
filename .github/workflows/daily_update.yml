@@ -1,33 +1,32 @@
-name: Update Daily News
+name: Terminal News Auto Update
 
 on:
-  schedule:
-    # 每天北京时间早上 8:00 与下午 14:00 自动运行 (UTC 0:00 与 06:00)
-    - cron: '0 0,6 * * *'
-  workflow_dispatch: # 支持手动一键运行
+  scheduled:
+    - cron: '0 0,6 * * *' # 每天北京时间 08:00 和 14:00 自动运行 (UTC 0点和6点)
+  workflow_dispatch: # 支持手动点击按钮触发
 
 jobs:
-  update-html:
+  update-terminal:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # 赋予写权限，允许自动提交代码
 
     steps:
-      - name: Checkout Repo
+      - name: 迁出代码仓库
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 设置 Python 环境
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Run Update Script
-        run: |
-          python update.py
+      - name: 运行 Python 更新脚本与 AI 解读生成
+        run: python update.py
 
-      - name: Push to GitHub Pages
+      - name: 自动提交并推送更新后的 index.html 到仓库
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto refresh daily news [skip ci]" && git pull origin main --rebase && git push origin main)
+          git diff --cached --quiet || git commit -m "chore: auto-update financial terminal data [skip ci]"
+          git push
