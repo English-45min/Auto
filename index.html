@@ -9,7 +9,7 @@
     body { background-color: #0b0f17; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .news-card { background: #131b2e; border: 1px solid #1e293b; transition: all 0.2s ease-in-out; }
     .news-card:active { background: #1a243d; }
-    .read-title { color: #64748b !important; } /* 已读新闻标题灰显 */
+    .read-title { color: #64748b !important; }
     .highlight-word { color: #f59e0b; background-color: rgba(245, 158, 11, 0.1); padding: 0 2px; border-radius: 2px; }
   </style>
 </head>
@@ -23,7 +23,9 @@
           <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
           <h1 class="text-base font-bold tracking-wide text-slate-100">TERMINAL // 财经与时政焦点</h1>
         </div>
-        <div id="updateTime" class="text-slate-400 font-medium text-xs">更新时间: 2026-10-23 11:04:18 (北京时间)</div>
+        <div id="updateTime" class="text-slate-400 font-medium text-xs">
+          更新时间: 加载中...
+        </div>
       </div>
       <!-- 字体大小调节按钮 -->
       <div class="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
@@ -36,22 +38,25 @@
 
   <main class="max-w-3xl mx-auto px-4 pt-4">
 
-    <!-- 频道切换 Tabs -->
-    <div class="flex border-b border-slate-800 mb-4 text-sm">
-      <button id="tab-global" onclick="switchTab('global')" class="py-2.5 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition focus:outline-none">
+    <!-- 频道切换 Tabs（新增 📊 财报季解读） -->
+    <div class="flex overflow-x-auto border-b border-slate-800 mb-4 text-sm scrollbar-none">
+      <button id="tab-global" onclick="switchTab('global')" class="py-2.5 px-3.5 font-bold text-amber-500 border-b-2 border-amber-500 transition whitespace-nowrap focus:outline-none">
         国际财经 Top 20
       </button>
-      <button id="tab-asia" onclick="switchTab('asia')" class="py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none">
+      <button id="tab-asia" onclick="switchTab('asia')" class="py-2.5 px-3.5 font-bold text-slate-400 border-b-2 border-transparent transition whitespace-nowrap focus:outline-none">
         亚太市场 Top 10
       </button>
-      <button id="tab-china" onclick="switchTab('china')" class="py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none">
+      <button id="tab-china" onclick="switchTab('china')" class="py-2.5 px-3.5 font-bold text-slate-400 border-b-2 border-transparent transition whitespace-nowrap focus:outline-none">
         国内核心 Top 10
+      </button>
+      <button id="tab-earnings" onclick="switchTab('earnings')" class="py-2.5 px-3.5 font-bold text-slate-400 border-b-2 border-transparent transition whitespace-nowrap focus:outline-none">
+        📊 核心财报季
       </button>
     </div>
 
-    <!-- 新闻列表容器 -->
+    <!-- 新闻/财报列表容器 -->
     <div id="news-container" class="space-y-3.5">
-      <!-- 动态插入新闻卡片 -->
+      <!-- 动态插入内容 -->
     </div>
 
     <!-- 免责声明底部 -->
@@ -70,40 +75,38 @@
     </svg>
   </button>
 
-  <!-- 静态数据嵌入区 (由 Python update.py 自动更新写入) -->
+  <!-- 静态数据嵌入区 (由 Python update.py 自动更新写入，现已支持 earnings 字段) -->
   <!-- NEWS_DATA_START -->
-<script>
-const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的审查后 SK 海力士股价扭转跌势","summary":"芯片制造商放弃对 Solidigm IPO 的审查后 SK 海力士股价扭转跌势","published":"2026-10-23 11:03:04+08:00","time":"10-23 11:03","source":"CNBC World","url":"https://www.cnbc.com/2026/10/23/sk-hynix-solidigm-ipo-.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.20"},{"title":"特朗普被要求在 BBC 诉讼中宣誓回答问题","summary":"特朗普正在起诉 BBC，原因是《全景》中的一集将他 2021 年演讲的两个不同部分剪辑在一起。","published":"2026-10-23 09:38:44+08:00","time":"10-23 09:38","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cmy0ryjx7741o?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.19"},{"title":"随着北京税网扩大，中国富人将海外资金转移到美国银行","summary":"银行家和律师表示，随着北京方面收紧对中国离岸财富的管控，中国客户对美国银行账户的需求不断增加。","published":"2026-10-23 09:23:12+08:00","time":"10-23 09:23","source":"CNBC World","url":"https://www.cnbc.com/2026/10/23/wealthy-chinese-tax-offshore-trusts-capital-control-.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.18"},{"title":"日本9月核心通胀率飙升至今年最高水平2.1%","summary":"扣除新鲜食品价格后的核心通胀率与路透社调查的经济学家预测的 2.1% 一致。","published":"2026-10-23 08:55:11+08:00","time":"10-23 08:55","source":"CNBC World","url":"https://www.cnbc.com/2026/10/23/japan-inflation-september-highest-in-2026.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.17"},{"title":"SpaceX 通过持有埃隆·马斯克 (Elon Musk) 旗下 Boring Co. 的股份获得了 5.61 亿美元的投资收益。","summary":"SpaceX 持有 Boring Co. 的股份有助于提高其第三季度的净利润。","published":"2026-10-23 08:46:09+08:00","time":"10-23 08:46","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/spacex-records-561-million-investment-gain-from-stake-in-boring-co.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.16"},{"title":"Etsy 禁止其在线市场上使用人工智能生成的食谱和图案","summary":"Etsy 还就其平台上的人工智能使用制定了更明确的规则，包括禁止卖家在没有任何人工参与的情况下创建机器人生成的列表。","published":"2026-10-23 07:45:50+08:00","time":"10-23 07:45","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/etsy-bans-ai-generated-recipes-patterns-from-its-online-marketplace.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.15"},{"title":"监视和“持续的偏执”：西方外交官向 BBC 讲述战时莫斯科的生活","summary":"官员们将俄罗斯全面入侵乌克兰以来的工作与冷战时期进行了比较。","published":"2026-10-23 07:16:20+08:00","time":"10-23 07:16","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cj75p1xr7p7vo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.14"},{"title":"英国广播公司(BBC)调查发现，苏丹无国界医生组织战士故意袭击医院","summary":"联合国人权事务高级专员沃尔克·蒂尔克表示，多起袭击事件可能构成战争罪。","published":"2026-10-23 07:16:16+08:00","time":"10-23 07:16","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/c54g1kxw4nvvo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.13"},{"title":"欧莱雅表示减肥药物正在影响美容和护肤品的销售","summary":"这家美容巨头的首席执行官表示，GLP-1 的使用“对我们来说是一个非常重要的现象”。","published":"2026-10-23 06:27:53+08:00","time":"10-23 06:27","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cvglwgwpgrlpo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.12"},{"title":"Meta 让扎克伯格留在加州的协议为选举前的财富税辩论增添了火力","summary":"距离中期选举还有不到两周的时间，梅塔明确表示，如果财富税通过，马克·扎克伯格将留在加州。","published":"2026-10-23 06:21:08+08:00","time":"10-23 06:21","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/meta-mark-zuckerberg-california-billionaire-tax.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.11"},{"title":"诉讼指控特朗普从外国加密货币交易中非法获利","summary":"律师马特·佩利坎 (Matt Pelikan) 告诉 CNBC：“我们提起诉讼是为了制止腐败，并迫使特朗普总统将利润返还给美国纳税人。”","published":"2026-10-23 06:02:34+08:00","time":"10-23 06:02","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/trump-world-liberty-crypto-lawsuit-uae.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.10"},{"title":"埃隆·马斯克 (Elon Musk) 投入 3.66 亿美元竞选活动，SpaceX 和特斯拉在选举中的风险很高","summary":"马斯克最大的政治赌注是参议院，参议院的控制权可能会影响未来的调查、联邦支出以及影响 SpaceX 和特斯拉的法规。","published":"2026-10-23 05:58:42+08:00","time":"10-23 05:58","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/elon-musk-midterm-election-spacex-tesla.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.09"},{"title":"尽管取得了积极的成果，但癌症疫苗数据泄露后 Moderna 股价暴跌","summary":"Moderna 公布了其与默克公司共同开发的备受关注的癌症疫苗的完整数据。","published":"2026-10-23 05:52:02+08:00","time":"10-23 05:52","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/moderna-stock-cancer-vaccine-data-leak.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.08"},{"title":"特朗普表示马斯克已恢复对乌克兰星链网络的访问","summary":"乌克兰依赖星链进行一系列军事用途——其所有者埃隆·马斯克一再否认限制访问。","published":"2026-10-23 05:42:39+08:00","time":"10-23 05:42","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cq74pjpmx0e8o?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.07"},{"title":"据《华尔街日报》报道，特朗普要求马斯克解除星链减速","summary":"据《华尔街日报》此前报道，乌克兰总统泽连斯基的批评者埃隆·马斯克已下令放慢 SpaceX 星链的速度。","published":"2026-10-23 05:02:07+08:00","time":"10-23 05:02","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/trump-musk-starlink-ukraine.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.06"},{"title":"出于安全和滥用问题，纽约在 160 年后禁止使用马车","summary":"当市议会投票废除马车时，中央公园对这一 160 年传统的看法出现了分歧。","published":"2026-10-23 04:49:12+08:00","time":"10-23 04:49","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/c6qjnwd1pgjxo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.05"},{"title":"迪士尼的多平台超级碗计划令 ABC 附属公司感到沮丧","summary":"迪士尼正在 ABC、ESPN、Disney+、ESPN2、ESPNU 和 NFL Network 上转播超级碗比赛，这让当地电视台附属公司感到懊恼。","published":"2026-10-23 04:44:26+08:00","time":"10-23 04:44","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/disneys-multiplatform-super-bowl-plan-frustrates-abc-affiliates.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.04"},{"title":"OpenAI 即将完成 300 亿美元融资，估值 1.25 万亿美元，由阿联酋投资者领投","summary":"知情人士告诉 CNBC，OpenAI 即将完成新一轮融资，这将成为其 2027 年 IPO 的桥梁。","published":"2026-10-23 04:41:37+08:00","time":"10-23 04:41","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/openai-funding-round-uae-investors.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.03"},{"title":"在两党批评后，特朗普与阿克顿分居的母亲一起为拉马斯瓦米的广告辩护","summary":"俄亥俄州州长迈克·德温表示，共和党州长候选人维韦克·拉马斯瓦米应该删除以民主党候选人艾米·阿克顿的母亲为主角的广告。","published":"2026-10-23 04:26:48+08:00","time":"10-23 04:26","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/trump-ramaswamy-ad-acton-mother-ad.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.02"},{"title":"随着债券收益率飙升和股票下跌，CoreWeave 的市场信心受到侵蚀","summary":"CoreWeave 股价 10 月份下跌了 36%，其信用违约掉期利差正在扩大。","published":"2026-10-23 04:12:30+08:00","time":"10-23 04:12","source":"CNBC World","url":"https://www.cnbc.com/2026/10/21/coreweaves-market-confidence-erodes-as-bond-yields-spike-stock-sinks.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.01"}],"asia":[{"title":"台湾在台风“占比”来临之前关闭，数百个航班被取消","summary":"台风占比的半径约为320公里，足以覆盖台湾大部分地区。","published":"2026-10-23 09:25:00+08:00","time":"10-23 09:25","source":"CNA Asia","url":"https://www.channelnewsasia.com/east-asia/typhoon-champi-approaches-taiwan-flights-cancelled-6484571","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.10"},{"title":"随着北京税网扩大，中国富人将海外资金转移到美国银行","summary":"银行家和律师表示，随着北京方面收紧对中国离岸财富的管控，中国客户对美国银行账户的需求不断增加。","published":"2026-10-23 09:23:12+08:00","time":"10-23 09:23","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/23/wealthy-chinese-tax-offshore-trusts-capital-control-.html","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.09"},{"title":"日本9月核心通胀率飙升至今年最高水平2.1%","summary":"扣除新鲜食品价格后的核心通胀率与路透社调查的经济学家预测的 2.1% 一致。","published":"2026-10-23 08:55:11+08:00","time":"10-23 08:55","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/23/japan-inflation-september-highest-in-2026.html","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.08"},{"title":"PMI显示日本10月制造业增长放缓至7个月低点","summary":"","published":"2026-10-23 08:32:00+08:00","time":"10-23 08:32","source":"CNA Business","url":"https://www.channelnewsasia.com/business/japan-manufacturing-growth-slows-7-month-low-in-october-pmi-shows-6484751","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.07"},{"title":"日本经济大臣称日本尚未正式摆脱通货紧缩","summary":"","published":"2026-10-23 08:06:00+08:00","time":"10-23 08:06","source":"CNA Business","url":"https://www.channelnewsasia.com/business/japan-not-yet-officially-out-deflation-economy-minister-says-6484686","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.06"},{"title":"NSB称中国加大干预选举力度","summary":"","published":"2026-10-23 08:00:00+08:00","time":"10-23 08:00","source":"Taipei Times","url":"https://www.taipeitimes.com/News/front/archives/2026/10/23/2003866462","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.05"},{"title":"澳大利亚和东帝汶签署加强安全协议","summary":"","published":"2026-10-23 08:00:00+08:00","time":"10-23 08:00","source":"Taipei Times","url":"https://www.taipeitimes.com/News/world/archives/2026/10/23/2003866488","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.04"},{"title":"假通勤：中国失业者如何挽回面子","summary":"","published":"2026-10-23 08:00:00+08:00","time":"10-23 08:00","source":"Taipei Times","url":"https://www.taipeitimes.com/News/feat/archives/2026/10/23/2003866458","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.03"},{"title":"中央社解释：为什么中国五中全会将重点关注党纪","summary":"观察人士称，将于周一（10 月 26 日）开始的重要会议可能会提供有关北京 2027 年优先事项的线索。","published":"2026-10-23 06:00:00+08:00","time":"10-23 06:00","source":"CNA Asia","url":"https://www.channelnewsasia.com/east-asia/china-fifth-plenum-2026-party-discipline-6461861","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.02"},{"title":"“我们真的不想取消”：新加坡人在暴力抗议中权衡法国旅行计划","summary":"上周末在巴黎的新加坡人讲述了店面受损、催泪瓦斯和交通中断的场景，尽管远离抗议地区的日常生活基本上照常进行。","published":"2026-10-23 06:00:00+08:00","time":"10-23 06:00","source":"CNA World","url":"https://www.channelnewsasia.com/singapore/france-protests-singaporeans-travel-paris-rioting-6481226","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.01"}],"china":[{"title":"工信部陈彦丞：坚定不移强化智能网联汽车企业科技创新和国际合作","summary":"10月23日，在2026世界智能网联汽车大会关键技术论坛上，工业和信息化部高新技术司副司长陈彦丞表示，展望未来，智能网联汽车高质量可持续发展，仍需依托国际科技创新和国际合作来联合破解难题。下一步，工业和信息化部将立足自身职能，会同有关方面共同加强智能网联新能源汽车关键核心技术，特别是前沿技术研发创新，为产业高质量发展注入强劲新动能。具体分为三方面：一是持之以恒推动关键核心技术研发，持续攻关智能网联相关的新一代通用人工智能与智驾大模型、车用协同感知决策等关键技术，有组织体系化地推动技术前沿、产业共性基础支撑攻关技术；二是进一步深化跨领域的交叉融合，以新能源汽车为载体，推动人工智能、新材料、新能源等多领域关键技术融合创新、集成应用，加快探索人工智能时代下的新一代智能网联新能源汽车的新形态、新功能、新结构，推动汽车向智能生活伙伴、移动智能终端升级，引领产业高质量发展；三是坚定不移强化企业科技创新和国际合作，引导支持新能源汽车企业加大技术研发投入，加速创新成果转化，深化产业链供应链的国际协同与技术合作交流，与全球志同道合者一起在开放合作中共同提升创新能力，加快培育形成新质生产力。","published":"2026-10-23 11:01:54+08:00","time":"10-23 11:01","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.10"},{"title":"财政部在香港成功发行2026年第五期155亿元人民币国债","summary":"10月23日，中华人民共和国财政部在香港特别行政区，面向机构投资者招标发行2026年第五期155亿元人民币国债，受到投资者广泛欢迎，认购倍数3.43倍。其中，2年期40亿元，发行利率1.24%；3年期50亿元，发行利率1.28%；5年期40亿元，发行利率1.38%；10年期25亿元，发行利率1.67%。","published":"2026-10-23 11:01:39+08:00","time":"10-23 11:01","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.09"},{"title":"统计部门将推进文化产业分类修订","summary":"国家统计局社会科技和文化产业统计司副司长冯怡琳10月22日在2026金融街论坛年会文化金融论坛上表示，2025年全国文化产业实现营业收入20.8万亿元，再创历史新高，五年间从不足14万亿元增长至20万亿元以上。其中，文化新业态行业营业收入达7.7万亿元，占全部文化产业营业收入的36.8%，成为文化产业增长的重要动力。统计部门将推进文化产业分类修订，以高质量文化统计监测服务文化产业高质量发展。","published":"2026-10-23 10:58:18+08:00","time":"10-23 10:58","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.08"},{"title":"中国地震台网正式测定：10月23日10时53分在青海玉树州杂多县（北纬32.49度，东经93.93度）发生3.1级地震，震源深度9千米。","summary":"中国地震台网正式测定：10月23日10时53分在青海玉树州杂多县（北纬32.49度，东经93.93度）发生3.1级地震，震源深度9千米。","published":"2026-10-23 10:57:40+08:00","time":"10-23 10:57","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.07"},{"title":"中国学习平板第三季度销量下降30.8%","summary":"洛图科技数据显示，2026年第三季度，中国学习平板全渠道销量为125万台，同比下降30.8%；销售额为45亿元，同比下降17.1%。销量降幅明显大于销售额，市场继续向中高价产品迁移。 线上渠道中，3000至3999元价位段销量占比达到31.3%，同比提高17.7个百分点。作业帮、科大讯飞、学而思和小猿合计占据82%的销量份额，同比提高6.7个百分点。","published":"2026-10-23 10:56:31+08:00","time":"10-23 10:56","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.06"},{"title":"中国电气装备集团资产管理公司增资至20亿元，增幅150%","summary":"天眼查App显示，10月16日，中国电气装备集团资产管理有限公司发生工商变更，注册资本由8亿元人民币增至20亿元人民币，增幅150%。该公司成立于2022年5月，法定代表人为陈培军，经营范围包括自有资金投资的资产管理服务、工程管理服务、土地使用权租赁等，由中国电气装备集团有限公司全资持股。","published":"2026-10-23 10:55:08+08:00","time":"10-23 10:55","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.05"},{"title":"10月22日参与两融交易的投资者数量为30.29万名，环比增加0.05万名","summary":"10月22日参与融资融券交易的投资者数量为30.29万名，与上一交易日相比，增加0.05万名，环比上升0.18%。截至10月22日，融资融券个人投资者数量为845.23万名，机构投资者数量为53639家，有融资融券负债的投资者数量为200.79万名。(证券时报）","published":"2026-10-23 10:54:58+08:00","time":"10-23 10:54","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.04"},{"title":"今年上半年头部企事业单位广告业务收入突破1.04万亿元","summary":"第33届中国国际广告节今天（23日）开幕。国家市场监督管理总局副局长白清元介绍，2025年，全国广告业务收入首次突破2万亿元，同比增长32.6%。2026年上半年，头部企事业单位广告业务收入突破1.04万亿元，同比增长11.3%。中国广告市场规模稳居全球第二。广告服务品牌建设和促进消费功能显著增强，为服务经济社会高质量发展作出积极贡献。（央视新闻）","published":"2026-10-23 10:53:57+08:00","time":"10-23 10:53","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.03"},{"title":"大连前三季度地区生产总值同比增长5.3% 民用钢制船舶产量增长2.5倍","summary":"大连市统计局、国家统计局大连调查队10月23日公布前三季度全市经济运行情况，根据辽宁省地区生产总值统一核算结果，前三季度，全市地区生产总值7726.7亿元，按不变价格计算，同比增长5.3%。分产业看，第一产业增加值384.2亿元，同比增长3.2%；第二产业增加值2709.5亿元，增长5.0%；第三产业增加值4633.0亿元，增长5.6%。前三季度，全市规上工业增加值同比增长6.5%。从三大门类看，制造业增加值同比增长7.3%，采矿业下降5.2%，电力、热力、燃气及水的生产和供应业增长0.3%。从重点行业看，石化工业增加值同比增长5.8%；装备制造业增长7.4%，增速比1—8月份提高0.6个百分点，其中铁路船舶、仪器仪表、通用设备行业分别增长48.1%、13.3%、13.0%；农产品加工业增长16.1%，连续9个月保持两位数增长。从产品产量看，民用钢制船舶、水泥、滚动轴承、锂离子电池、发电机组（发电设备）分别增长2.5倍、38.2%、26.2%、20.1%、15.9%。","published":"2026-10-23 10:50:54+08:00","time":"10-23 10:50","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.02"},{"title":"中国电气装备集团资产管理公司增资至20亿","summary":"天眼查App显示，近日，中国电气装备集团资产管理有限公司发生工商变更，注册资本由8亿元人民币增至20亿元人民币，增幅150%。该公司成立于2022年5月，法定代表人为陈培军，经营范围包括自有资金投资的资产管理服务、工程管理服务、土地使用权租赁等，由中国电气装备集团有限公司全资持股。","published":"2026-10-23 10:49:48+08:00","time":"10-23 10:49","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.01"}]};
-</script>
-<!-- NEWS_DATA_END -->
+  <script>
+    const newsData = { "global": [], "asia": [], "china": [], "earnings": [] };
+  </script>
+  <!-- NEWS_DATA_END -->
 
-  <!-- JS 交互逻辑与体验增强脚本 -->
+  <!-- JS 交互逻辑 -->
   <script>
     let currentTab = 'global';
     let currentFontSizeLevel = 0;
     const fontSizes = ['text-base', 'text-lg', 'text-xl'];
     const summaryFontSizes = ['text-xs', 'text-sm', 'text-base'];
 
-    // 1. 切换 Tab
     function switchTab(tab) {
       currentTab = tab;
-      const tabs = ['global', 'asia', 'china'];
+      const tabs = ['global', 'asia', 'china', 'earnings'];
       tabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         if (t === tab) {
-          btn.className = "py-2.5 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition focus:outline-none";
+          btn.className = "py-2.5 px-3.5 font-bold text-amber-500 border-b-2 border-amber-500 transition whitespace-nowrap focus:outline-none";
         } else {
-          btn.className = "py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none";
+          btn.className = "py-2.5 px-3.5 font-bold text-slate-400 border-b-2 border-transparent transition whitespace-nowrap focus:outline-none";
         }
       });
       renderNews();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // 2. 关键词高亮
     function highlightKeywords(text) {
       if (!text) return '';
-      const keywords = ['降息', '加息', '央行', 'A股', '美联储', '半导体', '台积电', '关税', '通胀', 'CPI', 'GDP', '人民币', '沪指', '港股'];
+      const keywords = ['降息', '加息', '央行', 'A股', '美联储', '半导体', '台积电', '关税', '通胀', 'CPI', 'GDP', '人民币', '沪指', '港股', '财报', '营收', '净利润', '超预期'];
       let formatted = text;
       keywords.forEach(kw => {
         const regex = new RegExp(`(${kw})`, 'gi');
@@ -112,7 +115,6 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
       return formatted;
     }
 
-    // 3. 已读状态追踪
     function getReadStatus() {
       try {
         return JSON.parse(localStorage.getItem('read_news_items') || '{}');
@@ -130,16 +132,18 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
       renderNews();
     }
 
-    // 4. 渲染新闻
     function renderNews() {
       const container = document.getElementById('news-container');
       const items = (typeof newsData !== 'undefined' && newsData[currentTab]) ? newsData[currentTab] : [];
       const readMap = getReadStatus();
 
       if (!items || items.length === 0) {
+        const emptyTips = currentTab === 'earnings' 
+          ? '当前非密集财报季，暂无重点公司财报发布，财报季期间将自动聚合美股/A股/港股巨头财报。' 
+          : '暂无最新资讯，请稍后刷新或运行 GitHub Actions 更新';
         container.innerHTML = `
-          <div class="text-center py-12 text-slate-500 text-sm">
-            暂无最新资讯，请稍后刷新或运行 GitHub Actions 更新
+          <div class="text-center py-12 text-slate-500 text-sm px-4 leading-relaxed">
+            ${emptyTips}
           </div>`;
         return;
       }
@@ -155,7 +159,7 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
           <a href="${item.url}" target="_blank" rel="noopener noreferrer" 
              onclick="markAsRead('${item.url}', '${item.title}')"
              class="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-0.5 transition">
-            阅读原文 ↗
+            阅读财报原文 ↗
           </a>` : '<span class="text-xs text-slate-600">暂无原文链接</span>';
 
         return `
@@ -166,7 +170,7 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
                   ${item.id || ('NO.' + (index + 1))}
                 </span>
                 <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">
-                  ${item.tag || '财经'}
+                  ${item.tag || '财报解读'}
                 </span>
               </div>
               <span class="font-mono text-slate-400">${item.time || ''}</span>
@@ -183,17 +187,17 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
 
             <div class="bg-slate-900/60 rounded p-2.5 mb-3 text-xs space-y-1.5 border border-slate-800/80">
               <div class="flex items-start text-slate-300">
-                <span class="text-red-400 font-bold shrink-0 mr-1.5">📌 市场传导影响:</span>
-                <span>${item.impact || '需结合原文、官方数据及实时行情进一步判断影响。'}</span>
+                <span class="text-red-400 font-bold shrink-0 mr-1.5">📌 核心业绩摘要:</span>
+                <span>${item.impact || '营业收入与净利润表现稳健，需关注指引。'}</span>
               </div>
               <div class="flex items-start text-slate-300">
                 <span class="text-amber-400 font-bold shrink-0 mr-1.5">💡 关联资产标的:</span>
-                <span>${item.asset || '相关资产标的'}</span>
+                <span>${item.asset || '相关美股 / 港股 / A股标的'}</span>
               </div>
             </div>
 
             <div class="flex items-center justify-between pt-1 text-xs text-slate-500 border-t border-slate-800/40">
-              <span>来源: ${item.source || '官方/权威媒体'}</span>
+              <span>来源: ${item.source || '官方财报/权威财经'}</span>
               ${urlBtn}
             </div>
           </div>
@@ -201,7 +205,6 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
       }).join('');
     }
 
-    // 5. 字体调节
     function adjustFontSize(direction) {
       currentFontSizeLevel += direction;
       if (currentFontSizeLevel > 2) currentFontSizeLevel = 2;
@@ -209,7 +212,6 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
       renderNews();
     }
 
-    // 6. 返回顶部
     function scrollToTop() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -223,11 +225,8 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
       }
     }, { passive: true });
 
-    // 7. 初始化与移动端手势（下拉刷新 + 左右滑动）
     document.addEventListener('DOMContentLoaded', () => {
       renderNews();
-
-      // 注册网络优先 PWA Service Worker（保障离线可用，同时联网绝对优先拉取最新数据）
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(() => {});
       }
@@ -235,7 +234,7 @@ const newsData = {"global":[{"title":"芯片制造商放弃对 Solidigm IPO 的�
 
     let startX = 0;
     let startY = 0;
-    const tabsOrder = ['global', 'asia', 'china'];
+    const tabsOrder = ['global', 'asia', 'china', 'earnings'];
 
     window.addEventListener('touchstart', (e) => {
       startX = e.touches[0].pageX;
