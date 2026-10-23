@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-财经与时政焦点看板自动更新脚本（含 AI 解读与财报季聚合版）
-功能：
-1. 抓取国际财经、亚太市场（含台湾源）、国内核心政经及核心财报季；
-2. 内置智能文本分析与 AI 深度解读逻辑（自动生成核心影响与资产映射）；
-3. 严格 48 小时旧闻过滤 + 绝对时间倒序；
-4. 国内频道防串台拦截检测；
-5. 自动写入 index.html。
+财经与时政焦点看板自动更新脚本（AI智能解读 + 摘要轻量化版）
 """
 
 import datetime
@@ -29,7 +23,6 @@ BEIJING_TZ = datetime.timezone(datetime.timedelta(hours=8))
 BASE_DIR = Path(__file__).resolve().parent
 HTML_FILE = BASE_DIR / "index.html"
 
-# 频道容量配额设置
 GLOBAL_LIMIT = 20
 ASIA_LIMIT = 10
 CHINA_LIMIT = 10
@@ -46,7 +39,6 @@ RSS_FEEDS = {
         ("Focus Taiwan", "https://focustaiwan.tw/rss/news.xml"),
         ("Taipei Times", "https://www.taipeitimes.com/xml/index.rss"),
         ("CNA Business", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"),
-        ("CNA Asia", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
         ("Nikkei Asia", "https://asia.nikkei.com/rss/feed/nar"),
     ],
 }
@@ -62,14 +54,13 @@ CHINA_RSS_FEEDS = [
     ("证券时报", "https://www.stcn.com/rss/rss.xml"),
 ]
 
-# 核心财报与业绩快讯源
 EARNINGS_RSS_FEEDS = [
     ("华尔街见闻财报", "https://dedicated.wallstreetcn.com/rss.xml"),
     ("新浪财经财报", "https://rss.sina.com.cn/roll/finance/hot_roll.xml"),
 ]
 
 
-# ========================= 时间与文本处理 =========================
+# ========================= 工具函数 =========================
 
 def now_beijing():
     return datetime.datetime.now(datetime.timezone.utc).astimezone(BEIJING_TZ)
@@ -138,44 +129,40 @@ def http_get(url, timeout=12):
         return response.read()
 
 
-# ========================= AI 智能解读与资产映射生成 =========================
+# ========================= AI 智能解读生成器 =========================
 
 def generate_ai_insights(title, summary, channel_tag):
-    """
-    智能分析标题与摘要，生成具有洞察力的 AI 解读与资产关联
-    """
     text = (title + " " + summary).lower()
     
-    # 默认兜底
-    impact = "该事件对当前宏观流动性与风险偏好具有潜在扰动，需持续跟踪后续官方政策或财报指引。"
+    impact = "宏观流动性与风险偏好处于敏感期，建议密切跟踪后续官方跟进动态。"
     asset = "全球股指 / 美元 / 大宗商品"
 
-    if "财报" in text or "营收" in text or "净利润" in text or "每股收益" in text or "eps" in text:
-        impact = "AI智能解读：核心财务指标超预期或逊色于市场共识，直接影响公司估值修复空间及板块情绪。"
-        asset = "美股科技股 / 港股恒生科技 / A股权重核心标的"
+    if "财报" in text or "营收" in text or "净利润" in text or "eps" in text or "业绩" in text:
+        impact = "核心财报指标超预期或承压，直接影响公司估值锚定及相关产业链情绪修复。"
+        asset = "美股科技核心 / 港股恒生科技 / A股权重标的"
     elif "降息" in text or "加息" in text or "美联储" in text or "央行" in text or "lpr" in text:
-        impact = "AI智能解读：货币政策走向发生边际变化，直接重塑无风险收益率曲线与全球资本流向。"
-        asset = "黄金 / 美债 / 汇率 / 银行与高股息资产"
-    elif "半导体" in text or "芯片" in text or "台积电" in text or "nvidia" in text or "英伟达" in text:
-        impact = "AI智能解读：AI算力基础设施景气度验证，上游供应链订单与产能利用率成核心定价锚。"
-        asset = "费城半导体指数 / 纳斯达克 / A股半导体产业链"
+        impact = "货币政策预期发生边际转向，直接重塑无风险收益率曲线与大类资产定价。"
+        asset = "黄金 / 美债 / 银行与高股息板块"
+    elif "半导体" in text or "芯片" in text or "台积电" in text or "英伟达" in text or "nvidia" in text:
+        impact = "AI算力与半导体景气度持续验证，上游订单与产能利用率成核心定价风向标。"
+        asset = "费城半导体指数 / 纳斯达克 / A股半导体链"
     elif "房地产" in text or "楼市" in text or "房贷" in text:
-        impact = "AI智能解读：地产供需关系调整与信用风险缓释进展，影响国内宏观经济预期回暖节奏。"
-        asset = "地产股 / 钢铁水泥建材 / 国内银行板块"
+        impact = "地产供需关系调整与信用风险缓释进程，直接影响国内宏观预期回暖节奏。"
+        asset = "地产股 / 建材水泥 / 国内银行板块"
     elif "关税" in text or "贸易" in text or "出口" in text:
-        impact = "AI智能解读：全球供应链格局面临重构压力，相关出海企业成本及海外市场份额面临测试。"
-        asset = "外贸出口板块 / 汇率 / 跨境物流"
+        impact = "全球供应链重构压力显现，相关出海企业成本及海外市场份额面临测试。"
+        asset = "外贸出口板块 / 跨境物流 / 汇率"
     elif channel_tag == "国内核心":
-        impact = "AI智能解读：国内政策面与产业资本风向共振，直接作用于本土风险偏好与估值体系。"
+        impact = "国内政策面与产业资本预期共振，直接作用于本土市场风险偏好与估值。"
         asset = "A股核心指数 / 人民币资产 / 顺周期板块"
     elif channel_tag == "亚太市场":
-        impact = "AI智能解读：亚太区域经济数据与地缘动态交织，对周边汇市及科技制造产业链形成溢出效应。"
+        impact = "亚太区域经济数据与地缘动态交织，对周边汇市及科技制造产业链产生溢出效应。"
         asset = "日经225 / 港股恒生指数 / 亚太汇率"
 
     return impact, asset
 
 
-# ========================= 翻译与 RSS 解析 =========================
+# ========================= 翻译与抓取 =========================
 
 def translate_to_chinese(text):
     text = clean_text(text)
@@ -224,7 +211,6 @@ def parse_rss_xml(xml_bytes, source_name):
                 "title": title,
                 "summary": summary,
                 "published": published,
-                "time": published.strftime("%m-%d %H:%M") if published else "",
                 "source": source_name,
                 "url": link,
             })
@@ -247,7 +233,7 @@ def collect_rss(feed_defs):
     return all_items
 
 
-# ========================= 过滤与排序 =========================
+# ========================= 过滤与精简 =========================
 
 ASIA_KEYWORDS = ("asia", "singapore", "japan", "korea", "hong kong", "china", "taiwan", "亚太", "亚洲", "新加坡", "日本", "韩国", "香港", "台湾", "日经", "港股")
 
@@ -270,16 +256,22 @@ def fetch_china_news():
     try:
         raw = http_get(SINA_URL, timeout=10)
         data = json.loads(raw.decode("utf-8", errors="replace"))
-        # 简化提取
         for feed in data.get("result", {}).get("data", []):
             content = clean_text(feed.get("rich_text") or feed.get("title") or "")
             if len(content) > 8:
                 pub = parse_date(feed.get("create_time"))
+                # 将过长的 Sina Zhibo 直播流拆分为短标题与精简摘要
+                match = re.match(r"^【([^】]+)】\s*(.*)$", content)
+                if match:
+                    title = match.group(1).strip()
+                    summary = match.group(2).strip() or content
+                else:
+                    title = content[:40].strip() + "..."
+                    summary = content
                 items.append({
-                    "title": content[:80],
-                    "summary": content,
+                    "title": title,
+                    "summary": summary,
                     "published": pub,
-                    "time": pub.strftime("%m-%d %H:%M") if pub else "",
                     "source": "新浪财经",
                     "url": feed.get("url", "")
                 })
@@ -295,7 +287,6 @@ def fetch_china_news():
 
 
 def fetch_earnings_news():
-    """聚合财报季相关资讯"""
     items = collect_rss(EARNINGS_RSS_FEEDS)
     earnings_items = []
     for it in items:
@@ -325,13 +316,21 @@ def rank_news(items, limit, channel_tag):
             continue
 
         item["title"] = translate_to_chinese(title) if channel_tag != "国内核心" else title
-        item["summary"] = translate_to_chinese(item.get("summary", "")) if channel_tag != "国内核心" else item.get("summary", "")
+        
+        # 💡 核心优化：对所有长摘要进行统一截断（最多保留 130 个字符），确保卡片轻量整洁
+        raw_summary = clean_text(item.get("summary", ""))
+        if channel_tag != "国内核心":
+            raw_summary = translate_to_chinese(raw_summary)
+        if len(raw_summary) > 130:
+            raw_summary = raw_summary[:130] + "..."
+        item["summary"] = raw_summary
+
         item["time"] = pub.strftime("%m-%d %H:%M") if isinstance(pub, datetime.datetime) else ""
         item["tag"] = channel_tag
         item["source"] = clean_text(item.get("source", "")) or "权威财经媒体"
         item["url"] = clean_text(item.get("url", ""))
         
-        # 自动调用 AI 智能解读生成核心影响与资产标的
+        # 填充 AI 解读与资产标的
         impact, asset = generate_ai_insights(item["title"], item["summary"], channel_tag)
         item["impact"] = impact
         item["asset"] = asset
@@ -359,7 +358,7 @@ def main():
     datetime_str = current.strftime("%Y-%m-%d %H:%M:%S")
 
     print("=" * 50)
-    print(f"开始抓取并由 AI 动态生成解读：{datetime_str}")
+    print(f"开始抓取并由 AI 生成洞察：{datetime_str}")
     print("=" * 50)
 
     final_global = rank_news(collect_rss(RSS_FEEDS["global"]), GLOBAL_LIMIT, "全球宏观")
@@ -388,7 +387,7 @@ def main():
     updated, _ = re.subn(time_pattern, lambda _: time_replacement, updated, count=1, flags=re.DOTALL)
 
     HTML_FILE.write_text(updated, encoding="utf-8")
-    print("✅ 看板及 AI 解读数据更新完成！")
+    print("✅ 看板及 AI 智能解读数据更新完成！")
 
 
 if __name__ == "__main__":
