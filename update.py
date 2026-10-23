@@ -1,608 +1,187 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-财经与时政焦点看板自动更新脚本（纯净时效与国内防串台拦截完全版）
-功能：
-1. 抓取国际财经/时政、亚太财经/时政（含台湾源）、国内核心政经；
-2. 严格 48 小时旧闻过滤 + 绝对发布时间倒序，确保资讯绝对新鲜；
-3. 国内新闻频道增加涉外/国际新闻硬拦截检测机制，彻底杜绝串台；
-4. 时间显示格式为 MM-DD HH:MM，方便直观核对日期；
-5. 自动将国际与亚太新闻高质量翻译为中文，安全内嵌写入 index.html。
-"""
-
-import datetime
-import html
-import json
-import os
-import re
-import time
-import urllib.parse
-import urllib.request
-import xml.etree.ElementTree as ET
-from email.utils import parsedate_to_datetime
-from pathlib import Path
-
-
-# ========================= 基本设置 =========================
-
-BEIJING_TZ = datetime.timezone(datetime.timedelta(hours=8))
-BASE_DIR = Path(__file__).resolve().parent
-HTML_FILE = BASE_DIR / "index.html"
-
-# 频道容量配额设置
-GLOBAL_LIMIT = 20
-ASIA_LIMIT = 10
-CHINA_LIMIT = 10
-
-RSS_FEEDS = {
-    # 国际财经与重磅时政源
-    "global": [
-        ("CNBC World", "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
-        ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
-        ("CNBC Economy", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
-        ("BBC World News", "http://feeds.bbci.co.uk/news/world/rss.xml"),
-    ],
-    # 亚太财经与时政源（已集成 Focus Taiwan 和 Taipei Times）
-    "asia": [
-        ("Focus Taiwan", "https://focustaiwan.tw/rss/news.xml"),
-        ("Taipei Times", "https://www.taipeitimes.com/xml/index.rss"),
-        ("CNA Business", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936"),
-        ("CNA Asia", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511"),
-        ("CNA World", "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6311"),
-        ("CNBC Asia", "https://www.cnbc.com/id/19832390/device/rss/rss.html"),
-        ("Nikkei Asia", "https://asia.nikkei.com/rss/feed/nar"),
-    ],
-}
-
-SINA_URL = (
-    "https://zhibo.sina.com.cn/api/zhibo/feed"
-    "?page=1&page_size=50&zhibo_id=152"
-)
-
-# 国内频道备用权威政经 RSS 源
-CHINA_RSS_FEEDS = [
-    ("新浪财经焦点", "https://rss.sina.com.cn/roll/finance/hot_roll.xml"),
-    ("华尔街见闻", "https://dedicated.wallstreetcn.com/rss.xml"),
-    ("凤凰财经", "https://finance.ifeng.com/rss/index.xml"),
-    ("证券时报", "https://www.stcn.com/rss/rss.xml"),
-]
-
-
-# ========================= 时间与文本处理 =========================
-
-def now_beijing():
-    return datetime.datetime.now(datetime.timezone.utc).astimezone(BEIJING_TZ)
-
-
-def clean_text(value):
-    if value is None:
-        return ""
-    text = str(value)
-    text = re.sub(r"(?is)<script.*?>.*?</script>", " ", text)
-    text = re.sub(r"(?is)<style.*?>.*?</style>", " ", text)
-    text = re.sub(r"(?s)<[^>]*>", " ", text)
-    text = html.unescape(text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-def normalize_title(value):
-    text = clean_text(value).lower()
-    return re.sub(r"[\W_]+", "", text, flags=re.UNICODE)
-
-
-def parse_date(value):
-    if value is None or value == "":
-        return None
-
-    if isinstance(value, (int, float)):
-        try:
-            stamp = float(value)
-            if stamp > 10**12:
-                stamp /= 1000
-            return datetime.datetime.fromtimestamp(
-                stamp, tz=datetime.timezone.utc
-            ).astimezone(BEIJING_TZ)
-        except (ValueError, TypeError, OverflowError, OSError):
-            return None
-
-    value = str(value).strip()
-    if not value:
-        return None
-
-    try:
-        result = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if result.tzinfo is None:
-            result = result.replace(tzinfo=BEIJING_TZ)
-        return result.astimezone(BEIJING_TZ)
-    except (ValueError, TypeError):
-        pass
-
-    try:
-        result = parsedate_to_datetime(value)
-        if result.tzinfo is None:
-            result = result.replace(tzinfo=datetime.timezone.utc)
-        return result.astimezone(BEIJING_TZ)
-    except (ValueError, TypeError, OverflowError):
-        pass
-
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
-                "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M"):
-        try:
-            return datetime.datetime.strptime(value, fmt).replace(tzinfo=BEIJING_TZ)
-        except ValueError:
-            continue
-    return None
-
-
-def http_get(url, timeout=12):
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/130.0 Safari/537.36"
-            ),
-            "Accept": "application/rss+xml, application/xml, "
-                      "text/xml, application/json, */*",
-        },
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.read()
-
-
-# ========================= 国际/亚太新闻中文翻译 =========================
-
-def translate_to_chinese(text):
-    text = clean_text(text)
-    if not text:
-        return text
-    chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
-    latin_chars = len(re.findall(r"[A-Za-z]", text))
-    if chinese_chars >= 8 and chinese_chars >= latin_chars:
-        return text
-
-    def translate_chunk(chunk):
-        try:
-            params = urllib.parse.urlencode({"client":"gtx", "sl":"auto", "tl":"zh-CN", "dt":"t", "q":chunk})
-            raw = http_get("https://translate.googleapis.com/translate_a/single?" + params, timeout=18)
-            payload = json.loads(raw.decode("utf-8", errors="replace"))
-            result = "".join(part[0] for part in (payload[0] or []) if isinstance(part, list) and part and isinstance(part[0], str)).strip()
-            if result:
-                return result
-        except Exception:
-            pass
-        try:
-            params = urllib.parse.urlencode({"q":chunk, "langpair":"en|zh-CN"})
-            raw = http_get("https://api.mymemory.translated.net/get?" + params, timeout=18)
-            payload = json.loads(raw.decode("utf-8", errors="replace"))
-            result = clean_text((payload.get("responseData") or {}).get("translatedText", ""))
-            if result:
-                return html.unescape(result)
-        except Exception:
-            pass
-        return chunk
-
-    chunks = []
-    remaining = text
-    while len(remaining) > 300:
-        cut = max(remaining.rfind("。", 0, 300), remaining.rfind(".", 0, 300), remaining.rfind(" ", 0, 300))
-        if cut < 80:
-            cut = 300
-        chunks.append(remaining[:cut+1].strip())
-        remaining = remaining[cut+1:].strip()
-    if remaining:
-        chunks.append(remaining)
-    results = []
-    for chunk in chunks:
-        results.append(translate_chunk(chunk))
-        time.sleep(0.15)
-    return " ".join(results).strip()
-
-
-def translate_international_channels(items, channel_name):
-    title_count = 0
-    for item in items:
-        old_title = clean_text(item.get("title", ""))
-        old_summary = clean_text(item.get("summary", ""))
-        if old_title:
-            item["title"] = translate_to_chinese(old_title)
-            if item["title"] != old_title:
-                title_count += 1
-        if old_summary:
-            item["summary"] = translate_to_chinese(old_summary)
-    print(f"🌐 {channel_name}：标题转为中文 {title_count}/{len(items)} 条")
-    return items
-
-
-# ========================= RSS 抓取逻辑 =========================
-
-def parse_rss_xml(xml_bytes, source_name):
-    items = []
-    try:
-        try:
-            xml_str = xml_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            xml_str = xml_bytes.decode("gbk", errors="replace")
-            
-        root = ET.fromstring(xml_str)
-    except Exception:
-        return items
-
-    for node in root.iter():
-        tag = node.tag.rsplit("}", 1)[-1].lower()
-        if tag not in ("item", "entry"):
-            continue
-
-        values = {}
-        for child in list(node):
-            key = child.tag.rsplit("}", 1)[-1].lower()
-            if key == "link":
-                link = child.attrib.get("href") or child.text or ""
-                values[key] = link.strip()
-            elif key not in values:
-                values[key] = child.text or ""
-
-        title = clean_text(values.get("title", ""))
-        summary = clean_text(
-            values.get("description") or values.get("summary")
-            or values.get("content") or ""
-        )
-        link = values.get("link", "").strip()
-        published_raw = (
-            values.get("pubdate") or values.get("published")
-            or values.get("updated") or values.get("date") or ""
-        )
-        published = parse_date(published_raw)
-
-        if title:
-            items.append({
-                "title": title,
-                "summary": summary,
-                "published": published,
-                "time": published.strftime("%m-%d %H:%M") if published else "",
-                "source": source_name,
-                "url": link,
-            })
-    return items
-
-
-def fetch_rss_direct(source_name, rss_url):
-    try:
-        data = http_get(rss_url, timeout=12)
-        items = parse_rss_xml(data, source_name)
-        return items
-    except Exception:
-        return []
-
-
-def fetch_rss2json(source_name, rss_url):
-    api_key = os.environ.get("RSS2JSON_API_KEY", "").strip()
-    params = {"rss_url": rss_url}
-    if api_key:
-        params["api_key"] = api_key
-    gateway = "https://api.rss2json.com/v1/api.json?" + urllib.parse.urlencode(params)
-
-    try:
-        data = json.loads(http_get(gateway, timeout=12).decode("utf-8", errors="replace"))
-        if data.get("status") != "ok":
-            return []
-
-        results = []
-        for item in data.get("items", []):
-            title = clean_text(item.get("title", ""))
-            summary = clean_text(item.get("description", "") or item.get("content", ""))
-            published = parse_date(item.get("pubDate") or item.get("published") or "")
-            if title:
-                results.append({
-                    "title": title,
-                    "summary": summary,
-                    "published": published,
-                    "time": published.strftime("%m-%d %H:%M") if published else "",
-                    "source": source_name,
-                    "url": item.get("link", ""),
-                })
-        return results
-    except Exception:
-        return []
-
-
-def fetch_feed(source_name, url):
-    items = fetch_rss_direct(source_name, url)
-    if items:
-        return items
-    return fetch_rss2json(source_name, url)
-
-
-def collect_rss(feed_defs):
-    all_items = []
-    for source_name, url in feed_defs:
-        all_items.extend(fetch_feed(source_name, url))
-        time.sleep(0.15)
-    return all_items
-
-
-# ========================= 亚太频道地域过滤 =========================
-
-ASIA_KEYWORDS = (
-    "asia", "asian", "singapore", "japan", "japanese", "tokyo", "korea", "korean",
-    "seoul", "hong kong", "china", "chinese", "taiwan", "indonesia", "malaysia",
-    "thailand", "vietnam", "philippines", "australia", "nikkei", "kospi", "hang seng",
-    "asx", "sgx", "亚太", "亚洲", "新加坡", "日本", "东京", "韩国", "首尔",
-    "香港", "台湾", "东南亚", "印尼", "泰国", "越南", "澳大利亚", "日经", "港股"
-)
-
-def filter_asia_news(items):
-    kept = []
-    for item in items:
-        text = (clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))).lower()
-        if any(word in text for word in ASIA_KEYWORDS):
-            kept.append(item)
-    return kept
-
-
-# ========================= 国内新闻严格防串台与国际新闻拦截检测 =========================
-
-CHINA_RELEVANCE_KEYWORDS = (
-    "中国", "国内", "央行", "人民币", "a股", "沪指", "上证", "深证",
-    "创业板", "科创板", "北向资金", "南向资金", "港股", "沪深", "证券",
-    "国家统计局", "财政部", "商务部", "发改委", "工信部", "国务院", "证监会",
-    "金融监管总局", "社融", "lpr", "gdp", "cpi", "ppi", "房地产", "楼市",
-    "地方债", "新能源", "海关", "A股市场", "深交所", "上交所"
-)
-
-# 国际新闻硬拦截黑名单（只要媒体在报道以下国际涉外/地缘政治内容，坚决拦截不让其上线）
-CHINA_EXCLUDE_KEYWORDS = (
-    "美联储", "美国大选", "白宫", "五角大楼", "欧洲央行", "英国首相", "日本首相",
-    "泽连斯基", "普京", "拜登", "特朗普", "马斯克", "拉加德",
-    "乌克兰", "俄罗斯", "莫斯科", "加沙", "哈马斯", "巴勒斯坦", "黎巴嫩",
-    "叙利亚", "伊朗", "以色列", "红海", "中东局势", "朝鲜半岛",
-    "华尔街股市", "标普500", "纳斯达克指数", "欧洲股市"
-)
-
-def find_candidate_lists(obj):
-    candidates = []
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if (
-                key.lower() in {"feed", "feeds", "items", "list"}
-                and isinstance(value, list)
-                and any(isinstance(row, dict) for row in value)
-            ):
-                candidates.append(value)
-            candidates.extend(find_candidate_lists(value))
-    elif isinstance(obj, list):
-        for value in obj:
-            candidates.extend(find_candidate_lists(value))
-    return candidates
-
-
-def fetch_sina_china():
-    try:
-        raw = http_get(SINA_URL, timeout=12)
-        data = json.loads(raw.decode("utf-8", errors="replace"))
-
-        candidates = find_candidate_lists(data)
-        if not candidates:
-            return []
-
-        feed_list = max(candidates, key=len)
-        results = []
-        seen = set()
-
-        for feed in feed_list:
-            if not isinstance(feed, dict):
-                continue
-            content = clean_text(
-                feed.get("rich_text") or feed.get("content")
-                or feed.get("title") or ""
-            )
-            if len(content) < 8:
-                continue
-
-            match = re.match(r"^【([^】]+)】\s*(.*)$", content)
-            if match:
-                title = match.group(1).strip()
-                summary = match.group(2).strip() or content
-            else:
-                title = content[:100].strip()
-                summary = content
-
-            key = normalize_title(title)
-            if not key or key in seen:
-                continue
-            seen.add(key)
-
-            raw_date = (
-                feed.get("create_time") or feed.get("ctime")
-                or feed.get("time") or feed.get("created_at")
-                or feed.get("pubDate") or ""
-            )
-            published = parse_date(raw_date)
-
-            results.append({
-                "title": title,
-                "summary": summary,
-                "published": published,
-                "time": published.strftime("%m-%d %H:%M") if published else "",
-                "source": "新浪财经",
-                "url": feed.get("url") or feed.get("link") or "",
-            })
-
-        return results
-
-    except Exception:
-        return []
-
-
-def is_china_relevant(item):
-    text = clean_text(item.get("title", "")) + " " + clean_text(item.get("summary", ""))
-    low = text.lower()
-    
-    # 1. 拦截检测：当媒体在报道国际新闻或涉外内容时，直接一票否决拦截
-    for ex in CHINA_EXCLUDE_KEYWORDS:
-        if ex.lower() in low:
-            return False
-            
-    # 2. 必须命中至少一个国内核心宏观政经词汇
-    return any(word.lower() in low for word in CHINA_RELEVANCE_KEYWORDS)
-
-
-def fetch_china_news():
-    items = [it for it in fetch_sina_china() if is_china_relevant(it)]
-    if len(items) < CHINA_LIMIT:
-        rss_items = [it for it in collect_rss(CHINA_RSS_FEEDS) if is_china_relevant(it)]
-        
-        seen = {normalize_title(it["title"]) for it in items}
-        for rss_item in rss_items:
-            key = normalize_title(rss_item["title"])
-            if key not in seen:
-                seen.add(key)
-                items.append(rss_item)
-            if len(items) >= CHINA_LIMIT:
-                break
-
-    return items
-
-
-# ========================= 时间排序与 48 小时旧闻过滤 =========================
-
-def rank_news(items, limit, channel_tag, default_asset):
-    deduped = []
-    seen = set()
-
-    # 设置 48 小时门槛，自动清退过期旧闻
-    cutoff_time = now_beijing() - datetime.timedelta(hours=48)
-
-    for raw_item in items:
-        item = dict(raw_item)
-        title = clean_text(item.get("title", ""))
-        if not title:
-            continue
-
-        key = normalize_title(title)
-        if not key or key in seen:
-            continue
-        seen.add(key)
-
-        published = item.get("published")
-        if isinstance(published, str):
-            published = parse_date(published)
-
-        # 过滤掉 48 小时以前的旧新闻
-        if published and published < cutoff_time:
-            continue
-
-        item["title"] = title
-        item["summary"] = clean_text(item.get("summary", ""))
-        item["published"] = published
-        item["time"] = (
-            published.strftime("%m-%d %H:%M")
-            if isinstance(published, datetime.datetime)
-            else clean_text(item.get("time", ""))
-        )
-        item["tag"] = channel_tag
-        item["source"] = clean_text(item.get("source", "")) or "官方/权威媒体"
-        item["url"] = clean_text(item.get("url", ""))
-        item["impact"] = "需结合原文、官方数据及实时行情进一步判断影响。"
-        item["asset"] = default_asset
-        deduped.append(item)
-
-    # 严格按照发布时间倒序排列（最新发布的永远在最上面）
-    min_date = datetime.datetime.min.replace(tzinfo=BEIJING_TZ)
-    deduped.sort(
-        key=lambda item: item.get("published") or min_date,
-        reverse=True,
-    )
-
-    selected = deduped[:limit]
-    total = len(selected)
-    output = []
-
-    for idx, item in enumerate(selected):
-        item["id"] = f"NO.{total - idx:02d}"
-        output.append(item)
-
-    return output
-
-
-def js_safe_json(value):
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str).replace(
-        "</", "<\\/"
-    ).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-
-
-def main():
-    current = now_beijing()
-    datetime_str = current.strftime("%Y-%m-%d %H:%M:%S")
-
-    print("=" * 58)
-    print("开始抓取财经与时政焦点新闻")
-    print(f"北京时间：{datetime_str}")
-    print("=" * 58)
-
-    raw_global = collect_rss(RSS_FEEDS["global"])
-    raw_asia = filter_asia_news(collect_rss(RSS_FEEDS["asia"]))
-    raw_china = fetch_china_news()
-
-    final_global = rank_news(
-        raw_global, GLOBAL_LIMIT, "全球宏观", "全球股指 / 美元 / 美债 / 大宗商品"
-    )
-    final_asia = rank_news(
-        raw_asia, ASIA_LIMIT, "亚太市场", "亚洲股指 / 港股 / 日股 / 汇率"
-    )
-    final_china = rank_news(
-        raw_china, CHINA_LIMIT, "国内核心", "A股 / 人民币 / 国债 / 相关行业"
-    )
-
-    # 国际与亚太新闻全自动中文翻译
-    final_global = translate_international_channels(final_global, "国际财经与政经")
-    final_asia = translate_international_channels(final_asia, "亚太财经与政经")
-
-    print("-" * 58)
-    print(f"频道 全球宏观：实际展示 {len(final_global)} 条")
-    print(f"频道 亚太市场：实际展示 {len(final_asia)} 条")
-    print(f"频道 国内核心：实际展示 {len(final_china)} 条")
-    print("-" * 58)
-
-    if not HTML_FILE.exists():
-        raise FileNotFoundError(f"找不到 {HTML_FILE}")
-
-    content = HTML_FILE.read_text(encoding="utf-8")
-    pattern = r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->"
-
-    news_data = {
-        "global": final_global,
-        "asia": final_asia,
-        "china": final_china,
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>财经与时政焦点看板</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b0f17; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .news-card { background: #131b2e; border: 1px solid #1e293b; transition: all 0.2s ease-in-out; }
+    .news-card:active { background: #1a243d; }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <!-- 头部 Header（保持上下两行避免折行） -->
+  <header class="sticky top-0 z-50 bg-[#0b0f17]/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+    <div class="max-w-3xl mx-auto space-y-1">
+      <div class="flex items-center space-x-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <h1 class="text-base font-bold tracking-wide text-slate-100">TERMINAL // 财经与时政焦点</h1>
+      </div>
+      <div id="updateTime" class="text-slate-400 font-medium text-xs">
+        更新时间: 加载中...
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 pt-4">
+
+    <!-- 频道切换 Tabs -->
+    <div class="flex border-b border-slate-800 mb-4 text-sm">
+      <button id="tab-global" onclick="switchTab('global')" class="py-2.5 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition focus:outline-none">
+        国际财经 Top 20
+      </button>
+      <button id="tab-asia" onclick="switchTab('asia')" class="py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none">
+        亚太市场 Top 10
+      </button>
+      <button id="tab-china" onclick="switchTab('china')" class="py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none">
+        国内核心 Top 10
+      </button>
+    </div>
+
+    <!-- 新闻列表容器 -->
+    <div id="news-container" class="space-y-3.5">
+      <!-- 动态插入新闻卡片 -->
+    </div>
+
+    <!-- 免责声明底部 -->
+    <footer class="mt-10 pt-6 border-t border-slate-800/60 text-center text-xs text-slate-500 leading-relaxed">
+      <p>免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。</p>
+      <p class="mt-1">请以新闻原文、监管机构公告和实时市场数据为准。</p>
+      <p class="mt-2 text-slate-600">© 2026 财经焦点看板</p>
+    </footer>
+
+  </main>
+
+  <!-- 静态数据嵌入区 (由 Python update.py 自动更新写入) -->
+  <!-- NEWS_DATA_START -->
+  <script>
+    const newsData = { "global": [], "asia": [], "china": [] };
+  </script>
+  <!-- NEWS_DATA_END -->
+
+  <!-- JS 交互逻辑与移动端手势 -->
+  <script>
+    let currentTab = 'global';
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const tabs = ['global', 'asia', 'china'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          btn.className = "py-2.5 px-4 font-bold text-amber-500 border-b-2 border-amber-500 transition focus:outline-none";
+        } else {
+          btn.className = "py-2.5 px-4 font-bold text-slate-400 border-b-2 border-transparent transition focus:outline-none";
+        }
+      });
+      renderNews();
     }
 
-    replacement = (
-        "<!-- NEWS_DATA_START -->\n"
-        "<script>\n"
-        f"const newsData = {js_safe_json(news_data)};\n"
-        "</script>\n"
-        "<!-- NEWS_DATA_END -->"
-    )
+    function renderNews() {
+      const container = document.getElementById('news-container');
+      const items = (typeof newsData !== 'undefined' && newsData[currentTab]) ? newsData[currentTab] : [];
 
-    updated, count = re.subn(pattern, lambda _m: replacement, content, count=1, flags=re.DOTALL)
-    if count != 1:
-        raise RuntimeError("没有找到 NEWS_DATA_START / NEWS_DATA_END 标记")
+      if (!items || items.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-500 text-sm">
+            暂无最新资讯，请稍后刷新或运行 GitHub Actions 更新
+          </div>`;
+        return;
+      }
 
-    time_pattern = r'<div id="updateTime"[^>]*>.*?</div>'
-    time_replacement = (
-        '<div id="updateTime" class="text-slate-400 font-medium text-xs">'
-        f"更新时间: {datetime_str} (北京时间)</div>"
-    )
-    updated, _ = re.subn(time_pattern, lambda _m: time_replacement, updated, count=1, flags=re.DOTALL)
+      container.innerHTML = items.map((item, index) => {
+        const urlBtn = item.url ? `
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-0.5 transition">
+            阅读原文 ↗
+          </a>` : '<span class="text-xs text-slate-600">暂无原文链接</span>';
 
-    HTML_FILE.write_text(updated, encoding="utf-8")
+        return `
+          <div class="news-card rounded-lg p-4 shadow-sm">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+              <div class="flex items-center space-x-2">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  ${item.id || ('NO.' + (index + 1))}
+                </span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">
+                  ${item.tag || '财经'}
+                </span>
+              </div>
+              <span class="font-mono text-slate-400">${item.time || ''}</span>
+            </div>
 
-    print("✅ 财经/时政焦点新闻看板更新完成")
-    print(f"更新时间：{datetime_str}")
-    print("=" * 58)
+            <h3 class="text-base font-bold text-slate-100 leading-snug mb-2">
+              ${item.title || ''}
+            </h3>
 
+            ${item.summary ? `
+              <p class="text-xs text-slate-300 leading-relaxed mb-3">
+                ${item.summary}
+              </p>` : ''}
 
-if __name__ == "__main__":
-    main()
+            <div class="bg-slate-900/60 rounded p-2.5 mb-3 text-xs space-y-1.5 border border-slate-800/80">
+              <div class="flex items-start text-slate-300">
+                <span class="text-red-400 font-bold shrink-0 mr-1.5">📌 市场传导影响:</span>
+                <span>${item.impact || '需结合原文、官方数据及实时行情进一步判断影响。'}</span>
+              </div>
+              <div class="flex items-start text-slate-300">
+                <span class="text-amber-400 font-bold shrink-0 mr-1.5">💡 关联资产标的:</span>
+                <span>${item.asset || '相关资产标的'}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 text-xs text-slate-500 border-t border-slate-800/40">
+              <span>来源: ${item.source || '官方/权威媒体'}</span>
+              ${urlBtn}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 页面初始化渲染
+    document.addEventListener('DOMContentLoaded', () => {
+      renderNews();
+    });
+
+    // 移动端手势监听：下拉刷新 + 左右滑动切换 Tab
+    let startX = 0;
+    let startY = 0;
+    const tabsOrder = ['global', 'asia', 'china'];
+
+    window.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].pageX;
+      startY = e.touches[0].pageY;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      const y = e.touches[0].pageY;
+      // 1. 顶部向下拖拽 > 150px 触发强制刷新
+      if (window.scrollY === 0 && y - startY > 150) {
+        location.reload(true);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      const endX = e.changedTouches[0].pageX;
+      const endY = e.changedTouches[0].pageY;
+      const diffX = endX - startX;
+      const diffY = endY - startY;
+
+      // 2. 只有水平滑动幅度大于 60px，且水平滑动大于垂直滑动（防误触）时触发切页
+      if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY)) {
+        const currentIndex = tabsOrder.indexOf(currentTab);
+        if (diffX < 0 && currentIndex < tabsOrder.length - 1) {
+          // 向左滑动 -> 切换到右侧频道
+          switchTab(tabsOrder[currentIndex + 1]);
+        } else if (diffX > 0 && currentIndex > 0) {
+          // 向右滑动 -> 切换到左侧频道
+          switchTab(tabsOrder[currentIndex - 1]);
+        }
+      }
+    }, { passive: true });
+  </script>
+</body>
+</html>
