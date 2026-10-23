@@ -1,30 +1,311 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0f19">
 <title>Bloomberg 财经焦点看板</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-:root{color-scheme:dark}body{background:#0b0f19;color:#e2e8f0;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}.tab{padding:.65rem .8rem;border-bottom:2px solid transparent;color:#94a3b8;font-weight:700}.tab.active{border-color:#f59e0b;color:#f59e0b}.card{background:#111827;border:1px solid #263244;border-radius:14px;padding:16px}.muted{color:#94a3b8}.ai{background:#0d2430;border:1px solid #155e75;border-radius:10px;padding:12px}.pill{font-size:12px;padding:3px 8px;border-radius:999px;background:#1e293b;color:#cbd5e1}.read{opacity:.65}.highlight{background:#713f12;color:#fef3c7}.btn{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 10px}a{color:#fbbf24}
-</style></head>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{
+  margin:0;background:#0b0f19;color:#e2e8f0;
+  font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif
+}
+.tab{
+  padding:.75rem .6rem;border-bottom:2px solid transparent;
+  color:#94a3b8;font-weight:700;cursor:pointer
+}
+.tab.active{border-color:#f59e0b;color:#f59e0b}
+.card{
+  background:#111827;border:1px solid #263244;
+  border-radius:14px;padding:16px;overflow-wrap:anywhere
+}
+.muted{color:#94a3b8}
+.ai{
+  background:#0d2430;border:1px solid #155e75;
+  border-radius:10px;padding:12px
+}
+.pill{
+  display:inline-block;font-size:12px;padding:4px 8px;
+  border-radius:999px;background:#1e293b;color:#cbd5e1
+}
+.read{opacity:.68}
+.btn{
+  background:#1e293b;border:1px solid #334155;
+  border-radius:8px;padding:7px 10px;cursor:pointer
+}
+.btn:hover{background:#334155}
+a{color:#fbbf24;text-decoration:none}
+a:hover{text-decoration:underline}
+input{outline:none}
+input:focus{border-color:#f59e0b}
+.news-title{font-size:1.1em;line-height:1.55}
+@media(max-width:520px){
+  .card{padding:12px}
+  .tab{font-size:13px;padding:.65rem .25rem}
+  .news-title{font-size:1.03em}
+}
+</style>
+</head>
 <body>
-<header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur"><div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-xl sm:text-2xl font-black">📈 Bloomberg 财经焦点看板</h1><p class="muted text-sm mt-1">全球市场 · 亚太财经 · 国内财经 · 核心财报</p></div><div class="text-xs muted">最近更新：<span id="updateTime">等待更新</span><div id="aiStatus" class="mt-1">AI 状态读取中</div></div></div></header>
+
+<header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl sm:text-2xl font-black">📈 Bloomberg 财经焦点看板</h1>
+      <p class="muted text-sm mt-1">全球市场 · 亚太财经 · 国内财经 · 核心财报</p>
+    </div>
+    <div class="text-xs muted">
+      最近更新：<span id="updateTime">等待更新</span>
+      <div id="aiStatus" class="mt-1">AI 状态读取中</div>
+    </div>
+  </div>
+</header>
+
 <main class="max-w-6xl mx-auto px-4 py-5">
-<div class="flex flex-wrap gap-2 items-center mb-4"><input id="searchInput" class="flex-1 min-w-48 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2" placeholder="搜索新闻标题、摘要或资产…"><button class="btn" id="fontDown">A−</button><button class="btn" id="fontUp">A+</button><button class="btn" id="clearRead">清除已读标记</button></div>
-<nav class="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 mb-5" id="tabs"><button class="tab active" data-tab="global">国际财经 Top 20</button><button class="tab" data-tab="asia">亚太财经 Top 10</button><button class="tab" data-tab="china">国内财经 Top 10</button><button class="tab" data-tab="earnings">📊 核心财报 Top 10</button></nav>
-<div class="flex justify-between items-center mb-3"><h2 id="sectionTitle" class="text-lg font-bold">国际财经新闻</h2><span id="count" class="muted text-sm"></span></div><div id="newsList" class="space-y-4"><div class="card muted">等待新闻数据。请在 GitHub Actions 中运行 Daily Update。</div></div>
-<p class="muted text-xs mt-8">说明：AI 分析仅用于新闻理解与信息整理，不构成投资建议。新闻源内容可能存在延迟或翻译误差，请以原始来源为准。</p>
+  <div class="flex flex-wrap gap-2 items-center mb-4">
+    <input
+      id="searchInput"
+      type="search"
+      class="flex-1 min-w-48 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2"
+      placeholder="搜索新闻标题、摘要、来源或资产…"
+      aria-label="搜索新闻"
+    >
+    <button class="btn" id="fontDown" type="button" aria-label="缩小字号">A−</button>
+    <button class="btn" id="fontUp" type="button" aria-label="放大字号">A+</button>
+    <button class="btn" id="clearRead" type="button">清除已读标记</button>
+  </div>
+
+  <nav class="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 mb-5" id="tabs">
+    <button class="tab active" data-tab="global" type="button">国际财经 Top 20</button>
+    <button class="tab" data-tab="asia" type="button">亚太财经 Top 10</button>
+    <button class="tab" data-tab="china" type="button">国内财经 Top 10</button>
+    <button class="tab" data-tab="earnings" type="button">📊 核心财报 Top 10</button>
+  </nav>
+
+  <div class="flex justify-between items-center gap-3 mb-3">
+    <h2 id="sectionTitle" class="text-lg font-bold">国际财经新闻</h2>
+    <span id="count" class="muted text-sm">0 条</span>
+  </div>
+
+  <div id="newsList" class="space-y-4" aria-live="polite">
+    <div class="card muted">等待新闻数据。请在 GitHub Actions 中运行 Daily Update。</div>
+  </div>
+
+  <footer class="muted text-xs mt-8 leading-relaxed">
+    说明：AI 分析仅用于新闻理解与信息整理，不构成投资建议。
+    新闻源内容可能存在延迟、遗漏或翻译误差，请以原始报道为准。
+    相关资产仅代表可能的关联方向，不代表价格必然上涨或下跌。
+  </footer>
 </main>
+
 <!-- NEWS_DATA_START -->
-<script>window.newsData = {"global": [{"title": "英国广播公司发现，苏丹无国界医生组织战士故意袭击医院", "originalTitle": "Hospitals deliberately targeted by Sudan's RSF fighters, BBC finds", "summary": "联合国人权事务高级专员沃尔克·蒂尔克表示，多起袭击事件可能构成战争罪。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/c54g1kxw4nvvo?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 18:23", "timestamp": 1792750987, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.20"}, {"title": "塞浦路斯警方对罗曼·阿布拉莫维奇的财务状况展开调查", "originalTitle": "Cyprus police open investigation into financial affairs of Roman Abramovich", "summary": "本月早些时候，有人对阿布拉莫维奇的一些专业顾问的诚信提出了质疑。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/c875p1yy90ryo?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 18:14", "timestamp": 1792750477, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.19"}, {"title": "尼日利亚埃博拉病毒确诊妇女是瑞士外交官的妻子", "originalTitle": "Woman with Ebola in Nigeria confirmed as wife of Swiss diplomat", "summary": "瑞士官员称，她的丈夫目前处于隔离状态，但没有出现任何症状。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/cmwy4wlzqz3zo?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 18:14", "timestamp": 1792750473, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.18"}, {"title": "CNBC 每日开盘：科技坠落，马斯克的命运出现分歧", "originalTitle": "CNBC Daily Open: Tech falls to earth, Musk's fortunes diverge", "summary": "市场正在消化华尔街科技股的溃败，纳斯达克综合指数因对人工智能支出的新疑虑而录得三个月来最糟糕的一天。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/trump-elon-musk-tesla-starlink-tech-nasdaq-.html", "publishedAt": "2026-10-23 17:58", "timestamp": 1792749536, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.17"}, {"title": "约旦河西岸枪击事件导致五名以色列人受伤，两名疑似巴勒斯坦袭击者丧生", "originalTitle": "Five Israelis wounded and two suspected Palestinian attackers killed in West Bank shooting", "summary": "这次袭击发生在约旦河西岸紧张局势加剧之际，距离以色列大选还有四天。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/cq4g1p974wxko?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 17:44", "timestamp": 1792748680, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.16"}, {"title": "沃尔沃汽车股价暴跌27%，首席执行官称中国销量下滑“比我们想象的要快”", "originalTitle": "Volvo Cars plunges 27% as CEO says China sales slump came 'faster than we thought'", "summary": "这家瑞典汽车制造商表示，中国和美国市场状况“更加严峻”导致环境不断恶化，“对自由现金流产生了负面影响”。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/volvo-cars-q3-earnings-job-cuts.html", "publishedAt": "2026-10-23 17:41", "timestamp": 1792748461, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.15"}, {"title": "乌克兰称星链在特朗普表示解除限制后仍受到限制", "originalTitle": "Ukraine says Starlink still restricted after Trump says limits lifted", "summary": "消息人士称，在多次否认故意放慢速度后，乌克兰军方使用的网络仍然存在问题。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/cq74pjpmx0e8o?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 17:36", "timestamp": 1792748203, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.14"}, {"title": "尽管美国斡旋的和平谈判重新得到推动，俄罗斯和乌克兰仍进行了新的打击", "originalTitle": "Russia and Ukraine trade fresh strikes despite renewed push for U.S.-brokered peace talks", "summary": "普京和泽连斯基周四均表示，尽管他们连夜继续进行罢工，但他们对和平谈判持开放态度。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/russia-ukraine-strikes-peace-talks.html", "publishedAt": "2026-10-23 17:28", "timestamp": 1792747709, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.13"}, {"title": "英伟达的黄仁勋首次前往哈萨克斯坦——而且他并不是唯一一个有宏伟计划的人", "originalTitle": "Nvidia's Huang heads to Kazakhstan for the first time — and he's not the only one with big plans", "summary": "黄仁勋首次访问哈萨克斯坦凸显了该国不断增长的人工智能雄心和全球商业吸引力。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/nvidia-huang-investment-kazakhstan-.html", "publishedAt": "2026-10-23 17:21", "timestamp": 1792747319, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.12"}, {"title": "法国正在释放欧元危机信号。这次的断层线不同了", "originalTitle": "France is flashing euro crisis signals. This time, the fault lines are different", "summary": "随着债务和政治风险上升，法国借贷成本飙升，引发了压力是否会蔓延到整个欧元区的问题。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/france-debt-euro-zone-contagion.html", "publishedAt": "2026-10-23 17:03", "timestamp": 1792746206, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.11"}, {"title": "由于伊朗表示已做好战争准备，美国石油价格维持在 100 美元上方，布伦特原油价格升至五个月高点", "originalTitle": "U.S. oil holds above $100, Brent at five-month high as Iran says it’s prepared for warfare", "summary": "美国总统唐纳德·特朗普周四指责伊朗试图操纵石油市场。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/oil-price-brent-wti-iran-war-saudi-arabia.html", "publishedAt": "2026-10-23 17:02", "timestamp": 1792746164, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.10"}, {"title": "台风强比封锁台湾 数百航班取消", "originalTitle": "Hundreds of flights cancelled as Typhoon Champi shuts Taiwan", "summary": "当局称，台湾琉球岛有一人被海浪卷走后死亡。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/cw98zn304zg7o?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 16:45", "timestamp": 1792745158, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.09"}, {"title": "美国面临高油价，卢比奥转向印度小镇", "originalTitle": "Rubio turns to small Indian town as US faces high oil prices", "summary": "美国国务卿马可·卢比奥今年第二次访问印度时将商业和能源议程置于外交之上。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/c3x2wnk8ejq5o?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 16:39", "timestamp": 1792744782, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.08"}, {"title": "与乌克兰签订鹰狮战斗机交易后，国防巨头萨博公司的订单增加了两倍", "originalTitle": "Defense giant Saab sees orders triple after Gripen fighter jet deal with Ukraine", "summary": "欧洲各国政府竞相将国防支出承诺转化为军事能力，从而增加了企业的订单。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/saab-q3-earnings-figther-jet-maker-beats-expectations-as-orders-triple.html", "publishedAt": "2026-10-23 16:10", "timestamp": 1792743027, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.07"}, {"title": "日本9月核心通胀率飙升至今年最高水平2.1%", "originalTitle": "Japan core inflation in September surges to its highest this year at 2.1%", "summary": "剔除新鲜食品价格的核心通胀率与路透社调查的经济学家预测的 2.1% 一致。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/japan-inflation-september-highest-in-2026.html", "publishedAt": "2026-10-23 16:06", "timestamp": 1792742797, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.06"}, {"title": "由于芯片制造商放弃 Solidigm IPO 计划，SK Hynix 股价在早期下跌后上涨超过 4%", "originalTitle": "SK Hynix shares jump over 4% after early losses as chipmaker scraps Solidigm IPO plans", "summary": "由于芯片制造商停止审查 Solidigm 在美国的 IPO 计划，SK 海力士股价早盘下跌后收盘上涨 4%。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/sk-hynix-solidigm-ipo-.html", "publishedAt": "2026-10-23 14:45", "timestamp": 1792737904, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.05"}, {"title": "为什么学生抗议运动挑战武契奇在塞尔维亚 12 年的统治", "originalTitle": "Why a student protest movement is challenging 12 years of Vučić rule in Serbia", "summary": "经过两年的学生抗议后，塞尔维亚人于周日举行选举，这可能会推翻执政党。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/cmq8n3v94ql3o?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 14:26", "timestamp": 1792736785, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.04"}, {"title": "西藏发生强烈地震，造成16人死亡", "originalTitle": "Powerful earthquake hits Tibet killing 16 people, reports say", "summary": "地震发生在中国所谓的西藏自治区的一个人口稀少的山区。", "source": "BBC World", "url": "https://www.bbc.co.uk/news/articles/ck5ynd1z6e83o?at_medium=RSS&at_campaign=rss", "publishedAt": "2026-10-23 13:16", "timestamp": 1792732597, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.03"}, {"title": "随着北京税网扩大，中国富人将离岸资金转移到美国银行", "originalTitle": "Wealthy Chinese move offshore money to U.S. banks as Beijing’s tax net widens", "summary": "银行家和律师表示，随着北京方面收紧对中国离岸财富的管控，中国客户对美国银行账户的需求不断增加。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/wealthy-chinese-tax-offshore-trusts-capital-control-.html", "publishedAt": "2026-10-23 12:55", "timestamp": 1792731359, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.02"}, {"title": "CNBC 每日开盘：人工智能支出担忧在万圣节前困扰市场", "originalTitle": "CNBC Daily Open: AI spending fears haunt markets before Halloween", "summary": "距离万圣节还有大约一周的时间，但市场上已经出现了一些惊喜。", "source": "CNBC World", "url": "https://www.cnbc.com/2026/10/23/cnbc-daily-open-ai-spending-elon-musk-bill-ackman-jensen-huang.html", "publishedAt": "2026-10-23 09:42", "timestamp": 1792719755, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.01"}], "asia": [{"title": "随着经济增长推动美食热潮，印度热衷于法式烹饪", "originalTitle": "India warms to French cooking as economic growth fuels fine-dining boom", "summary": "中产阶级的崛起，越来越多地旅行，越来越多地在豪华场所就餐，正在创造对高端酒店员工的需求。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/news/2026/10/23/asia-pacific/society/india-french-cooking-schools/", "publishedAt": "2026-10-23 16:33", "timestamp": 1792744380, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.10"}, {"title": "日本通胀今年首次突破2%", "originalTitle": "Japanese inflation breaks 2% for the first time this year", "summary": "9月份的数据给日本央行带来了年底前加息的压力。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/business/2026/10/23/economy/cpi-september-inflation/", "publishedAt": "2026-10-23 15:21", "timestamp": 1792740060, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.09"}, {"title": "如果富士山喷发，日本正在考虑如何疏散数千名游客", "originalTitle": "Japan weighs how to evacuate thousands of tourists if Mount Fuji erupts", "summary": "日本最高峰经常被忽视为一座活火山。但由于火山喷发的风险始终存在，备灾工作至关重要。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/news/2026/10/23/japan/mount-fuji-eruption-foreign-tourists/", "publishedAt": "2026-10-23 15:08", "timestamp": 1792739280, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.08"}, {"title": "日本小说家村上龙去世，享年 74 岁", "originalTitle": "Japanese novelist Ryu Murakami dies at 74", "summary": "村上隆的作品探讨了性、暴力和青年文化，并在全球范围内被翻译。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/culture/2026/10/23/books/novelist-ryu-murakami-obituary/", "publishedAt": "2026-10-23 14:25", "timestamp": 1792736700, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.07"}, {"title": "西藏地震造成16人死亡，中国下令全力救援", "originalTitle": "China orders ‘all-out’ rescue after Tibet quake kills 16", "summary": "周四晚上 10:33 发生的 7.0 级地震中有 300 多栋房屋倒塌。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/news/2026/10/23/asia-pacific/tibet-magnitude-7-quake/", "publishedAt": "2026-10-23 14:12", "timestamp": 1792735920, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.06"}, {"title": "宫本茂被任命为首位与视频游戏相关的日本文化勋章获得者", "originalTitle": "Shigeru Miyamoto named first video game-related recipient of Japan’s Order of Culture", "summary": "这位传奇的任天堂人物将于 11 月 3 日举行的颁奖典礼上被正式授予该奖项。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/life/2026/10/23/digital/order-of-culture-miyamoto/", "publishedAt": "2026-10-23 14:11", "timestamp": 1792735860, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.05"}, {"title": "湾星队希望在日本系列赛与老鹰队的复赛中重演历史", "originalTitle": "BayStars hoping history repeats in Japan Series rematch with Hawks", "summary": "老鹰队希望连续第二年赢得日本系列赛冠军，而湾星队则在争夺三个赛季中的第二个冠军头衔。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/sports/2026/10/23/baseball/japanese-baseball/hawks-baystars-japan-series/", "publishedAt": "2026-10-23 13:31", "timestamp": 1792733460, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.04"}, {"title": "澳大利亚的能源转型给世界敲响了警钟", "originalTitle": "Australia’s energy transition offers a warning to the world", "summary": "一个能源丰富的国家正在花费数十亿美元来维持其铝冶炼厂的运营。它的政策选择有助于解释原因。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/commentary/2026/10/23/world/australias-energy-transition/", "publishedAt": "2026-10-23 11:44", "timestamp": 1792727040, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.03"}, {"title": "前明星击球手松井英树将成为 NPB 巨人队的下一任主教练", "originalTitle": "Former star slugger Hideki Matsui to become next manager of Giants in NPB", "summary": "松井在日本读卖新闻队的职业生涯中打出了 332 个本垒打。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/sports/2026/10/23/baseball/japanese-baseball/hideki-matsui-giants/", "publishedAt": "2026-10-23 10:26", "timestamp": 1792722360, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.02"}, {"title": "日本为逃学学生提供眼睛健康检查支持", "originalTitle": "Japan eyes health checkup support for truant students", "summary": "一些城市允许逃学学生在他们不会在学校见到其他学生的日子和时间进行健康检查。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/news/2026/10/23/japan/truant-students-health-checkup-support/", "publishedAt": "2026-10-23 10:14", "timestamp": 1792721640, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.01"}], "china": [], "earnings": [{"title": "康卡斯特盈利超出预期，媒体收入抵消了连接方面的疲软", "originalTitle": "Comcast beats earnings expectations as media revenue offsets weakness in connectivity", "summary": "康卡斯特正在将其媒体业务分拆为一家独立的上市公司。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/22/comcast-cmcsa-earnings-q3-2026.html", "publishedAt": "2026-10-23 04:04", "timestamp": 1792699491, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.10"}, {"title": "美国航空预计 2026 年燃油上涨将造成更大损失，并计划明年放缓增长", "originalTitle": "American Airlines forecasts bigger loss in 2026 on fuel spike, plans to slow growth next year", "summary": "由于燃油成本飙升，该公司是本月第四家下调 2026 年预测的美国主要航空公司。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/22/american-airlines-aal-q3-2026-earnings.html", "publishedAt": "2026-10-22 22:52", "timestamp": 1792680729, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.09"}, {"title": "受洗衣和家居产品推动，宝洁公司 (Procter & Gamble) 销售额增长 4%，盈利超预期", "originalTitle": "Procter & Gamble earnings beat as sales rise 4%, boosted by laundry and home products", "summary": "宝洁公司的季度盈利和收入超过了华尔街的预期。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/22/procter-gamble-pg-q1-2027-earnings.html", "publishedAt": "2026-10-22 22:19", "timestamp": 1792678780, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.08"}, {"title": "在强劲的季度和指导之后，Meta 制定了雄心勃勃的 Muse 货币化路线图", "originalTitle": "Meta put out an ambitious roadmap to Muse monetization after strong quarter and guide", "summary": "投资者喜欢他们所看到的。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/investingclub/2026/10/21/meta-put-out-an-ambitious-roadmap-to-muse-monetization-after-strong-quarter-and-guide.html", "publishedAt": "2026-10-22 20:45", "timestamp": 1792673106, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.07"}, {"title": "西南航空因燃油价格上涨而下调 2026 年利润预期", "originalTitle": "Southwest Airlines cuts 2026 profit forecast on higher fuel", "summary": "由于燃油价格上涨，西南航空本月成为第三家下调 2026 年利润预期的美国主要航空公司。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/21/southwest-airlines-luv-3q-2026-earnings.html", "publishedAt": "2026-10-22 20:42", "timestamp": 1792672921, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.06"}, {"title": "尽管汽车收入下降，特斯拉的盈利和销量仍表现出色", "originalTitle": "Tesla beats on earnings and sales even as auto revenue declines", "summary": "特斯拉公布的第三季度业绩好于预期。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/21/tesla-tsla-q3-2026-earnings-report.html", "publishedAt": "2026-10-22 07:32", "timestamp": 1792625524, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.05"}, {"title": "第一资本 (Capital One) 的季度表现强劲。为什么我们还没有宣布胜利", "originalTitle": "Capital One delivered a strong quarter. Why we're not declaring victory just yet", "summary": "第一资本报告了稳健的收益，但我们最大的担忧之一仍然存在。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/investingclub/2026/10/21/capital-one-delivered-a-strong-quarter-why-were-not-declaring-victory-just-yet.html", "publishedAt": "2026-10-22 02:06", "timestamp": 1792605991, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.04"}, {"title": "高盛、摩根大通和摩根士丹利正在主导人工智能股票的繁荣。这是他们的优势", "originalTitle": "Goldman Sachs, JPMorgan and Morgan Stanley are dominating the AI stock boom. Here's their edge", "summary": "华尔街三巨头今年已创造了 520 亿美元的股票交易收入，凭借对冲基金保证金贷款的增加占据了约 80% 的市场份额。", "source": "CNBC Finance", "url": "https://www.cnbc.com/2026/10/21/goldman-sachs-jpmorgan-morgan-stanley-ai-trading.html", "publishedAt": "2026-10-21 23:30", "timestamp": 1792596650, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.03"}, {"title": "美联航大幅下调 2026 年燃油价格盈利预期，但尽管票价上涨，旅客仍坚持预订", "originalTitle": "United Airlines slashes 2026 profit outlook on fuel prices, but travelers keep booking despite higher fares", "summary": "由于燃油价格持续攀升，联合航空下调了今年的利润预期。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/20/united-airlines-ual-3q-2026-earnings.html", "publishedAt": "2026-10-21 19:27", "timestamp": 1792582079, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.02"}, {"title": "法国超市巨头警告“前所未有”的骚乱将影响业务，股价暴跌14%", "originalTitle": "French supermarket giant's shares plunge 14% after warning ‘unprecedented’ unrest will hit business", "summary": "家乐福下调了 2026 年全年财务预测，理由是法国社会动荡和安全状况恶化，影响了消费者支出。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/21/carrefour-french-protests-guidance-cut.html", "publishedAt": "2026-10-21 16:12", "timestamp": 1792570371, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "aiStatus": "未分析", "id": "NO.01"}], "updatedAt": "2026-10-23 18:23:51", "aiEnabled": true};</script>
+<script>window.newsData = window.newsData || {global:[],asia:[],china:[],earnings:[],updatedAt:"",aiEnabled:false};</script>
 <!-- NEWS_DATA_END -->
+
 <script>
-const labels={global:'国际财经新闻',asia:'亚太财经新闻',china:'国内财经新闻',earnings:'核心财报新闻'};let active='global',fontSize=15;const readKey='financeDashboardRead_v1';let readIds=new Set();try{readIds=new Set(JSON.parse(localStorage.getItem(readKey)||'[]'))}catch(e){}
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function markRead(id){readIds.add(id);localStorage.setItem(readKey,JSON.stringify([...readIds]));render()}
-function render(){const all=window.newsData?.[active]||[];const q=(document.getElementById('searchInput').value||'').trim().toLowerCase();const items=all.filter(n=>[n.title,n.summary,n.source,(n.asset||[]).join(' '),n.analysis].join(' ').toLowerCase().includes(q));document.getElementById('sectionTitle').textContent=labels[active];document.getElementById('count').textContent=`显示 ${items.length} / ${all.length} 条`;
-const list=document.getElementById('newsList');if(!items.length){list.innerHTML='<div class="card muted">此栏目暂时没有匹配的新闻。请稍后运行 GitHub Actions 更新。</div>';return}
-list.innerHTML=items.map((n,i)=>{const id=active+'_'+(n.url||n.title);const isRead=readIds.has(id);return `<article class="card ${isRead?'read':''}" style="font-size:${fontSize}px"><div class="flex flex-wrap justify-between gap-2 items-center mb-3"><div class="flex flex-wrap gap-2 items-center"><span class="pill">${esc(n.id||('NO.'+(items.length-i)))}</span><span class="pill">${esc(n.source||'新闻来源')}</span><span class="pill">${esc(n.publishedAt||'')}</span></div><button class="btn text-xs" onclick="markRead('${esc(id)}')">${isRead?'✓ 已读':'标记已读'}</button></div><h3 class="text-lg font-bold leading-snug mb-2">${esc(n.title||'无标题')}</h3>${n.originalTitle&&n.originalTitle!==n.title?`<details class="mb-2 text-xs muted"><summary class="cursor-pointer">查看原文标题</summary><p class="mt-1">${esc(n.originalTitle)}</p></details>`:''}<p class="text-slate-300 leading-relaxed mb-3">${esc(n.summary||'暂无摘要')}</p><div class="flex flex-wrap gap-2 mb-3"><span class="pill">潜在影响：${esc(n.impact||'待分析')}</span>${(n.asset||[]).map(a=>`<span class="pill">${esc(a)}</span>`).join('')}</div>${n.analysis?`<section class="ai mb-3"><div class="font-bold text-cyan-300 mb-2">🤖 Gemini AI 分析</div><p class="leading-relaxed">${esc(n.analysis)}</p>${n.risk?`<p class="muted text-sm mt-2"><b>风险与不确定性：</b>${esc(n.risk)}</p>`:''}</section>`:`<div class="rounded-lg bg-slate-900 p-3 muted text-sm mb-3">${window.newsData?.aiEnabled?'本条尚未生成 AI 分析（本次调用额度有限或模型调用失败）。':'尚未启用 Gemini：请在 GitHub 仓库 Secrets 中配置 GEMINI_API_KEY。'}</div>`}<div class="text-sm"><a href="${esc(n.url||'#')}" target="_blank" rel="noopener noreferrer">阅读原始报道 ↗</a></div></article>`}).join('')}
-document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{active=b.dataset.tab;document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===b));render()}));document.getElementById('searchInput').addEventListener('input',render);document.getElementById('fontUp').onclick=()=>{fontSize=Math.min(22,fontSize+1);render()};document.getElementById('fontDown').onclick=()=>{fontSize=Math.max(12,fontSize-1);render()};document.getElementById('clearRead').onclick=()=>{readIds.clear();localStorage.removeItem(readKey);render()};
-if(window.newsData?.updatedAt)document.getElementById('updateTime').textContent=window.newsData.updatedAt;document.getElementById('aiStatus').textContent=window.newsData?.aiEnabled?'🟢 Gemini AI 已配置':'🟠 未检测到 Gemini API 密钥';render();
-</script></body></html>
+"use strict";
+
+const labels = {
+  global: "国际财经新闻",
+  asia: "亚太财经新闻",
+  china: "国内财经新闻",
+  earnings: "核心财报新闻"
+};
+
+let active = "global";
+let fontSize = 15;
+
+const readKey = "financeDashboardRead_v1";
+let readIds = new Set();
+
+try {
+  readIds = new Set(JSON.parse(localStorage.getItem(readKey) || "[]"));
+} catch (e) {
+  readIds = new Set();
+}
+
+const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+}[ch]));
+
+function saveRead() {
+  try {
+    localStorage.setItem(readKey, JSON.stringify([...readIds]));
+  } catch (e) {}
+}
+
+function markRead(id) {
+  readIds.add(id);
+  saveRead();
+  render();
+}
+
+function safeUrl(value) {
+  try {
+    const url = new URL(String(value || ""), window.location.href);
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      return url.href;
+    }
+  } catch (e) {}
+  return "#";
+}
+
+function render() {
+  const all = Array.isArray(window.newsData?.[active])
+    ? window.newsData[active]
+    : [];
+
+  const query = (document.getElementById("searchInput").value || "")
+    .trim().toLowerCase();
+
+  const items = all.filter(news => {
+    const assets = Array.isArray(news.asset) ? news.asset.join(" ") : "";
+    const haystack = [
+      news.title, news.summary, news.source, assets,
+      news.analysis, news.impact, news.risk, news.originalTitle
+    ].join(" ").toLowerCase();
+
+    return haystack.includes(query);
+  });
+
+  document.getElementById("sectionTitle").textContent = labels[active];
+  document.getElementById("count").textContent =
+    `显示 ${items.length} / ${all.length} 条`;
+
+  const list = document.getElementById("newsList");
+
+  if (!items.length) {
+    const message = all.length
+      ? "没有找到符合搜索条件的新闻，请尝试其他关键词。"
+      : "此栏目暂时没有抓取到新闻。请稍后在 GitHub Actions 中运行 Daily Update。";
+
+    list.innerHTML = `<div class="card muted">${esc(message)}</div>`;
+    return;
+  }
+
+  list.innerHTML = items.map((news, index) => {
+    const newsUrl = safeUrl(news.url);
+    const readId = active + "_" + String(news.url || news.title || index);
+    const isRead = readIds.has(readId);
+    const assets = Array.isArray(news.asset) ? news.asset : [];
+    const newsFont = `font-size:${fontSize}px`;
+
+    const analysisHtml = news.analysis
+      ? `<section class="ai mb-3">
+           <div class="font-bold text-cyan-300 mb-2">🤖 Gemini AI 分析</div>
+           <p class="leading-relaxed">${esc(news.analysis)}</p>
+           ${news.risk
+             ? `<p class="muted text-sm mt-3"><b>风险与不确定性：</b>${esc(news.risk)}</p>`
+             : ""}
+         </section>`
+      : `<div class="rounded-lg bg-slate-900 p-3 muted text-sm mb-3">
+           ${window.newsData?.aiEnabled
+             ? "本条尚未生成 AI 分析：可能是本次调用额度已用完，或模型请求失败。"
+             : "尚未检测到 Gemini API 密钥。请在 GitHub 仓库 Secrets 中配置 GEMINI_API_KEY。"}
+         </div>`;
+
+    return `
+      <article class="card ${isRead ? "read" : ""}" style="${newsFont}">
+        <div class="flex flex-wrap justify-between gap-2 items-center mb-3">
+          <div class="flex flex-wrap gap-2 items-center">
+            <span class="pill">${esc(news.id || ("NO." + (items.length - index)))}</span>
+            <span class="pill">${esc(news.source || "新闻来源")}</span>
+            <span class="pill">${esc(news.publishedAt || "")}</span>
+            ${news.aiStatus === "Gemini AI"
+              ? '<span class="pill">AI 已分析</span>'
+              : ""}
+          </div>
+          <button
+            class="btn text-xs"
+            type="button"
+            data-read-id="${esc(readId)}"
+          >${isRead ? "✓ 已读" : "标记已读"}</button>
+        </div>
+
+        <h3 class="news-title font-bold mb-2">${esc(news.title || "无标题")}</h3>
+
+        ${news.originalTitle && news.originalTitle !== news.title
+          ? `<details class="mb-3 text-xs muted">
+               <summary class="cursor-pointer">查看原文标题</summary>
+               <p class="mt-2">${esc(news.originalTitle)}</p>
+             </details>`
+          : ""}
+
+        <p class="text-slate-300 leading-relaxed mb-3">${esc(news.summary || "暂无摘要")}</p>
+
+        <div class="flex flex-wrap gap-2 mb-3">
+          <span class="pill">潜在影响：${esc(news.impact || "待分析")}</span>
+          ${assets.map(asset => `<span class="pill">${esc(asset)}</span>`).join("")}
+        </div>
+
+        ${analysisHtml}
+
+        <div class="text-sm">
+          <a href="${esc(newsUrl)}" target="_blank" rel="noopener noreferrer">
+            阅读原始报道 ↗
+          </a>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-read-id]").forEach(button => {
+    button.addEventListener("click", () => {
+      markRead(button.getAttribute("data-read-id"));
+    });
+  });
+}
+
+document.querySelectorAll("[data-tab]").forEach(button => {
+  button.addEventListener("click", () => {
+    active = button.dataset.tab;
+
+    document.querySelectorAll("[data-tab]").forEach(tab => {
+      tab.classList.toggle("active", tab === button);
+    });
+
+    render();
+  });
+});
+
+document.getElementById("searchInput").addEventListener("input", render);
+
+document.getElementById("fontUp").addEventListener("click", () => {
+  fontSize = Math.min(22, fontSize + 1);
+  render();
+});
+
+document.getElementById("fontDown").addEventListener("click", () => {
+  fontSize = Math.max(12, fontSize - 1);
+  render();
+});
+
+document.getElementById("clearRead").addEventListener("click", () => {
+  readIds.clear();
+  try {
+    localStorage.removeItem(readKey);
+  } catch (e) {}
+  render();
+});
+
+if (window.newsData?.updatedAt) {
+  document.getElementById("updateTime").textContent =
+    window.newsData.updatedAt;
+}
+
+document.getElementById("aiStatus").textContent =
+  window.newsData?.aiEnabled
+    ? `🟢 Gemini AI 已配置${window.newsData.aiModel ? " · " + window.newsData.aiModel : ""}`
+    : "🟠 未检测到 Gemini API 密钥";
+
+render();
+</script>
+</body>
+</html>
