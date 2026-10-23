@@ -9,18 +9,30 @@
     body { background-color: #0b0f17; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .news-card { background: #131b2e; border: 1px solid #1e293b; transition: all 0.2s ease-in-out; }
     .news-card:active { background: #1a243d; }
+    .read-title { color: #64748b !important; } /* 已读新闻标题灰显 */
+    .highlight-word { color: #f59e0b; background-color: rgba(245, 158, 11, 0.1); padding: 0 2px; border-radius: 2px; }
   </style>
 </head>
-<body class="min-h-screen pb-12">
+<body class="min-h-screen pb-12" id="body-root">
 
-  <!-- 头部 Header（还原为原版的两行结构，防止手机挤压折行） -->
+  <!-- 头部 Header（含标题、更新时间及字体大小调节器） -->
   <header class="sticky top-0 z-50 bg-[#0b0f17]/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
-    <div class="max-w-3xl mx-auto space-y-1">
-      <div class="flex items-center space-x-2">
-        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <h1 class="text-base font-bold tracking-wide text-slate-100">TERMINAL // 财经与时政焦点</h1>
+    <div class="max-w-3xl mx-auto flex items-center justify-between">
+      <div class="space-y-1">
+        <div class="flex items-center space-x-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <h1 class="text-base font-bold tracking-wide text-slate-100">TERMINAL // 财经与时政焦点</h1>
+        </div>
+        <div id="updateTime" class="text-slate-400 font-medium text-xs">
+          更新时间: 加载中...
+        </div>
       </div>
-      <div id="updateTime" class="text-slate-400 font-medium text-xs">更新时间: 2026-10-23 09:40:21 (北京时间)</div>
+      <!-- 字体大小调节按钮 -->
+      <div class="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 rounded-lg p-1 text-xs">
+        <button onclick="adjustFontSize(-1)" class="px-2 py-1 text-slate-400 hover:text-white transition font-bold" title="缩小字体">A-</button>
+        <span class="text-slate-600">|</span>
+        <button onclick="adjustFontSize(1)" class="px-2 py-1 text-slate-400 hover:text-white transition font-bold" title="放大字体">A+</button>
+      </div>
     </div>
   </header>
 
@@ -53,17 +65,28 @@
 
   </main>
 
+  <!-- 返回顶部悬浮按钮 -->
+  <button id="backToTop" onclick="scrollToTop()" class="fixed right-5 bottom-6 z-50 hidden bg-slate-800/90 text-amber-400 border border-slate-700 hover:bg-slate-700 p-3 rounded-full shadow-lg transition backdrop-blur-sm" title="返回顶部">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+    </svg>
+  </button>
+
   <!-- 静态数据嵌入区 (由 Python update.py 自动更新写入) -->
   <!-- NEWS_DATA_START -->
-<script>
-const newsData = {"global":[{"title":"特朗普被要求在 BBC 诉讼中宣誓回答问题","summary":"特朗普正在起诉 BBC，原因是《全景》中的一集将他 2021 年演讲的两个不同部分剪辑在一起。","published":"2026-10-23 09:38:44+08:00","time":"10-23 09:38","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cmy0ryjx7741o?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.20"},{"title":"随着北京税网扩大，中国富人将离岸资金转移到美国银行","summary":"银行家和律师表示，随着北京方面收紧对中国离岸财富的管控，中国客户对美国银行账户的需求不断增加。","published":"2026-10-23 09:23:12+08:00","time":"10-23 09:23","source":"CNBC World","url":"https://www.cnbc.com/2026/10/23/wealthy-chinese-tax-offshore-trusts-capital-control-.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.19"},{"title":"日本9月核心通胀率飙升至今年最高水平2.1%","summary":"扣除新鲜食品价格后的核心通胀率与路透社调查的经济学家预测的 2.1% 一致。","published":"2026-10-23 08:55:11+08:00","time":"10-23 08:55","source":"CNBC World","url":"https://www.cnbc.com/2026/10/23/japan-inflation-september-highest-in-2026.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.18"},{"title":"芯片制造商取消 Solidigm IPO 计划后 SK 海力士股价下跌","summary":"由于市场波动和股价担忧，SK 海力士搁置了 Solidigm 潜在的美国 IPO 计划。","published":"2026-10-23 08:53:36+08:00","time":"10-23 08:53","source":"CNBC World","url":"https://www.cnbc.com/2026/10/23/sk-hynix-solidigm-ipo-.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.17"},{"title":"SpaceX 通过持有埃隆·马斯克 (Elon Musk) 旗下 Boring Co. 的股份获得了 5.61 亿美元的投资收益。","summary":"SpaceX 持有 Boring Co. 的股份有助于提高其第三季度的净利润。","published":"2026-10-23 08:46:09+08:00","time":"10-23 08:46","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/spacex-records-561-million-investment-gain-from-stake-in-boring-co.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.16"},{"title":"Etsy 禁止其在线市场上使用人工智能生成的食谱和图案","summary":"Etsy 还就其平台上的人工智能使用制定了更明确的规则，包括禁止卖家在没有任何人工参与的情况下创建机器人生成的列表。","published":"2026-10-23 07:45:50+08:00","time":"10-23 07:45","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/etsy-bans-ai-generated-recipes-patterns-from-its-online-marketplace.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.15"},{"title":"监视和“持续的偏执”：西方外交官向 BBC 讲述战时莫斯科的生活","summary":"官员们将俄罗斯全面入侵乌克兰以来的工作与冷战时期进行了比较。","published":"2026-10-23 07:16:20+08:00","time":"10-23 07:16","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cj75p1xr7p7vo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.14"},{"title":"英国广播公司(BBC)调查发现，苏丹无国界医生组织战士故意袭击医院","summary":"联合国人权事务高级专员沃尔克·蒂尔克表示，多起袭击事件可能构成战争罪。","published":"2026-10-23 07:16:16+08:00","time":"10-23 07:16","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/c54g1kxw4nvvo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.13"},{"title":"欧莱雅表示减肥药物正在影响美容和护肤品的销售","summary":"这家美容巨头的首席执行官表示，GLP-1 的使用“对我们来说是一个非常重要的现象”。","published":"2026-10-23 06:27:53+08:00","time":"10-23 06:27","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cvglwgwpgrlpo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.12"},{"title":"Meta 让扎克伯格留在加州的协议为选举前的财富税辩论增添了火力","summary":"距离中期选举还有不到两周的时间，梅塔明确表示，如果财富税通过，马克·扎克伯格将留在加州。","published":"2026-10-23 06:21:08+08:00","time":"10-23 06:21","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/meta-mark-zuckerberg-california-billionaire-tax.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.11"},{"title":"诉讼指控特朗普从外国加密货币交易中非法获利","summary":"律师马特·佩利坎 (Matt Pelikan) 告诉 CNBC：“我们提起诉讼是为了制止腐败，并迫使特朗普总统将利润返还给美国纳税人。”","published":"2026-10-23 06:02:34+08:00","time":"10-23 06:02","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/trump-world-liberty-crypto-lawsuit-uae.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.10"},{"title":"埃隆·马斯克 (Elon Musk) 投入 3.66 亿美元竞选活动，SpaceX 和特斯拉在选举中的风险很高","summary":"马斯克最大的政治赌注是参议院，参议院的控制权可能会影响未来的调查、联邦支出以及影响 SpaceX 和特斯拉的法规。","published":"2026-10-23 05:58:42+08:00","time":"10-23 05:58","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/elon-musk-midterm-election-spacex-tesla.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.09"},{"title":"尽管取得了积极的成果，但癌症疫苗数据泄露后 Moderna 股价暴跌","summary":"Moderna 公布了其与默克公司共同开发的备受关注的癌症疫苗的完整数据。","published":"2026-10-23 05:52:02+08:00","time":"10-23 05:52","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/moderna-stock-cancer-vaccine-data-leak.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.08"},{"title":"特朗普表示马斯克已恢复对乌克兰星链网络的访问","summary":"乌克兰依靠星链进行一系列军事用途——其所有者埃隆·马斯克一再否认限制访问。","published":"2026-10-23 05:42:39+08:00","time":"10-23 05:42","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/cq74pjpmx0e8o?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.07"},{"title":"据《华尔街日报》报道，特朗普要求马斯克解除星链减速","summary":"据《华尔街日报》此前报道，乌克兰总统泽连斯基的批评者埃隆·马斯克已下令放慢 SpaceX 星链的速度。","published":"2026-10-23 05:02:07+08:00","time":"10-23 05:02","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/trump-musk-starlink-ukraine.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.06"},{"title":"出于安全和滥用问题，纽约在 160 年后禁止使用马车","summary":"当市议会投票废除马车时，中央公园对这一 160 年传统的看法出现了分歧。","published":"2026-10-23 04:49:12+08:00","time":"10-23 04:49","source":"BBC World News","url":"https://www.bbc.co.uk/news/articles/c6qjnwd1pgjxo?at_medium=RSS\u0026at_campaign=rss","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.05"},{"title":"迪士尼的多平台超级碗计划令 ABC 附属公司感到沮丧","summary":"迪士尼正在 ABC、ESPN、Disney+、ESPN2、ESPNU 和 NFL Network 上转播超级碗比赛，这让当地电视台附属公司感到懊恼。","published":"2026-10-23 04:44:26+08:00","time":"10-23 04:44","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/disneys-multiplatform-super-bowl-plan-frustrates-abc-affiliates.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.04"},{"title":"OpenAI 即将完成 300 亿美元融资，估值 1.25 万亿美元，由阿联酋投资者领投","summary":"知情人士告诉 CNBC，OpenAI 即将完成新一轮融资，这将成为其 2027 年 IPO 的桥梁。","published":"2026-10-23 04:41:37+08:00","time":"10-23 04:41","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/openai-funding-round-uae-investors.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.03"},{"title":"在两党批评后，特朗普与阿克顿分居的母亲一起为拉马斯瓦米的广告辩护","summary":"俄亥俄州州长迈克·德温表示，共和党州长候选人维韦克·拉马斯瓦米应该删除以民主党候选人艾米·阿克顿的母亲为主角的广告。","published":"2026-10-23 04:26:48+08:00","time":"10-23 04:26","source":"CNBC World","url":"https://www.cnbc.com/2026/10/22/trump-ramaswamy-ad-acton-mother-ad.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.02"},{"title":"随着债券收益率飙升和股票下跌，CoreWeave 的市场信心受到侵蚀","summary":"CoreWeave 股价 10 月份下跌了 36%，其信用违约掉期利差正在扩大。","published":"2026-10-23 04:12:30+08:00","time":"10-23 04:12","source":"CNBC World","url":"https://www.cnbc.com/2026/10/21/coreweaves-market-confidence-erodes-as-bond-yields-spike-stock-sinks.html","tag":"全球宏观","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"全球股指 / 美元 / 美债 / 大宗商品","id":"NO.01"}],"asia":[{"title":"台湾在台风“占比”来临之前关闭，数百个航班被取消","summary":"台风占比的半径约为320公里，足以覆盖台湾大部分地区。","published":"2026-10-23 09:25:00+08:00","time":"10-23 09:25","source":"CNA Asia","url":"https://www.channelnewsasia.com/east-asia/typhoon-champi-approaches-taiwan-flights-cancelled-6484571","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.10"},{"title":"随着北京税网扩大，中国富人将离岸资金转移到美国银行","summary":"银行家和律师表示，随着北京方面收紧对中国离岸财富的管控，中国客户对美国银行账户的需求不断增加。","published":"2026-10-23 09:23:12+08:00","time":"10-23 09:23","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/23/wealthy-chinese-tax-offshore-trusts-capital-control-.html","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.09"},{"title":"日本9月核心通胀率飙升至今年最高水平2.1%","summary":"扣除新鲜食品价格后的核心通胀率与路透社调查的经济学家预测的 2.1% 一致。","published":"2026-10-23 08:55:11+08:00","time":"10-23 08:55","source":"CNBC Asia","url":"https://www.cnbc.com/2026/10/23/japan-inflation-september-highest-in-2026.html","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.08"},{"title":"PMI显示日本10月制造业增长放缓至7个月低点","summary":"","published":"2026-10-23 08:32:58+08:00","time":"10-23 08:32","source":"CNA Business","url":"https://www.channelnewsasia.com/business/japan-manufacturing-growth-slows-7-month-low-in-october-pmi-shows-6484751","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.07"},{"title":"日本经济大臣称日本尚未正式摆脱通货紧缩","summary":"","published":"2026-10-23 08:06:45+08:00","time":"10-23 08:06","source":"CNA Business","url":"https://www.channelnewsasia.com/business/japan-not-yet-officially-out-deflation-economy-minister-says-6484686","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.06"},{"title":"NSB称中国加大干预选举力度","summary":"","published":"2026-10-23 08:00:00+08:00","time":"10-23 08:00","source":"Taipei Times","url":"https://www.taipeitimes.com/News/front/archives/2026/10/23/2003866462","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.05"},{"title":"澳大利亚和东帝汶签署加强安全协议","summary":"","published":"2026-10-23 08:00:00+08:00","time":"10-23 08:00","source":"Taipei Times","url":"https://www.taipeitimes.com/News/world/archives/2026/10/23/2003866488","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.04"},{"title":"假通勤：中国失业者如何挽回面子","summary":"","published":"2026-10-23 08:00:00+08:00","time":"10-23 08:00","source":"Taipei Times","url":"https://www.taipeitimes.com/News/feat/archives/2026/10/23/2003866458","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.03"},{"title":"日本核心通胀超过日本央行目标，巩固近期加息机会","summary":"","published":"2026-10-23 07:48:25+08:00","time":"10-23 07:48","source":"CNA Business","url":"https://www.channelnewsasia.com/business/japan-core-inflation-exceeds-boj-target-cements-near-term-rate-hike-chance-6484616","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.02"},{"title":"中央社解释：为什么中国五中全会将重点关注党纪","summary":"观察人士称，将于周一（10 月 26 日）开始的重要会议可能会提供有关北京 2027 年优先事项的线索。","published":"2026-10-23 06:00:00+08:00","time":"10-23 06:00","source":"CNA Asia","url":"https://www.channelnewsasia.com/east-asia/china-fifth-plenum-2026-party-discipline-6461861","tag":"亚太市场","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"亚洲股指 / 港股 / 日股 / 汇率","id":"NO.01"}],"china":[{"title":"江西前三季度GDP为27597.9亿元 同比增长3.5%","summary":"江西省统计局、国家统计局江西调查总队发布了2026年前三季度全省经济运行情况。全省经济保持平稳运行，发展韧性持续彰显。根据地区生产总值统一核算结果，2026年前三季度全省地区生产总值（GDP）27597.9亿元，按不变价格计算，同比增长3.5%。其中，第一产业增加值1565.1亿元，增长3.2%；第二产业增加值11306.7亿元，增长1.6%；第三产业增加值14726.1亿元，增长4.8%。","published":"2026-10-23 09:40:25+08:00","time":"10-23 09:40","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.10"},{"title":"港股黄金股走低 灵宝黄金跌超5%","summary":"截至发稿，灵宝黄金(03330.HK)跌5.50%，紫金黄金国际(02259.HK)东阿4.57%，潼关黄金(00340.HK)跌4.52%。","published":"2026-10-23 09:40:21+08:00","time":"10-23 09:40","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.09"},{"title":"创业板指跌2.03%，现报2524.573点；上证指数跌1.48%，现报3604.038点；深证成指跌1.70%，现报11164.154点。","summary":"创业板指跌2.03%，现报2524.573点；上证指数跌1.48%，现报3604.038点；深证成指跌1.70%，现报11164.154点。","published":"2026-10-23 09:38:38+08:00","time":"10-23 09:38","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.08"},{"title":"长江证券宋筱筱：出口财政双支撑，四季度经济有韧性","summary":"对于国内宏观经济方面，长江证券宏观研究首席分析师宋筱筱最新解读称，四季度出口和财政将形成双支撑，政策释放积极信号。其中，9月出口同比升至36.3%，远超季节性表现，AI产业链量价齐升持续支撑外需。展望四季度，出口高景气有望延续。财政端，9月28日国常会后出台多项增量政策，安排使用5500亿元地方债结存限额，其中3000亿元用于提高县区一般公共预算保障能力、2500亿元用于项目建设。","published":"2026-10-23 09:36:08+08:00","time":"10-23 09:36","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.07"},{"title":"港股新消费股反弹 毛戈平涨超5%","summary":"截至发稿，毛戈平(01318.HK)涨5.01%，小米集团-W(01810.HK)涨4.03%，名创优品(09896.HK)涨3.33%。","published":"2026-10-23 09:34:51+08:00","time":"10-23 09:34","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.06"},{"title":"沪深300指数期货连续主力合约日内跌1%，现报3929.80点。","summary":"沪深300指数期货连续主力合约日内跌1%，现报3929.80点。","published":"2026-10-23 09:33:37+08:00","time":"10-23 09:33","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.05"},{"title":"南向资金净卖出额达10亿港元。","summary":"南向资金净卖出额达10亿港元。","published":"2026-10-23 09:33:23+08:00","time":"10-23 09:33","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.04"},{"title":"中国足协：女足主帅米利西奇离任。","summary":"中国足协：女足主帅米利西奇离任。","published":"2026-10-23 09:32:02+08:00","time":"10-23 09:32","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.03"},{"title":"2025年中国创新指数比上年增长6.4%","summary":"根据国家统计局社科文司《中国创新指数研究》课题组测算，2025年中国创新指数为185.5（以2015年为100），比上年增长6.4%。分领域看，创新环境指数、创新投入指数、创新产出指数和创新成效指数分别为199.9、172.2、233和137，分别比上年增长7.5%、5.9%、8.0%和2.9%。结果显示，2025年中国创新指数呈现稳步增长态势，创新环境持续优化，发展新动能积聚壮大，科技创新能力持续提升，为经济高质量发展提供有力支撑。(国家统计局)","published":"2026-10-23 09:31:28+08:00","time":"10-23 09:31","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.02"},{"title":"沪深300指数下跌1.1%至3,991.37点。","summary":"沪深300指数下跌1.1%至3,991.37点。","published":"2026-10-23 09:30:16+08:00","time":"10-23 09:30","source":"新浪财经","url":"","tag":"国内核心","impact":"需结合原文、官方数据及实时行情进一步判断影响。","asset":"A股 / 人民币 / 国债 / 相关行业","id":"NO.01"}]};
-</script>
-<!-- NEWS_DATA_END -->
+  <script>
+    const newsData = { "global": [], "asia": [], "china": [] };
+  </script>
+  <!-- NEWS_DATA_END -->
 
-  <!-- JS 交互逻辑与移动端手势 -->
+  <!-- JS 交互逻辑与增强体验脚本 -->
   <script>
     let currentTab = 'global';
+    let currentFontSizeLevel = 0; // 字体缩放档位
+    const fontSizes = ['text-base', 'text-lg', 'text-xl'];
+    const summaryFontSizes = ['text-xs', 'text-sm', 'text-base'];
 
+    // 1. 切换频道 Tab
     function switchTab(tab) {
       currentTab = tab;
       const tabs = ['global', 'asia', 'china'];
@@ -76,11 +99,44 @@ const newsData = {"global":[{"title":"特朗普被要求在 BBC 诉讼中宣誓�
         }
       });
       renderNews();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // 2. 核心关键词高亮处理
+    function highlightKeywords(text) {
+      if (!text) return '';
+      const keywords = ['降息', '加息', '央行', 'A股', '美联储', '半导体', '台积电', '关税', '通胀', 'CPI', 'GDP', '人民币', '沪指', '港股'];
+      let formatted = text;
+      keywords.forEach(kw => {
+        const regex = new RegExp(`(${kw})`, 'gi');
+        formatted = formatted.replace(regex, '<span class="highlight-word">$1</span>');
+      });
+      return formatted;
+    }
+
+    // 3. 已读状态本地存储标记
+    function getReadStatus() {
+      try {
+        return JSON.parse(localStorage.getItem('read_news_items') || '{}');
+      } catch(e) {
+        return {};
+      }
+    }
+
+    function markAsRead(url, titleKey) {
+      const readMap = getReadStatus();
+      readMap[url || titleKey] = true;
+      try {
+        localStorage.setItem('read_news_items', JSON.stringify(readMap));
+      } catch(e) {}
+      renderNews(); // 刷新以更新已读样式
+    }
+
+    // 4. 渲染新闻列表
     function renderNews() {
       const container = document.getElementById('news-container');
       const items = (typeof newsData !== 'undefined' && newsData[currentTab]) ? newsData[currentTab] : [];
+      const readMap = getReadStatus();
 
       if (!items || items.length === 0) {
         container.innerHTML = `
@@ -90,14 +146,22 @@ const newsData = {"global":[{"title":"特朗普被要求在 BBC 诉讼中宣誓�
         return;
       }
 
+      const titleSizeClass = fontSizes[currentFontSizeLevel];
+      const summarySizeClass = summaryFontSizes[currentFontSizeLevel];
+
       container.innerHTML = items.map((item, index) => {
+        const uniqueKey = item.url || item.title;
+        const isRead = readMap[uniqueKey] ? 'read-title' : '';
+
         const urlBtn = item.url ? `
-          <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-0.5 transition">
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" 
+             onclick="markAsRead('${item.url}', '${item.title}')"
+             class="text-xs text-slate-400 hover:text-amber-400 flex items-center gap-0.5 transition">
             阅读原文 ↗
           </a>` : '<span class="text-xs text-slate-600">暂无原文链接</span>';
 
         return `
-          <div class="news-card rounded-lg p-4 shadow-sm">
+          <div class="news-card rounded-lg p-4 shadow-sm" onclick="markAsRead('${item.url || ''}', '${item.title}')">
             <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
               <div class="flex items-center space-x-2">
                 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -110,13 +174,13 @@ const newsData = {"global":[{"title":"特朗普被要求在 BBC 诉讼中宣誓�
               <span class="font-mono text-slate-400">${item.time || ''}</span>
             </div>
 
-            <h3 class="text-base font-bold text-slate-100 leading-snug mb-2">
-              ${item.title || ''}
+            <h3 class="${titleSizeClass} font-bold text-slate-100 leading-snug mb-2 ${isRead}">
+              ${highlightKeywords(item.title || '')}
             </h3>
 
             ${item.summary ? `
-              <p class="text-xs text-slate-300 leading-relaxed mb-3">
-                ${item.summary}
+              <p class="${summarySizeClass} text-slate-300 leading-relaxed mb-3">
+                ${highlightKeywords(item.summary)}
               </p>` : ''}
 
             <div class="bg-slate-900/60 rounded p-2.5 mb-3 text-xs space-y-1.5 border border-slate-800/80">
@@ -139,14 +203,41 @@ const newsData = {"global":[{"title":"特朗普被要求在 BBC 诉讼中宣誓�
       }).join('');
     }
 
-    // 页面初始化渲染
+    // 5. 字体大小调节
+    function adjustFontSize(direction) {
+      currentFontSizeLevel += direction;
+      if (currentFontSizeLevel > 2) currentFontSizeLevel = 2;
+      if (currentFontSizeLevel < 0) currentFontSizeLevel = 0;
+      renderNews();
+    }
+
+    // 6. 返回顶部平滑滚动
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 滚动监听：控制返回顶部按钮的显隐
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('backToTop');
+      if (window.scrollY > 400) {
+        btn.classList.remove('hidden');
+      } else {
+        btn.classList.add('hidden');
+      }
+    }, { passive: true });
+
+    // 7. 页面初始化渲染
     document.addEventListener('DOMContentLoaded', () => {
       renderNews();
     });
 
-    // 移动端下拉刷新手势监听（顶部向下拖拽 > 150px 时无视缓存刷新）
+    // 8. 移动端手势监听：下拉刷新 + 左右滑动切换 Tab
+    let startX = 0;
     let startY = 0;
+    const tabsOrder = ['global', 'asia', 'china'];
+
     window.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].pageX;
       startY = e.touches[0].pageY;
     }, { passive: true });
 
@@ -154,6 +245,22 @@ const newsData = {"global":[{"title":"特朗普被要求在 BBC 诉讼中宣誓�
       const y = e.touches[0].pageY;
       if (window.scrollY === 0 && y - startY > 150) {
         location.reload(true);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      const endX = e.changedTouches[0].pageX;
+      const endY = e.changedTouches[0].pageY;
+      const diffX = endX - startX;
+      const diffY = endY - startY;
+
+      if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY)) {
+        const currentIndex = tabsOrder.indexOf(currentTab);
+        if (diffX < 0 && currentIndex < tabsOrder.length - 1) {
+          switchTab(tabsOrder[currentIndex + 1]);
+        } else if (diffX > 0 && currentIndex > 0) {
+          switchTab(tabsOrder[currentIndex - 1]);
+        }
       }
     }, { passive: true });
   </script>
