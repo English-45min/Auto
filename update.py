@@ -30,7 +30,7 @@ CACHE = BASE / "ai_cache.json"
 
 TZ = timezone(timedelta(hours=8))
 
-MAX_AI_CALLS = 3
+MAX_AI_CALLS = 8
 RETRIES = 1
 AI_TIMEOUT = 18
 MAX_NEWS_AGE_DAYS = 5
