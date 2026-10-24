@@ -4,486 +4,500 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0f19">
-<title>财经与时政焦点看板</title>
+<title>财经研究辅助看板</title>
+<script src="https://cdn.tailwindcss.com"></script>
 <style>
-:root{
-  --bg:#0b0f19;--panel:#121a29;--panel2:#172235;--border:#29364b;
-  --text:#e5edf7;--muted:#94a3b8;--orange:#f59e0b;
-  --green:#34d399;--red:#fb7185;--blue:#7dd3fc
-}
+:root{color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);
-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
-line-height:1.65}
-button,input,select{font:inherit}
-button{cursor:pointer}
-a{color:var(--blue);text-decoration:none}
+body{margin:0;background:#0b0f19;color:#e2e8f0;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
+.tab{padding:.75rem .6rem;border-bottom:2px solid transparent;color:#94a3b8;font-weight:700;cursor:pointer;touch-action:pan-y}
+.tab.active{border-color:#f59e0b;color:#f59e0b}
+.card{background:#111827;border:1px solid #263244;border-radius:14px;padding:16px;overflow-wrap:anywhere}
+.muted{color:#94a3b8}
+.ai{background:#0d2430;border:1px solid #155e75;border-radius:10px;padding:12px}
+.pill{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#1e293b;color:#cbd5e1}
+.read{opacity:.72}
+.featured-wrap{border:1px solid #92400e;background:linear-gradient(135deg,#24170b,#111827 65%);border-radius:16px;padding:16px;margin-bottom:22px}
+.featured-title{font-size:1.3rem;font-weight:900;color:#fbbf24;letter-spacing:.02em}
+.featured-card{border:1px solid #854d0e;background:#171b25;border-radius:12px;padding:14px;margin-top:10px}
+.featured-card h3{font-size:1.18rem;font-weight:900;line-height:1.5;color:#fff7ed}
+.priority-high{border-color:#b91c1c!important;box-shadow:inset 4px 0 #ef4444}
+.priority-medium{border-color:#b45309!important;box-shadow:inset 4px 0 #f59e0b}
+.priority-low{border-color:#334155!important}
+.score-badge{display:inline-block;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:900;background:#3f1d0d;color:#fdba74}
+.evidence-badge{display:inline-block;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:800;background:#1e293b;color:#cbd5e1}
+.featured-meta{font-size:.82rem;color:#cbd5e1;line-height:1.6}
+.btn{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:7px 10px;cursor:pointer}
+.btn:hover{background:#334155}
+a{color:#fbbf24;text-decoration:none}
 a:hover{text-decoration:underline}
-.container{width:min(1100px,100%);margin:auto;padding:0 15px}
-header{position:sticky;top:0;z-index:10;background:#0b0f19f5;
-border-bottom:1px solid var(--border);backdrop-filter:blur(12px)}
-.header-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 0}
-.brand{font-size:20px;font-weight:800}
-.brand span{color:var(--orange)}
-.muted,.meta{color:var(--muted)}
-.meta{font-size:12px}
-.eyebrow{font-size:10px;letter-spacing:1.5px;color:var(--muted)}
-.tabs{display:flex;gap:7px;overflow-x:auto;padding:0 0 12px;scrollbar-width:none}
-.tabs::-webkit-scrollbar{display:none}
-.tab{white-space:nowrap;background:transparent;color:var(--muted);
-border:1px solid transparent;border-radius:8px;padding:8px 13px;font-size:13px}
-.tab.active{color:var(--orange);border-color:#f59e0b66;background:#f59e0b12}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px}
-main{padding-top:20px;padding-bottom:35px}
-.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
-.metric{padding:13px;min-width:0}
-.metric-label{font-size:11px;color:var(--muted)}
-.metric-value{font-size:24px;font-weight:800;margin-top:3px}
-.section{margin-bottom:18px}
-.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-.section-title{font-size:17px;font-weight:800;margin:0}
-.featured{padding:15px;background:linear-gradient(135deg,#192236,#121a29)}
-.featured-item{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
-.featured-item:first-child{border-top:0}
-.feature-number{font-size:22px;font-weight:800;color:var(--orange);min-width:30px}
-.feature-title{font-size:14px;font-weight:700;overflow-wrap:anywhere}
-.badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700}
-.high{background:#fb71851b;color:#fb8999}
-.medium{background:#f59e0b1c;color:#fbbf24}
-.low{background:#7dd3fc18;color:#7dd3fc}
-.ai-badge{background:#34d39919;color:var(--green)}
-.controls{padding:14px;margin-bottom:18px}
-.control-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
-label{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}
-input,select{width:100%;min-width:0;padding:10px;background:#0b1220;
-border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px}
-.btn{border:1px solid var(--border);background:#172235;color:var(--text);
-padding:7px 10px;border-radius:7px;font-size:12px}
-.btn:hover{border-color:var(--orange);color:var(--orange)}
-.news-card{padding:15px;margin-bottom:11px;overflow:hidden}
-.news-card.read{opacity:.68}
-.news-title{font-size:16px;font-weight:750;line-height:1.6;margin:7px 0;overflow-wrap:anywhere}
-.summary{font-size:13px;color:#bac7d8;margin:8px 0;white-space:pre-wrap;overflow-wrap:anywhere}
-.news-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:11px;color:var(--muted)}
-.ai-box{margin-top:13px;padding:12px;border:1px solid var(--border);
-background:#0b1220;border-radius:9px}
-.ai-heading{color:var(--green);font-size:13px;font-weight:800;margin-bottom:8px}
-.ai-row{display:grid;grid-template-columns:85px minmax(0,1fr);gap:9px;
-padding:7px 0;border-top:1px solid #29364b88;font-size:12px}
-.ai-row:first-of-type{border-top:0}
-.ai-key{color:var(--muted)}
-.ai-value{white-space:pre-wrap;overflow-wrap:anywhere}
-.actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:9px;margin-top:13px}
-.notice{padding:12px;border:1px solid #29364b;border-radius:8px;
-color:var(--muted);font-size:12px}
-.empty{text-align:center;padding:30px 14px;color:var(--muted);font-size:13px}
-footer{border-top:1px solid var(--border);padding:20px 0 30px;color:var(--muted);font-size:11px}
-@media(max-width:650px){
- .container{padding-left:11px;padding-right:11px}
- .brand{font-size:17px}
- .metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
- .metric-value{font-size:22px}
- .control-grid{grid-template-columns:1fr}
- .news-card{padding:12px}
- .news-title{font-size:15px}
- .ai-row{grid-template-columns:73px minmax(0,1fr)}
+input{outline:none}
+input:focus{border-color:#f59e0b}
+.news-title{font-size:1.1em;line-height:1.55}
+.research-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.research-box{background:#0b1220;border:1px solid #263244;border-radius:9px;padding:10px;min-width:0}
+.research-box h4{font-size:.85em;font-weight:800;color:#7dd3fc;margin:0 0 6px}
+.research-box p,.research-box li{font-size:.92em;line-height:1.6;color:#dbeafe}
+.research-box ul{padding-left:1.2rem;margin:0}
+.research-wide{grid-column:1/-1}
+@media(max-width:520px){
+ .card{padding:12px}
+ .tab{font-size:12px;padding:.65rem .18rem}
+ .news-title{font-size:1.03em}
+ .research-grid{grid-template-columns:1fr}
+ .research-wide{grid-column:auto}
 }
 </style>
 </head>
 <body>
-
-<header>
-  <div class="container">
-    <div class="header-row">
-      <div>
-        <div class="eyebrow">MARKET INTELLIGENCE</div>
-        <div class="brand">财经<span>焦点</span>看板</div>
-      </div>
-      <div style="text-align:right">
-        <div class="meta">● 新闻更新系统</div>
-        <div id="updateTime" class="meta">等待数据更新</div>
-      </div>
-    </div>
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-channel="global">国际财经</button>
-      <button class="tab" data-channel="asia">亚太财经</button>
-      <button class="tab" data-channel="china">国内财经</button>
-      <button class="tab" data-channel="earnings">公司财报</button>
-    </nav>
+<header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+ <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+  <div>
+   <h1 class="text-xl sm:text-2xl font-black">📈 财经研究辅助看板</h1>
+   <p class="muted text-sm mt-1">新闻事实 · 传导逻辑 · 证据意识 · 风险约束</p>
   </div>
+  <div class="text-xs muted">
+   最近更新：<span id="updateTime">等待更新</span>
+   <div id="aiStatus" class="mt-1">AI 状态读取中</div>
+  </div>
+ </div>
 </header>
 
-<main class="container">
-  <section class="metrics">
-    <div class="panel metric">
-      <div class="metric-label">当前栏目新闻</div>
-      <div class="metric-value" id="totalCount">0</div>
-      <div class="meta">当前栏目收录量</div>
-    </div>
-    <div class="panel metric">
-      <div class="metric-label">重点新闻</div>
-      <div class="metric-value" id="highCount">0</div>
-      <div class="meta">重要性评分 ≥ 7</div>
-    </div>
-    <div class="panel metric">
-      <div class="metric-label">AI 已分析</div>
-      <div class="metric-value" id="aiCount">0</div>
-      <div class="meta">当前栏目分析数量</div>
-    </div>
-    <div class="panel metric">
-      <div class="metric-label">已读新闻</div>
-      <div class="metric-value" id="readCount">0</div>
-      <div class="meta">保存在当前浏览器</div>
-    </div>
-  </section>
+<main class="max-w-6xl mx-auto px-4 py-5">
+ <div class="flex flex-wrap gap-2 items-center mb-4">
+  <input id="searchInput" type="search"
+   class="flex-1 min-w-48 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2"
+   placeholder="搜索标题、摘要、来源、逻辑或资产…" aria-label="搜索新闻">
+  <button class="btn" id="fontDown" type="button">A−</button>
+  <button class="btn" id="fontUp" type="button">A+</button>
+  <button class="btn" id="clearRead" type="button">清除已读</button>
+ </div>
 
-  <section class="section panel featured">
-    <div class="section-head">
-      <div>
-        <div class="eyebrow">TOP STORIES</div>
-        <h2 class="section-title">重点新闻</h2>
-      </div>
-      <span class="badge medium">按重要性排序</span>
-    </div>
-    <div id="featuredList"><div class="empty">正在读取数据……</div></div>
-  </section>
+ <nav class="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 mb-5" id="tabs" aria-label="新闻栏目">
+  <button class="tab active" data-tab="global" type="button">国际财经 Top 20</button>
+  <button class="tab" data-tab="asia" type="button">亚太财经 Top 10</button>
+  <button class="tab" data-tab="china" type="button">国内财经 Top 10</button>
+  <button class="tab" data-tab="earnings" type="button">📊 核心财报 Top 10</button>
+ </nav>
 
-  <section class="panel controls">
-    <div class="section-head">
-      <h2 class="section-title">新闻检索</h2>
-      <button class="btn" id="clearFilters">清除条件</button>
-    </div>
-    <div class="control-grid">
-      <div>
-        <label for="searchInput">关键词</label>
-        <input id="searchInput" type="search" placeholder="搜索标题、摘要、媒体或 AI 分析">
-      </div>
-      <div>
-        <label for="importanceFilter">重要性</label>
-        <select id="importanceFilter">
-          <option value="all">全部新闻</option>
-          <option value="high">高重要性（7—10）</option>
-          <option value="medium">中重要性（4—6）</option>
-          <option value="low">一般新闻（1—3）</option>
-        </select>
-      </div>
-      <div>
-        <label for="readFilter">阅读状态</label>
-        <select id="readFilter">
-          <option value="all">全部状态</option>
-          <option value="unread">只看未读</option>
-          <option value="read">只看已读</option>
-        </select>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-head">
-      <div>
-        <div class="eyebrow" id="channelEyebrow">GLOBAL MARKETS</div>
-        <h2 class="section-title" id="channelTitle">国际财经新闻</h2>
-      </div>
-      <span class="meta" id="resultCount">0 条新闻</span>
-    </div>
-    <div id="dataNotice" class="notice" style="display:none;margin-bottom:12px"></div>
-    <div id="newsList"><div class="panel empty">正在读取新闻数据……</div></div>
-  </section>
-</main>
-
-<footer>
-  <div class="container">
-    <strong style="color:#d5dfec">财经焦点看板 · 市场信息研究工具</strong>
-    <p>新闻来自公开信息源。重要性评分和 AI 分析仅供研究参考，可能存在遗漏或错误。</p>
-    <p>本页面不构成投资建议。投资前请独立核实信息、数据和风险。</p>
+ <section id="featuredWrap" class="featured-wrap">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+   <h2 class="featured-title">🔥 当日重点财经新闻 · TOP 3</h2>
+   <span class="pill">重要性筛选 · 非涨跌预测</span>
   </div>
-</footer>
+  <p class="muted text-xs mt-2">
+   根据事件类型、潜在传导范围与时效性进行初筛；
+   分数仅用于阅读优先级，不代表收益概率。
+   来源未独立核实时会明确提示。
+  </p>
+  <div id="featuredList"></div>
+ </section>
+
+ <div class="flex justify-between items-center gap-3 mb-3">
+  <h2 id="sectionTitle" class="text-lg font-bold">国际财经新闻</h2>
+  <span id="count" class="muted text-sm">0 条</span>
+ </div>
+
+ <p class="muted text-xs mb-4">
+  手机左右滑动切换栏目：水平移动至少 70px，且水平距离超过垂直距离 2 倍才触发，
+  避免上下阅读长文章时误切换。
+ </p>
+
+ <div id="newsList" class="space-y-4" aria-live="polite">
+  <div class="card muted">等待新闻数据。请在 GitHub Actions 中运行 Daily Update。</div>
+ </div>
+
+ <footer class="muted text-xs mt-8 leading-relaxed">
+  研究辅助说明：AI 输出是基于标题、来源和摘要的初步分析，不等于已核验的完整研究。
+  请区分新闻事实、分析推断与情景假设；关联资产不代表价格必然上涨或下跌。
+  投资决策前应查阅原始报道、公司公告和可靠数据，不构成投资建议。
+ </footer>
+</main>
 
 <!-- NEWS_DATA_START -->
 <script>
-window.newsData = {"updatedAt":"2026-10-24 15:08:17","aiEnabled":true,"aiModel":"gemini-2.5-flash","aiStats":{"attempts":8,"successes":0,"failures":8,"maxPerRun":8},"global":[{"id":"GLOBAL-01","rank":1,"importance":10,"title":"肯·格里芬警告巴黎骚乱应该为美国人敲响“警钟”","originalTitle":"Ken Griffin warns Paris riots should be 'wake-up call' for Americans","summary":"Citadel 首席执行官肯·格里芬 (Ken Griffin) 将巴黎骚乱与芝加哥的暴力犯罪进行了比较，警告美国年轻人，法国的社会主义政策会导致动乱。","source":"foxbusiness.com","url":"https://www.foxbusiness.com/politics/ken-griffin-warns-paris-riots-should-wake-up-call-americans","publishedAt":"2026-10-24 05:52:48","timestamp":1792792368000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"GLOBAL-02","rank":2,"importance":10,"title":"专家警告伯纳姆不应急于向英国市长授予税收权力 - 英国《金融时报》","originalTitle":"Burnham should not rush on giving tax powers to English mayors, experts warn - Financial Times","summary":"专家警告英国《金融时报》，伯纳姆不应急于赋予英国市长税收权力","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxNTDhoWmpNMUlRM25mdm5sLTBhM2RFX0Q1UTE0ZjBhMGFGRGVRd0diR2xZVVJTdS1DWFNUQWZXcm1DemcxUFMtMlJwazg4M0lDeWZ0ZE1SUkx1Y0tIVFB6ZS0xZG0xcUhrb2poN0NRcm9nLTBMZi0tUTBjOEVfNXo1Q1h0ZS0?oc=5","publishedAt":"2026-10-24 00:27:07","timestamp":1792772827000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-03","rank":3,"importance":10,"title":"国会如何解决社会保障破产问题以及隐性成本","originalTitle":"How Congress could address Social Security insolvency – and the hidden cost","summary":"宾夕法尼亚大学沃顿商学院的一位专家警告说，联邦预算规则可能会将一般收入转移视为无成本，从而掩盖社会保障迫在眉睫的破产。","source":"foxbusiness.com","url":"https://www.foxbusiness.com/politics/how-congress-could-address-social-security-insolvency-hidden-cost","publishedAt":"2026-10-23 19:00:03","timestamp":1792753203000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"GLOBAL-04","rank":4,"importance":10,"title":"德黑兰的咖啡馆让人们暂时逃离战争和经济危机 - 英国《金融时报》","originalTitle":"Tehran’s cafés offer a brief escape from war and economic crisis - Financial Times","summary":"德黑兰的咖啡馆让人们暂时逃离战争和经济危机","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxNblppNlVGREtaazNadVZPc1c0ZkJDa1ZxSkJ1OURhSWl3WlNuRkxISVJKc1c2WFNxUWkteV9NWW5OSzdtbUthbDItajcxTUNBbC13WEFRR3E5V0ROUlBHQTdwdXpnX1pjVEdnbnpvZUg1WHdIMFdyZEl5VE96Tk1iVjRaTnQ?oc=5","publishedAt":"2026-10-23 12:03:45","timestamp":1792728225000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-05","rank":5,"importance":10,"title":"谨防贝森特向短期债务倾斜 - 英国《金融时报》","originalTitle":"Beware Bessent’s tilt towards short-term debt - Financial Times","summary":"谨防贝森特向短期债务倾斜 英国《金融时报》","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxNY3pFUjBpQXduOWd6R21VYlozZVlYcnVEbWFXTjFGQ05QdUNrVjBYT3ZOMUQ3b1d3WW1BVncxdEZ6LTdSdU9KWmtvUnFoSW1tTk43aER1YlM4dEFFS2lvRUYxY2FmdVlUS3VfeDhrVjdwV2FXRWtseDBXcGEtRXk3eFo2Y00?oc=5","publishedAt":"2026-10-23 12:02:12","timestamp":1792728132000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-06","rank":6,"importance":10,"title":"洛克希德·马丁公司公布了为美军生产 850 架 F-35 战斗机的 10 年框架","originalTitle":"Lockheed Martin unveils 10-year framework to produce 850 F-35 fighter jets for the US military","summary":"洛克希德·马丁公司的10年期F-35框架涵盖为美军提供850架飞机，但该交易仍需国会批准才能推进。","source":"foxbusiness.com","url":"https://www.foxbusiness.com/politics/lockheed-martin-unveils-10-year-framework-produce-850-f-35-fighter-jets-us-military","publishedAt":"2026-10-23 03:55:01","timestamp":1792698901000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"GLOBAL-07","rank":7,"importance":10,"title":"伊朗称七艘油轮在霍尔木兹海峡遭到袭击，因为人们担心战争会卷土重来 - 美联社新闻","originalTitle":"Iran says 7 oil tankers attacked in the Strait of Hormuz as fears grow of a return to war - AP News","summary":"伊朗称7艘油轮在霍尔木兹海峡遭到袭击，因担心重新爆发战争 美联社新闻","source":"AP News","url":"https://news.google.com/rss/articles/CBMipAFBVV95cUxPOVo5NGVvb09wSzBSTFVOa21PVVRNWWlEYUd1ZEU2U0tjTm55R3hYQ2Ezd1lUWUYwbFNpVUhJVDBxNlZaamJKaDJvblV1dl83LVhSX21rMkZuUXQtWFZmZmpZbXRrMkwwRzloVnA0QUs0cjN5MXNiZDBKR2MwaW9Sa1BKUGlaRUlQeG5PYnNPcTQ3YXZFc3QybjE1ZmVCYVJmY0doag?oc=5","publishedAt":"2026-10-23 02:55:00","timestamp":1792695300000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-08","rank":8,"importance":10,"title":"比尔·阿克曼 (Bill Ackman) 表示，随着战争和通胀缓解，2027 年对股市来说将是惊人的一年 - CNBC","originalTitle":"Bill Ackman says 2027 will be an amazing year for stocks as wars, inflation ease - CNBC","summary":"比尔·阿克曼 (Bill Ackman) 表示，随着战争和通胀缓解，2027 年股市将是惊人的一年","source":"CNBC","url":"https://news.google.com/rss/articles/CBMiiAFBVV95cUxPT2dySUtTcDJmOXEtWlQyVUZYV0p0YjRIekJITVZ0X0xKWi15d19YNjN2OThaUVVTekxnM2xXdjh6MGg0T2pyTHY4VjdSbzFSVHdkWERVTDA1RTNtbDl4TVVBZVpVT09JdHZRNVdEd1UwSTJPTGpXQ1BvRHdBN0xYcDByU2Y3NHFj0gGOAUFVX3lxTE9Uc2lXY1MwdzFvczlIRHB0VW8zS3E3MGgzQnJTYjltZkhXZjdvblI4Q0JXdVV4UkNYRGllcTNqMG9qMWQyU3FhZFFJNnNjOWdZSm9idjRrVW5xZDFqYnU2VjltUGYxZ0JUUl8xVFYwWFEtTm5DaktCNWh0VTg0Zk1VSnJ6RXZLRlFSSTN6aFE?oc=5","publishedAt":"2026-10-22 22:55:52","timestamp":1792680952000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-09","rank":9,"importance":10,"title":"美国初请失业金人数重回下降趋势 - 华尔街日报","originalTitle":"U.S. Jobless Claims Return to Downward Trend - WSJ","summary":"美国初请失业金人数重回下降趋势 华尔街日报","source":"WSJ","url":"https://news.google.com/rss/articles/CBMijgFBVV95cUxPZGJ0enIydGpnaExlUG5GdFJlR25SVE9PR1Q4LVN4eUFKbkhaUmQyT21uNHozaHF0UGM4MnpZQjNiU3hiSDlyU1lHQlJoMEkzQmM3cFNFSC1GaC1yTndWV29rd1NJd253VjNxdEI1NGtNLTJhaDk3d2k4bk1Ga290bTd2OWt1RjFSaUNqVlBB?oc=5","publishedAt":"2026-10-22 21:11:00","timestamp":1792674660000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-10","rank":10,"importance":10,"title":"没有战争，没有通货膨胀：特朗普兑现了他的重大承诺吗？ - 金融时报","originalTitle":"No wars and no inflation: Has Trump delivered on his big promises? - Financial Times","summary":"没有战争，没有通货膨胀：特朗普兑现了他的重大承诺吗？金融时报","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxNX2txX2JhRDEtN1hwUTJ2X1JKUDlQNmhLRmdxNFAyN2dTTkNkUVVtN3Mxd1RFd3Nla3lqMUw2c0ZfdHZzQTF6aHFockJMMzRoRVVpUmp2OUNFWUlpRXVXYktDTWZHTUlKVjNnVm95SzJkTjhWbjk3OVU0bGk5d2oyLVhoODc?oc=5","publishedAt":"2026-10-22 12:00:46","timestamp":1792641646000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-11","rank":11,"importance":10,"title":"施瓦辛格敦促加州核电“终结污染” - 英国《金融时报》","originalTitle":"Schwarzenegger urges nuclear power for California to ‘terminate pollution’ - Financial Times","summary":"施瓦辛格敦促加州核电“终结污染” 英国《金融时报》","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxPTmNrSmJuNE9ZNVlMNHFpQzFzUHhMS2Q4aDZZZjVIazdWQUYyVnRISlY4WWJPNFAtRGpNYUxLSEVCaEhsdzNOb2pYZmxySVpaLWhaRXd4dmdLdzRYMzJaclRoZnVfWXdkb1lkVGNtZ1lwNHdzS1JPNHpPVzN0N00yRXlkXzY?oc=5","publishedAt":"2026-10-22 12:00:30","timestamp":1792641630000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-12","rank":12,"importance":10,"title":"澳大利亚铁矿石开采商警告称，如果没有与中国达成协议，产量将放缓 - 金融时报","originalTitle":"Australian iron ore miner warns of production slowdown without China deal - Financial Times","summary":"澳大利亚铁矿石开采商警告称，如果没有与中国达成协议，产量将放缓 - 英国《金融时报》","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxPbGhhU0tQa01TbjRvYk44RDVSSGlVV09JbjBELVBkY0tuSzMydDFfQkFhcGh4cG9EaDZFd3lLa1FUWHh6ZlZfNjFSVVA0ODNaVkdjTEN0Zm1LMGIzaFY5SDBNSmxHODRZSFQtOXVSckRpQkRjc1RJd1BNMWM2aFFtNzBoYnY?oc=5","publishedAt":"2026-10-22 11:15:26","timestamp":1792638926000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-13","rank":13,"importance":10,"title":"美国长达数月封锁后，伊朗影子油轮舰队已耗尽石油 - 华尔街日报","originalTitle":"Iran’s Fleet of Shadow Tankers Has Run Out of Oil After Monthslong U.S. Blockade - WSJ","summary":"美国长达数月封锁后，伊朗影子油轮舰队已耗尽石油 华尔街日报","source":"WSJ","url":"https://news.google.com/rss/articles/CBMiwwFBVV95cUxNa0NkenN2WUo2NHU0WXRYU0dmdldBVmhIVmphdk9HZFpMckZOZ2paMVFiQ3BaMHFCZ0lydjdyVHVWWUFwNUwzblVZVWVacU8tRXBCVXI0V1pibHdaT1BtelN4Qks5eVA0VDJkOGdWS1BpNWhZZVdtRXgtMmJ2bXFkYkZUMlRSNjF0WTBVZEZKdkVkakgtd0R2SnZHUk9MSHNJYXppMUpWNXhDMXFJQjg1QTBoemZBUG9GWVNwRlZyZW9xYlE?oc=5","publishedAt":"2026-10-22 09:00:00","timestamp":1792630800000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-14","rank":14,"importance":10,"title":"印尼应留意摩根士丹利资本国际 (MSCI) 的警告 - 金融时报","originalTitle":"Indonesia should heed MSCI’s warning - Financial Times","summary":"印尼应留意摩根士丹利资本国际 (MSCI) 的警告《金融时报》","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxQaFJhd1dHd1dkLUI3U2tGX3hSVGRSXzhPM2xzN2VwNy1LQTlJQ1dzcU8wMk85YzVpSzFGZElrdnktaC10RW0tSEpTQXJFc0dzM2dxTFlUb2VDRkVBMHNHbmdaN1lJTF96Tnd5UXVnNHp2LVl0R2xsVDVkcG1pc1phN2VycnU?oc=5","publishedAt":"2026-10-22 01:36:57","timestamp":1792604217000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-15","rank":15,"importance":10,"title":"中东石油出口回升至战前水平 - 英国《金融时报》","originalTitle":"Middle East oil exports climb back to prewar levels - Financial Times","summary":"中东石油出口回升至战前水平 英国《金融时报》","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxNRUpxSXBnV3lLb2hmSHBCc2sxQlgyVnhTSklvZEpnM21ZSGRMTHlOa1FEQnkwMDA3ME83Yjc1b1ZQQnJNSFlvN0J4ZWgyZHRnRXdpZWZ5VUVEMDd1eHh3WkJNZE5vckZjX1dXZ2lnUXpDa1dPV3dIVmdZWHlJbF9IaTRGSFc?oc=5","publishedAt":"2026-10-21 20:01:37","timestamp":1792584097000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-16","rank":16,"importance":10,"title":"医疗保健股正在上涨，并向市场其他板块发出警告 - 华尔街日报","originalTitle":"Healthcare Stocks Are Rallying, and Flashing a Warning for the Rest of the Market - WSJ","summary":"医疗保健股正在上涨，并向市场其他板块发出警告 华尔街日报","source":"WSJ","url":"https://news.google.com/rss/articles/CBMiwgFBVV95cUxPdlhWeklVUVQ5Si1oNFBocmZXU2ZPU1JrSFJ2cjJiN29oSmh2UUNucjVSWTJYdGNiR3h5ZVNLZnlwa3NuWWFZbU5tdURxS1ZJMi15TmJQdlAwU0o3a0haTENjcG1rSy1ILU1wWEJsYmoxN3E3bE5MRy1UN3JqbXQ2bVhmbE5pMDhLaUxJRFl3LVBtQ0NCU0FDYUN2R2FzaU5qeGtuREpqMm5lc3ZPRFhQLVNwVkdXb2tkZFN3Zkh5SVZCZw?oc=5","publishedAt":"2026-10-21 17:30:00","timestamp":1792575000000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-17","rank":17,"importance":8,"title":"唐纳德·特朗普在共和党压力下削减加拿大关税 - 英国《金融时报》","originalTitle":"Donald Trump to cut Canadian tariffs after pressure from Republicans - Financial Times","summary":"唐纳德·特朗普在共和党压力下削减加拿大关税 英国《金融时报》","source":"Financial Times","url":"https://news.google.com/rss/articles/CBMihAFBVV95cUxQTmIteHZVMmhna3VxTkZLbEhfU2hWRS1xS3hGYXYxVnJwMXVaX3hZNEdHX1RacXpjWDZDRS00Z0lJOTh1eno0eF91SzR3V0ZpZ25YWk5GdGFuOW51NV9uY1NEc2hsYlE2YXM0T3B6RENqdS1kaGFUV0NiNE9FcGF3X0FQNHo?oc=5","publishedAt":"2026-10-24 04:03:43","timestamp":1792785823000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-18","rank":18,"importance":8,"title":"关税如何成为政治中最令人讨厌的词 - 华尔街日报","originalTitle":"How Tariffs Became the Most Hated Word in Politics - WSJ","summary":"关税如何成为政治中最令人讨厌的词 华尔街日报","source":"WSJ","url":"https://news.google.com/rss/articles/CBMimAFBVV95cUxPRWloQWdGR2RtVlpicDV6Qm1WT3F2ZFlPVHRtVlR0bVZUbW9DWWJHVENrcGUzbzVzZTZDc3lQdDJ0d0FZa3pxR1htNHByQ25aQmtFODNhNFBQU0tNdlpIV011RzM3cFNBbG9yeXBNWUtrb1EwNDl0dWRHMXFuaXZfdVVvbUdaNlRyS21nbWRpMTFuOWhJRjc2TA?oc=5","publishedAt":"2026-10-23 17:30:00","timestamp":1792747800000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-19","rank":19,"importance":8,"title":"油价上涨支撑美联储加息押注，金价本周将大幅下跌 - CNBC","originalTitle":"Gold set for steep weekly loss as rising oil prices bolster Fed rate hike bets - CNBC","summary":"油价上涨支撑美联储加息押注，金价本周将大幅下跌","source":"CNBC","url":"https://news.google.com/rss/articles/CBMiqgFBVV95cUxOS0x2VHNBWkt6RWNETndlR0p1eDd4UnhlZFFFbWpaYWdocUl2MnRCQm16RFpYbHQ3dF9jOEtLMENKOHUySjNmaW03YkhFRmR3WXRnbWtIaGZwbVVQNHJMMC11aklCdlBNcjMySDZsOU16WVBaZl8zR2ttZkgxMXVVWldnY25RRjJzbks3WFJwZWpnUE9maFdseVAwcmlmRHFJYUxCTEJ4RmN5QdIBrwFBVV95cUxNUEhSek0wcnlJbXhsZ0NkYmVoNEJmSUF5NEdCRElnZUVtNEcyY1hJSUloNEVtV3RRcDNXazdBUzc5a0V5OS1JXzFZMkROWVU2VHE3dUZmUExCMzdiRkNXZ0ZTY3pwUEJXR2RGaWY2QXVJOEtxV3lCWmV6OGdkZEE2NmJxcGZpSUYzZUhFNnRCVkotekVpY3BrWEVudnJkckF6dmVVZl9qNUtwN193MVV3?oc=5","publishedAt":"2026-10-23 12:29:38","timestamp":1792729778000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"GLOBAL-20","rank":20,"importance":7,"title":"由于油价加剧通胀风险，白银期货跌至今年最低点 - 华尔街日报","originalTitle":"Silver Futures Fall to Lowest This Year as Oil Prices Fuel Inflation Risks - WSJ","summary":"由于油价加剧通胀风险，白银期货跌至今年最低点 华尔街日报","source":"WSJ","url":"https://news.google.com/rss/articles/CBMiywFBVV95cUxORUItR05OSU1QNjA3dzU1SXJ3N2ZhRldQeF8xaVNOVXlRVDhaZnU4TUFjYnowU0RhSkR5VTNvck5LdF9pU2R4T3lzQ2NDY3Z6dXBpTFR4bmtuUlZBbVFZZi1JVGJZRU1JZGh3emVzTEhMbE9qVzFIUFBFYzNzbG9sQ1BjQXlsSThiY1ZMVkk5REo5MWxWbUJQZWphVnZrVW5IWk5rcnVRNmEzZkhqbjhUVzUwSlRudEJfWHRyMnBYUnFPSEtwOE1ia0psNA?oc=5","publishedAt":"2026-10-23 02:34:00","timestamp":1792694040000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"}],"asia":[{"id":"ASIA-01","rank":1,"importance":10,"title":"梅拉尼娅·特朗普表示，她在饱受战争蹂躏的乌克兰城市促成停战","originalTitle":"Melania Trump says she brokered truce in war-torn Ukrainian city","summary":"她的不同寻常的干预是在她的丈夫寻求全面结束俄罗斯战争之际突然转向莫斯科，这引起了基辅的警惕。","source":"japantimes.co.jp","url":"https://www.japantimes.co.jp/news/2026/10/24/world/melania-trump-ukraine-city-truce/","publishedAt":"2026-10-24 13:34:00","timestamp":1792820040000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"ASIA-02","rank":2,"importance":10,"title":"印度尼西亚的能源削减警告对东盟意味着什么 - 南华早报","originalTitle":"What Indonesia’s warnings of energy cuts mean for Asean - South China Morning Post","summary":"印度尼西亚的能源削减警告对东盟意味着什么 南华早报","source":"South China Morning Post","url":"https://news.google.com/rss/articles/CBMipwFBVV95cUxQRDQzcFUyOXpQYVgxWUc4eG9OMkNQM2xLY0Vmb1NfUXQwdXRwQWxwbUNQLWFNd0xhR1lNR3NEaGVPZFZ3Mmp5U0VfaW10RVJJVk5LZFFkdGh4cU1zRDFqUXdIUmtXeER4azFEN3AtU05XcEFqLURnY212NEV3Q2RaeXhTMTBXZjd5aUFHNkdua0hEaEFKWnp4MGNVOFg2eFhhOFpxVTV2b9IBpwFBVV95cUxPX2oxc1Awem9QM3VqUk1fcGQzWl9IUGgwRE5tLXhfRk5uVUFWUlFGd21jbGM5NGR6VHJyb0NXdXJsekxXZlVNUXRfa24xQk81QWJZX2lVNkJ3Q0FsZ2Qwak9tNmxTZjZ3cUlDcWQ4TXh2SGNoYTVZaDQySDZxWmRtc2x3cFlWUXk4Mks4U1JvcVlxU2tCdUdMd0E0dUxtb29CaGlDYzNxSQ?oc=5","publishedAt":"2026-10-23 21:22:20","timestamp":1792761740000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"ASIA-03","rank":3,"importance":10,"title":"随着经济增长推动美食热潮，印度热衷于法式烹饪","originalTitle":"India warms to French cooking as economic growth fuels fine-dining boom","summary":"中产阶级的崛起，越来越多地旅行，越来越多地在豪华场所就餐，正在创造对高端酒店员工的需求。","source":"japantimes.co.jp","url":"https://www.japantimes.co.jp/news/2026/10/23/asia-pacific/society/india-french-cooking-schools/","publishedAt":"2026-10-23 16:33:00","timestamp":1792744380000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"ASIA-04","rank":4,"importance":10,"title":"美伊战争使世界饥饿更加严重","originalTitle":"The U.S.-Iran war is making world hunger much worse","summary":"营养不良、儿童发育迟缓和消瘦等综合祸害变得更加严重，阻碍了两年来的改善趋势。","source":"japantimes.co.jp","url":"https://www.japantimes.co.jp/commentary/2026/10/23/world/iran-war-world-hunger/","publishedAt":"2026-10-23 15:29:00","timestamp":1792740540000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"ASIA-05","rank":5,"importance":10,"title":"拉里：史蒂芬·施瓦茨曼 (23)","originalTitle":"Larry: Stephen Schwarzman (23)","summary":"","source":"asia.nikkei.com","url":"https://asia.nikkei.com/spotlight/my-personal-history/larry-stephen-schwarzman-23","publishedAt":"","timestamp":0,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"ASIA-06","rank":6,"importance":10,"title":"全球金融危机，第 2 部分：史蒂芬·施瓦茨曼 (22)","originalTitle":"The Global Financial Crisis, Part 2: Stephen Schwarzman (22)","summary":"","source":"asia.nikkei.com","url":"https://asia.nikkei.com/spotlight/my-personal-history/the-global-financial-crisis-part-2-stephen-schwarzman-22","publishedAt":"","timestamp":0,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"ASIA-07","rank":7,"importance":7,"title":"日本通胀今年首次突破2%","originalTitle":"Japanese inflation breaks 2% for the first time this year","summary":"9月份的数据给日本央行带来了年底前加息的压力。","source":"japantimes.co.jp","url":"https://www.japantimes.co.jp/business/2026/10/23/economy/cpi-september-inflation/","publishedAt":"2026-10-23 15:21:00","timestamp":1792740060000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"ASIA-08","rank":8,"importance":7,"title":"为什么日本央行副行长指出通胀风险时日元几乎没有变动？ -tmgm.com","originalTitle":"Why is the Japanese Yen barely moving as a Bank of Japan deputy flags inflation risk? - tmgm.com","summary":"为什么日本央行副行长指出通胀风险时日元几乎没有变动？ tmgm.com","source":"tmgm.com","url":"https://news.google.com/rss/articles/CBMi4gFBVV95cUxOZWV2dWFfREhvZXRVR3ZWRHBfUTZMWENadERaMWhTcTg2RXJQZWgyTkxNRVRBQ0JpMGVwUmpVLXlQeGVUUEdmbkE0Uk9DY2h0bmZibUFXcEZfRjAyRjNETFloQTlwZEVYSjRtbXFJa2dQSHN2VGtEMWgtaEJUaUFFbmRfQmJNN1lIS3p2dUdKMGJlNFBtSmcwckQ1UzNZaU5oVVJkN1pyRUpadVp6WDNkZXdlQXN6ejB1a1AtNS1YdURQMUtWNTFZX2EwNGRMeWFNRUZYaUpkR2JtRXFxU2xBeFRn?oc=5","publishedAt":"2026-10-22 13:37:29","timestamp":1792647449000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"ASIA-09","rank":9,"importance":7,"title":"由于通货膨胀抑制经济增长，菲律宾将关键利率提高至 5.5%","originalTitle":"Philippines raises key rate to 5.5% as inflation saps growth","summary":"","source":"asia.nikkei.com","url":"https://asia.nikkei.com/business/markets/philippines-raises-key-rate-to-5.5-as-inflation-saps-growth","publishedAt":"","timestamp":0,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"ASIA-10","rank":10,"importance":6,"title":"如果共和党输了，特朗普将下令诉讼阻止阿拉斯加参议院的结果","originalTitle":"Trump orders lawsuit to block Alaska Senate result if Republicans lose","summary":"总统的干预对可能的选举结果发起先发制人的挑战，给中期选举蒙上了新的阴影。","source":"japantimes.co.jp","url":"https://www.japantimes.co.jp/news/2026/10/24/world/politics/trump-alaska-midterm-election/","publishedAt":"2026-10-24 13:11:00","timestamp":1792818660000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"}],"china":[{"id":"CHINA-01","rank":1,"importance":2,"title":"沪深 300 指数延续 10 周跌势，中国股市陷入熊市 - CNBC","originalTitle":"China's stock market sinks into bear territory as CSI 300 extends 10-week rout - CNBC","summary":"沪深 300 指数延续 10 周溃败，中国股市陷入熊市 CNBC 中国股市因人工智能交易而进入熊市，政策希望消退 Bloomberg.com 股市闪现看跌迹象，中国“国家队”出手救援 日经亚洲 为什么中国人工智能的胜利未能拯救萎靡不振的股市 亚洲时报 中国股市暴跌 20%：龙失去火力的 3 个原因 NDTV 中国股市进入熊领地！沪深 300 指数较 6 月高点暴跌 20% 《经济时报》 中国股市在跌入熊市后与经济低迷抗争 日经亚洲 尽管国家买入，中国股市仍更深地陷入熊市 Bloomberg.com","source":"CNBC","url":"https://news.google.com/rss/articles/CBMiggFBVV95cUxNWmt2MnVkcmdCNXBPMzNIaHJwWlFIV2J2SU5pNk52MENwNi10dW56Q2duNHZBc181R1BQeXBQNlQwSzY0V2RSWlR1U3k4OFdRMDJyR25tTEVveUVCNWl4d08tVXhZY3BKTmFVNXA2V3BNMGpjSmxUZ09SOGtFc29MS1Fn0gGHAUFVX3lxTE9JbzZ4T01zVW93dG8xM0Q1TUtoU1hCYWVULTVQX285THphbnRNYWdvVVp5Wml4VDBGSlBHUFdEZFlHOU1TSWZFR1ZXUFVJVl9xbDRGeTBjUUkzY21fTVp4ZXpTSW9rdDBNNUZlY2QzMll0VGtyM1lVYnNFM0JoVFlhZ3NvX3pjRQ?oc=5","publishedAt":"2026-10-22 11:30:00","timestamp":1792639800000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"CHINA-02","rank":2,"importance":1,"title":"中国股市因国家支持疑似从熊市反弹 - 《南华早报》","originalTitle":"Chinese stocks bounce back from bear market on suspected state support - South China Morning Post","summary":"疑似国家支持 中国股市从熊市反弹 南华早报","source":"South China Morning Post","url":"https://news.google.com/rss/articles/CBMizgFBVV95cUxORHU1dDJlZlEweUJhZmRTM3M5a1R4ekJVaUJfNmN5TUVSU2lqSzNhVjVsaVlQSXJkalY5YnZRNHRfNTBxQVd5TkxRZTRGOUZxR29XN0ZuUmhRcWtfdGpKbWVaenRCUUFod2hoNFVaV05aLUZLZWlqelVBQmVyaFQ0cUx1LXBsWVVDb3FjMk5zeEFuTjJTeGJwenVCRC12ZFd5cGQ5dXFQMlVjaURlMXlFS2ZYZ0hZWV83dktVMHZ0bk41STJrODI3LU1lNXRSZ9IBzgFBVV95cUxQb2M4Y0VpQWk3SlktbUJSS3I3Rkh5VTEzem9aYjgxYURjTDk2ME9qWHVncjJEeFYxT21KeG1pTzVUN1FlZGZaSU5PU0Q2TzFOc3pjbnpaMWNBN0FWX3BrSHRYRF8ybTdiejdaU0JmWEY2TTZoY1g2VUlINTBMMGFHNHBybDVSVVB1U1RsTm5NZGhxbjYyR2JJOGRFdXEwN3hZZzBZYkRuVkNMNWI4VHp0ZTdoSWs0UFFxNUZxYTRrRUt5bzV2LVptWjBtZ25xUQ?oc=5","publishedAt":"2026-10-23 10:41:51","timestamp":1792723311000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"CHINA-03","rank":3,"importance":1,"title":"由于增长担忧和人工智能抛售引发谨慎，中国熊市溃败加深 - 《南华早报》","originalTitle":"China’s bear-market rout deepens as growth concerns and AI sell-off spur caution - South China Morning Post","summary":"由于增长担忧和人工智能抛售引发谨慎，中国的熊市溃败加剧 《南华早报》","source":"South China Morning Post","url":"https://news.google.com/rss/articles/CBMizgFBVV95cUxQb2M4Y0VpQWk3SlktbUJSS3I3Rkh5VTEzem9aYjgxYURjTDk2ME9qWHVncjJEeFYxT21KeG1pTzVUN1FlZGZaSU5PU0Q2TzFOc3pjbnpaMWNBN0FWX3BrSHRYRF8ybTdiejdaU0JmWEY2TTZoY1g2VUlINTBMMGFHNHBybDVSVVB1U1RsTm5NZGhxbjYyR2JJOGRFdXEwN3hZZzBZYkRuVkNMNWI4VHp0ZTdoSWs0UFFxNUZxYTRrRUt5bzV2LVptWjBtZ25xUdIBzgFBVV95cUxQb2M4Y0VpQWk3SlktbUJSS3I3Rkh5VTEzem9aYjgxYURjTDk2ME9qWHVncjJEeFYxT21KeG1pTzVUN1FlZGZaSU5PU0Q2TzFOc3pjbnpaMWNBN0FWX3BrSHRYRF8ybTdiejdaU0JmWEY2TTZoY1g2VUlINTBMMGFHNHBybDVSVVB1U1RsTm5NZGhxbjYyR2JJOGRFdXEwN3hZZzBZYkRuVkNMNWI4VHp0ZTdoSWs0UFFxNUZxYTRrRUt5bzV2LVptWjBtZ25xUQ?oc=5","publishedAt":"2026-10-23 10:41:51","timestamp":1792723311000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"CHINA-04","rank":4,"importance":1,"title":"全球市场：人民币兑美元汇率创四年多新高 - 经济时报","originalTitle":"Global Market: China's yuan hits more than four-year high against dollar - The Economic Times","summary":"全球市场：人民币兑美元创四年多新高 经济时报","source":"The Economic Times","url":"https://news.google.com/rss/articles/CBMi4AFBVV95cUxQeGQ5c3F6OEFSalRqRW5nNllYcEEyUEtpQjd1bXJCbFhCTkFBOXBIMlFyVEFVbHFIUkI3TzY2RFE3NUNvTF8yaWF1ZW4yV1NiREkzLW9NZTZ2ZzBHOW5hZmhzeThZbVVlRzhnaHF3N3dqY2V5Zl9RcW9uSHdOUEJKR2VPUWFjSExvejhYdXdIME00NXUwMndIelFoVU9KdDhvUUpDSU1tWWhKUmVPbWk1VmR4RGZNRTZSbTZDTDhMLWNfMV9jeHpZZHJ0WF9IQ0FnaU5DcmZ0VXNWdnM1Z2swM9IB5gFBVV95cUxQMEZCUkJjMWY1TVotaEEyQ3A2N3JyMlZsbEE3cTFxbzhGNVBfczRILVFfM254TmdTbURMYTJZY0w1NlRsNmJodjdkNFRUd3V5UG0wQUpfakxFVDdRdHBzM2lVbUhzTktPalBaNG4zRXVzUDkxWXU4OWRHaFlrYVB4MFNrTk01eFZZYUJ5bUZ4MEp6X1lIMi1kVXFmeVZmUWRwS0QtdjVvb1ZhX2JsVHdmUmtJTy1vX0d1TWRta3dqdnU4V3VMbTdfNEdiT05oU0hfZl9iUDFoTC1sU1ZrWlBGckNCZTQtUQ?oc=5","publishedAt":"2026-10-22 15:45:40","timestamp":1792655140000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"CHINA-05","rank":5,"importance":1,"title":"人民币升至四年新高，全球央行会议成为焦点 - Business Recorder","originalTitle":"China's yuan climbs to fresh 4-year high, global central bank meetings in focus - Business Recorder","summary":"人民币升至四年新高，全球央行会议成为焦点 Business Recorder","source":"Business Recorder","url":"https://news.google.com/rss/articles/CBMiVkFVX3lxTE5FNlBiaFZTZHhjMU9md1NjcGxXR3VVM01ZNG9nTDhvei15b0VIckdibkx5VmpjUF80emlFZDlDeWlkZDVaTlNlajViY0JGQXhaZ0t2enN30gFWQVVfeXFMTkU2UGJoVlNkeGMxT2Z3U2NwbFdHdVUzTVk0b2dMOG96LXlvRUhyR2JuTHlWamNQXzR6aUVkOUN5aWRkNVpOU2VqNWJjQkZBeFpnS3Z6c3c?oc=5","publishedAt":"2026-10-22 15:00:49","timestamp":1792652449000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"}],"earnings":[{"id":"EARNINGS-01","rank":1,"importance":1,"title":"康卡斯特盈利超出预期，媒体收入抵消了连接方面的疲软","originalTitle":"Comcast beats earnings expectations as media revenue offsets weakness in connectivity","summary":"康卡斯特正在将其媒体业务分拆为一家独立的上市公司。","source":"cnbc.com","url":"https://www.cnbc.com/2026/10/22/comcast-cmcsa-earnings-q3-2026.html","publishedAt":"2026-10-23 04:04:51","timestamp":1792699491000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"EARNINGS-02","rank":2,"importance":1,"title":"受洗衣和家居产品推动，宝洁公司 (Procter & Gamble) 销售额增长 4%，盈利超预期","originalTitle":"Procter & Gamble earnings beat as sales rise 4%, boosted by laundry and home products","summary":"宝洁公司的季度盈利和收入超过了华尔街的预期。","source":"cnbc.com","url":"https://www.cnbc.com/2026/10/22/procter-gamble-pg-q1-2027-earnings.html","publishedAt":"2026-10-22 22:19:40","timestamp":1792678780000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"EARNINGS-03","rank":3,"importance":1,"title":"美国航空公司在历史性的燃油成本压力下创造了新的收入记录 - 美国航空","originalTitle":"American sets new revenue records amid historic fuel cost pressure - American Airlines","summary":"美国航空公司在历史性的燃油成本压力下创下新的收入记录 美国航空","source":"American Airlines","url":"https://news.google.com/rss/articles/CBMizgFBVV95cUxQVnA3UllBQVlkQ1VkRDR4MEE5NDUtbkRIeTVYU2Z3MEJOMTQxaFZmU2RoVmx6NEcwS3dTMkFpSEc5MEtWNk16cE81ZHB0dGJ2ek5fYllIb3ZSRmFEMVNzQndSYUVIQ0hKc2c2UGJFM2twRzM1cm41aTB2aUpaQ2VZajhiMEx3NkFJZjhoTFg0Mkwxd2ZLWE1YU044UnMydXVaaHYtaHZtY1g5M1JZWTR0VWZJZDNEVUE1UTMwNWFGTXpyeDNjNC03SW1tazIwQQ?oc=5","publishedAt":"2026-10-22 19:03:20","timestamp":1792667000000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"EARNINGS-04","rank":4,"importance":1,"title":"即使盈利如此强劲，三星还是 70,000 韩元，SK 海力士是 200,000 韩元？...我们重新计算了 KOSPI 的公允价值 [金钱医生：市场分析] - 매일경제","originalTitle":"Even with earnings this strong, Samsung at ₩70,000 and SK hynix at ₩200,000?... We recalculated the KOSPI’s fair value [Money Doctor: Market Analysis] - 매일경제","summary":"即使盈利如此强劲，三星还是 70,000 韩元，SK 海力士是 200,000 韩元？...我们重新计算了 KOSPI 的公允价值 [金钱医生：市场分析] 매일경제","source":"매일경제","url":"https://news.google.com/rss/articles/CBMiU0FVX3lxTE5qTW1zZW4zZ0JuWHdoOFJtdzVmMmVyZXhaVG9Nc21GM18wWTFKMC03S1RmYUxMcDVrSHh6X1FEOUdOVkIyWDVRYzNRNzVVMkxQMy1N?oc=5","publishedAt":"2026-10-22 17:42:42","timestamp":1792662162000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"EARNINGS-05","rank":5,"importance":1,"title":"Teledyne Technologies (TDY) 第三季度盈利在创纪录利润后上调 - 雅虎财经","originalTitle":"Teledyne Technologies (TDY) Q3 Earnings Lift Guidance After Record Profit - Yahoo Finance","summary":"Teledyne Technologies (TDY) 创纪录利润后第三季度盈利上调 雅虎财经","source":"Yahoo Finance","url":"https://news.google.com/rss/articles/CBMipAFBVV95cUxNVHlab3JEbnE2dVE4TV9Cak93bzlMN1lfV2U5REh4YW1aVjlUSUl6N2YtRllHWEg3M1NZc2R0dm9MTUlOVG9IUW9id05mVVVxY3FZdFhfVUN1MkZvVjlSUUpnclo3SV8yaTB0Nm1BOTRQMmt3U0hjRW13OVpqdVVaSE1lY3FOYmFZeWh1amk3R1FYZzBETlJHRnFSSURvLXpFVjF3NQ?oc=5","publishedAt":"2026-10-22 13:58:00","timestamp":1792648680000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"aggregator"},{"id":"EARNINGS-06","rank":6,"importance":1,"title":"尽管汽车收入下降，特斯拉的盈利和销量仍表现出色","originalTitle":"Tesla beats on earnings and sales even as auto revenue declines","summary":"特斯拉公布的第三季度业绩好于预期。","source":"cnbc.com","url":"https://www.cnbc.com/2026/10/21/tesla-tsla-q3-2026-earnings-report.html","publishedAt":"2026-10-22 07:32:04","timestamp":1792625524000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"},{"id":"EARNINGS-07","rank":7,"importance":1,"title":"第一资本 (Capital One) 的季度表现强劲。为什么我们还没有宣布胜利","originalTitle":"Capital One delivered a strong quarter. Why we're not declaring victory just yet","summary":"第一资本报告了稳健的收益，但我们最大的担忧之一仍然存在。","source":"cnbc.com","url":"https://www.cnbc.com/investingclub/2026/10/21/capital-one-delivered-a-strong-quarter-why-were-not-declaring-victory-just-yet.html","publishedAt":"2026-10-22 02:06:31","timestamp":1792605991000,"analysis":"","coreLogic":"","marketImpact":"","transmission":"","impact":"","asset":"","timeHorizon":"","scenarios":"","evidence":"","risk":"","confidence":"","provider":"","linkStatus":"original"}]};
+window.newsData = {
+ "global": [],
+ "asia": [],
+ "china": [],
+ "earnings": [],
+ "aiEnabled": false,
+ "aiModel": "",
+ "updatedAt": ""
+};
 </script>
 <!-- NEWS_DATA_END -->
 
 <script>
-(function(){
 "use strict";
 
-const CHANNELS={
-  global:{title:"国际财经新闻",eyebrow:"GLOBAL MARKETS"},
-  asia:{title:"亚太财经新闻",eyebrow:"ASIA PACIFIC"},
-  china:{title:"国内财经新闻",eyebrow:"CHINA MARKETS"},
-  earnings:{title:"公司财报",eyebrow:"CORPORATE EARNINGS"}
+const labels = {
+ global: "国际财经新闻",
+ asia: "亚太财经新闻",
+ china: "国内财经新闻",
+ earnings: "核心财报新闻"
 };
 
-const ACTIVE_KEY="financeDashboardActiveTab_v3";
-const READ_KEY="financeDashboardRead_v3";
+let active = "global";
+let fontSize = 15;
 
-let data=window.newsData||{};
-let active="global";
-let readSet=new Set();
+const TOPIC_RULES = [
+ {re:/central bank|federal reserve|\bfed\b|interest rate|rate cut|rate hike|inflation|CPI|PCE|就业报告|美联储|央行|利率|通胀|非农|货币政策/i,points:24,label:"宏观政策/经济数据"},
+ {re:/war|sanction|tariff|trade war|default|crisis|emergency|bank failure|战争|制裁|关税|贸易战|违约|危机|银行倒闭/i,points:23,label:"地缘/系统性风险"},
+ {re:/GDP|recession|bond yield|treasury|dollar|yuan|exchange rate|国债收益率|美元|人民币|汇率|经济衰退/i,points:18,label:"宏观与金融条件"},
+ {re:/earnings|revenue|profit|guidance|forecast|财报|营收|利润|业绩指引|盈利预警/i,points:14,label:"企业财报/业绩"},
+ {re:/oil|crude|gold|semiconductor|chip|artificial intelligence|能源|原油|黄金|半导体|芯片|人工智能/i,points:10,label:"重要行业/大宗商品"}
+];
 
-const $=id=>document.getElementById(id);
-const str=value=>value==null?"":String(value);
-
-function esc(value){
-  return str(value).replace(/[&<>"']/g,ch=>({
-    "&":"&amp;","<":"&lt;",">":"&gt;",
-    '"':"&quot;","'":"&#39;"
-  })[ch]);
+function esc(v) {
+ return String(v ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
 }
 
-function loadRead(){
-  try{
-    const parsed=JSON.parse(localStorage.getItem(READ_KEY)||"[]");
-    readSet=new Set(Array.isArray(parsed)?parsed:[]);
-  }catch(e){readSet=new Set();}
+function safeUrl(v) {
+ try {
+  const u = new URL(String(v || ""));
+  if (["https:","http:"].includes(u.protocol)) return u.href;
+ } catch(e) {}
+ return "";
 }
 
-function saveRead(){
-  try{
-    localStorage.setItem(READ_KEY,JSON.stringify([...readSet]));
-  }catch(e){}
-}
+function importance(n) {
+ const text = [n.title,n.originalTitle,n.summary].join(" ");
+ let score = 20;
+ const why = [];
 
-function keyOf(item){
-  return str(item.url||item.id||item.originalTitle||item.title);
-}
-
-function scoreOf(item){
-  const n=Number(item.importance!=null?item.importance:item.score);
-  return Number.isFinite(n)?Math.max(1,Math.min(10,n)):1;
-}
-
-function scoreClass(score){
-  return score>=7?"high":score>=4?"medium":"low";
-}
-
-function scoreLabel(score){
-  return score>=7?"高重要性":score>=4?"中重要性":"一般新闻";
-}
-
-function sortedItems(){
-  const items=Array.isArray(data[active])?data[active].slice():[];
-  return items.sort((a,b)=>{
-    const diff=scoreOf(b)-scoreOf(a);
-    if(diff)return diff;
-    return Number(b.timestamp||0)-Number(a.timestamp||0);
-  });
-}
-
-function hasAI(item){
-  return ["analysis","coreLogic","marketImpact","transmission",
-    "impact","asset","timeHorizon","scenarios","evidence",
-    "risk","confidence"].some(k=>str(item[k]).trim()!=="");
-}
-
-function safeLink(item){
-  const url=str(item.url).trim();
-  if(!url)return '<span class="meta">暂无可用原文链接</span>';
-
-  try{
-    const parsed=new URL(url);
-    if(!["https:","http:"].includes(parsed.protocol)){
-      return '<span class="meta">链接格式无效</span>';
-    }
-    const aggregated=parsed.hostname.toLowerCase()==="news.google.com";
-    const label=aggregated?"通过 Google News 查看 ↗":"查看原始报道 ↗";
-    return '<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+label+'</a>';
-  }catch(e){
-    return '<span class="meta">链接格式无效</span>';
+ for (const r of TOPIC_RULES) {
+  if (r.re.test(text)) {
+   score += r.points;
+   why.push(r.label);
   }
+ }
+
+ const ts = Number(n.timestamp || 0);
+ if (ts > 0) {
+  const age = Math.max(0, (Date.now()/1000-ts)/3600);
+  score += age < 12 ? 15 : age < 24 ? 10 : age < 48 ? 5 : 0;
+ }
+
+ if (safeUrl(n.url)) score += 5;
+
+ score = Math.min(100,score);
+
+ return {
+  score,
+  level: score >= 65 ? "高" : score >= 45 ? "中" : "常规",
+  why: why.slice(0,2)
+ };
 }
 
-function aiHTML(item){
-  const fields=[
-    ["新闻解读","analysis"],
-    ["核心逻辑","coreLogic"],
-    ["市场影响","marketImpact"],
-    ["传导路径","transmission"],
-    ["影响判断","impact"],
-    ["相关资产","asset"],
-    ["时间周期","timeHorizon"],
-    ["情景分析","scenarios"],
-    ["事实依据","evidence"],
-    ["风险提示","risk"],
-    ["分析信心","confidence"]
-  ];
-
-  const rows=fields.filter(([label,key])=>str(item[key]).trim()!=="")
-    .map(([label,key])=>
-      '<div class="ai-row"><div class="ai-key">'+esc(label)+
-      '</div><div class="ai-value">'+esc(item[key])+'</div></div>'
-    ).join("");
-
-  if(!rows){
-    return '<div class="notice" style="margin-top:12px">暂无 AI 分析。请检查 API 密钥、调用额度或运行日志。</div>';
-  }
-
-  return '<div class="ai-box"><div class="ai-heading">✦ AI 深度分析</div>'+rows+'</div>';
+function ranked(items) {
+ return items.map((n,i)=>({
+  ...n,
+  _rank:importance(n),
+  _originalIndex:i
+ })).sort((a,b)=>
+  b._rank.score-a._rank.score ||
+  Number(b.timestamp||0)-Number(a.timestamp||0)
+ );
 }
 
-function getFiltered(){
-  const query=$("searchInput").value.trim().toLowerCase();
-  const level=$("importanceFilter").value;
-  const readMode=$("readFilter").value;
+function articleLink(n,label) {
+ const url = safeUrl(n.url);
+ const searchUrl = safeUrl(n.searchUrl);
+ const status = String(n.linkStatus || "");
+ const unresolved =
+  status.includes("Google News") ||
+  /news\.google\.com\/(rss\/)?(articles|read)\//i.test(String(n.url||""));
 
-  return sortedItems().filter(item=>{
-    const score=scoreOf(item);
-    const isRead=readSet.has(keyOf(item));
+ let href = url;
+ let shown = label;
+ let note = "";
 
-    if(level==="high"&&score<7)return false;
-    if(level==="medium"&&(score<4||score>=7))return false;
-    if(level==="low"&&score>=4)return false;
-    if(readMode==="read"&&!isRead)return false;
-    if(readMode==="unread"&&isRead)return false;
+ if (unresolved) {
+  href = searchUrl;
+  shown = "搜索原始报道 ↗";
+  note = '<span class="muted text-xs ml-2">原文直达链接尚未解析</span>';
+ } else if (!href && searchUrl) {
+  href = searchUrl;
+  shown = "搜索相关新闻 ↗";
+  note = '<span class="muted text-xs ml-2">备用搜索入口，非原文链接</span>';
+ }
 
-    if(query){
-      const haystack=[
-        item.title,item.originalTitle,item.summary,item.source,
-        item.analysis,item.coreLogic,item.marketImpact
-      ].join(" ").toLowerCase();
-      if(!haystack.includes(query))return false;
-    }
-    return true;
-  });
+ if (!href) {
+  return '<span class="muted text-sm">暂无可用报道链接</span>';
+ }
+
+ return '<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+
+  esc(shown)+'</a>'+note;
 }
 
-function renderFeatured(){
-  const items=sortedItems().slice(0,3);
-  const box=$("featuredList");
-
-  if(!items.length){
-    box.innerHTML='<div class="empty">当前栏目暂无重点新闻。</div>';
-    return;
-  }
-
-  box.innerHTML=items.map((item,i)=>{
-    const score=scoreOf(item);
-    return '<div class="featured-item">'+
-      '<div class="feature-number">0'+(i+1)+'</div>'+
-      '<div style="min-width:0;flex:1">'+
-      '<div class="news-meta"><span class="badge '+scoreClass(score)+'">'+
-      scoreLabel(score)+' · '+score+'/10</span>'+
-      '<span>'+esc(item.source||"未知来源")+'</span></div>'+
-      '<div class="feature-title" style="margin-top:6px">'+
-      esc(item.title||item.originalTitle||"无标题")+'</div>'+
-      '<div class="meta" style="margin-top:5px">'+safeLink(item)+'</div>'+
-      '</div></div>';
-  }).join("");
+function list(items) {
+ if (!Array.isArray(items) || !items.length) {
+  return "<p>暂无足够信息；需核验原文。</p>";
+ }
+ return "<ul>"+items.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>";
 }
 
-function renderNews(){
-  const items=getFiltered();
-  const all=sortedItems();
-  const box=$("newsList");
-
-  $("totalCount").textContent=all.length;
-  $("highCount").textContent=all.filter(x=>scoreOf(x)>=7).length;
-  $("aiCount").textContent=all.filter(hasAI).length;
-  $("readCount").textContent=all.filter(x=>readSet.has(keyOf(x))).length;
-  $("resultCount").textContent=items.length+" 条新闻";
-
-  if(!items.length){
-    if(!all.length){
-      box.innerHTML='<div class="panel empty">'+
-        '<div style="font-weight:800;color:#d7e2f0;margin-bottom:8px">当前栏目暂无新闻数据</div>'+
-        '<div>请检查 GitHub Actions 是否更新成功，以及 RSS 来源是否正常。</div></div>';
-    }else{
-      box.innerHTML='<div class="panel empty">没有符合筛选条件的新闻，请调整搜索或筛选条件。</div>';
-    }
-    return;
-  }
-
-  box.innerHTML=items.map(item=>{
-    const score=scoreOf(item);
-    const isRead=readSet.has(keyOf(item));
-    const title=item.title||item.originalTitle||"无标题";
-
-    return '<article class="panel news-card '+(isRead?"read":"")+'">'+
-      '<div class="news-meta">'+
-      '<span class="badge '+scoreClass(score)+'">'+scoreLabel(score)+' · '+score+'/10</span>'+
-      (hasAI(item)?'<span class="badge ai-badge">AI 已分析</span>':"")+
-      '<span>'+esc(item.source||"未知来源")+'</span>'+
-      '<span>'+esc(item.publishedAt||"发布时间未知")+'</span>'+
-      '</div>'+
-      '<h3 class="news-title">'+esc(title)+'</h3>'+
-      (item.originalTitle&&item.originalTitle!==title?
-        '<div class="meta">原文标题：'+esc(item.originalTitle)+'</div>':"")+
-      (item.summary?'<div class="summary">'+esc(item.summary)+'</div>':"")+
-      aiHTML(item)+
-      '<div class="actions"><div>'+safeLink(item)+'</div>'+
-      '<button class="btn read-toggle" data-key="'+esc(keyOf(item))+'">'+
-      (isRead?"标记为未读":"标记为已读")+'</button></div>'+
-      '</article>';
-  }).join("");
-
-  box.querySelectorAll(".read-toggle").forEach(button=>{
-    button.addEventListener("click",()=>{
-      const key=button.getAttribute("data-key");
-      if(readSet.has(key))readSet.delete(key);
-      else readSet.add(key);
-      saveRead();
-      renderNews();
-    });
-  });
+function getActiveItems() {
+ const data = window.newsData || {};
+ return Array.isArray(data[active]) ? data[active] : [];
 }
 
-function render(){
-  const config=CHANNELS[active];
-  $("channelTitle").textContent=config.title;
-  $("channelEyebrow").textContent=config.eyebrow;
+function renderFeatured() {
+ const items = ranked(getActiveItems()).slice(0,3);
+ const root = document.getElementById("featuredList");
 
-  document.querySelectorAll(".tab").forEach(button=>{
-    button.classList.toggle("active",button.dataset.channel===active);
-  });
+ if (!items.length) {
+  root.innerHTML = '<p class="muted text-sm mt-3">本栏目暂时没有可展示的重点新闻。</p>';
+  return;
+ }
 
-  renderFeatured();
-  renderNews();
+ root.innerHTML = items.map((n,i)=>{
+  const r = n._rank;
+  const priority = r.level==="高" ? "high" : r.level==="中" ? "medium" : "low";
 
-  const notice=$("dataNotice");
-  const stats=data.aiStats||{};
+  return `
+   <article class="featured-card priority-${priority}">
+    <div class="flex flex-wrap gap-2 items-center mb-2">
+     <span class="score-badge">TOP ${i+1} · ${r.score}/100</span>
+     <span class="pill">重要性：${esc(r.level)}</span>
+     <span class="evidence-badge">证据：待核实</span>
+    </div>
+    <h3>${esc(n.title||"无标题")}</h3>
+    <p class="featured-meta mt-2">${esc(n.summary||"暂无摘要")}</p>
+    <p class="featured-meta mt-2">
+     <b>入选线索：</b>${esc(r.why.join("、")||"时效性与来源链接")}。
+     <b>注意：</b>此分数是阅读优先级，不是价格方向或收益预测。
+    </p>
+    <div class="mt-3 text-sm">${articleLink(n,"查看原始报道 ↗")}</div>
+   </article>`;
+ }).join("");
+}
 
-  if(data.aiEnabled===false){
-    notice.style.display="block";
-    notice.textContent="当前数据标记显示 AI 未启用。新闻采集与 AI 分析是两项独立功能，请检查 GEMINI_API_KEY 是否配置。";
-  }else{
-    notice.style.display="none";
+const readKey = "financeDashboardRead_v2";
+let readIds = new Set();
+
+try {
+ readIds = new Set(JSON.parse(localStorage.getItem(readKey)||"[]"));
+} catch(e) {}
+
+function render() {
+ const all = ranked(getActiveItems());
+ const q = (document.getElementById("searchInput").value||"").trim().toLowerCase();
+
+ const items = all.filter(n=>{
+  const assets = Array.isArray(n.asset) ? n.asset.join(" ") : "";
+  const content = [
+   n.title,n.summary,n.source,assets,n.analysis,n.coreLogic,
+   n.marketImpact,n.transmission,n.risk,n.originalTitle
+  ].join(" ").toLowerCase();
+
+  return content.includes(q);
+ });
+
+ document.getElementById("sectionTitle").textContent = labels[active];
+ document.getElementById("count").textContent = `显示 ${items.length} / ${all.length} 条`;
+ renderFeatured();
+
+ const root = document.getElementById("newsList");
+
+ if (!items.length) {
+  root.innerHTML = `<div class="card muted">${
+   all.length ? "没有找到符合条件的新闻。" : "此栏目暂时没有新闻，请稍后运行 Daily Update。"
+  }</div>`;
+  return;
+ }
+
+ root.innerHTML = items.map((n,i)=>{
+  const rid = active+"_"+String(n.url||n.title||i);
+  const read = readIds.has(rid);
+  const assets = Array.isArray(n.asset) ? n.asset : [];
+  const rank = n._rank || importance(n);
+  const priority = rank.level==="高" ? "high" : rank.level==="中" ? "medium" : "low";
+
+  let research = "";
+
+  if (n.analysis) {
+   research = `
+    <section class="ai mb-3">
+     <div class="font-bold text-cyan-300 mb-2">
+      🧭 AI 分层研究分析
+      <span class="pill">${esc(n.confidence||"置信度未标注")}</span>
+      <span class="evidence-badge">证据状态：待独立核实</span>
+     </div>
+     <p class="leading-relaxed mb-3">${esc(n.analysis)}</p>
+     <div class="research-grid">
+      <div class="research-box">
+       <h4>📌 核心逻辑</h4>
+       <p>${esc(n.coreLogic||"暂无，需核验原文。")}</p>
+      </div>
+      <div class="research-box">
+       <h4>📈 潜在市场影响</h4>
+       <p>${esc(n.marketImpact||n.impact||"暂无法判断。")}</p>
+      </div>
+      <div class="research-box">
+       <h4>🔗 传导机制</h4>
+       <p>${esc(n.transmission||"当前信息不足以判断传导路径。")}</p>
+      </div>
+      <div class="research-box">
+       <h4>⏳ 影响周期</h4>
+       <p>${esc(n.timeHorizon||"暂不确定，需结合后续数据。")}</p>
+      </div>
+      <div class="research-box">
+       <h4>🧾 证据线索（未独立核实）</h4>
+       ${list(n.evidence)}
+       <p class="muted text-xs mt-2">以上线索来自新闻摘要或模型整理，不等同于已核实事实。</p>
+      </div>
+      <div class="research-box">
+       <h4>⚖️ 情景分析（条件假设）</h4>
+       ${list(n.scenarios)}
+      </div>
+      <div class="research-box research-wide">
+       <h4>⚠️ 风险、反证与信息缺口</h4>
+       <p>${esc(n.risk||"尚未识别；需阅读原始报道并核验数据。")}</p>
+      </div>
+     </div>
+     <p class="muted text-xs mt-3">置信度是对当前材料充分程度的定性判断，不是统计概率或收益预测。</p>
+    </section>`;
+  } else {
+   const enabled = Boolean(window.newsData && window.newsData.aiEnabled);
+   research = `
+    <div class="rounded-lg bg-slate-900 p-3 muted text-sm mb-3">
+     ${enabled
+      ? "本条尚未生成分析，可能是调用额度已用完或服务暂时繁忙；下次更新会再尝试。"
+      : "尚未检测到 Gemini API 密钥状态，请检查 GitHub Secrets 和更新日志。"}
+    </div>`;
   }
 
-  const updated=str(data.updatedAt).trim();
-  $("updateTime").textContent=updated?"更新于 "+updated:"尚无更新时间";
-}
+  return `
+   <article class="card ${read?"read":""} priority-${priority}" style="font-size:${fontSize}px">
+    <div class="flex flex-wrap justify-between gap-2 items-center mb-3">
+     <div class="flex flex-wrap gap-2 items-center">
+      <span class="score-badge">重要性 ${rank.score}/100 · ${esc(rank.level)}</span>
+      <span class="evidence-badge">来源待独立核实</span>
+      <span class="pill">${esc(n.id||("NO."+(items.length-i)))}</span>
+      <span class="pill">${esc(n.source||"新闻来源")}</span>
+      <span class="pill">${esc(n.publishedAt||"")}</span>
+      ${n.aiStatus==="Gemini AI" ? '<span class="pill">已完成 AI 分析</span>' : ""}
+     </div>
+     <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">
+      ${read?"✓ 已读":"标记已读"}
+     </button>
+    </div>
+    <h3 class="news-title font-bold mb-2">${esc(n.title||"无标题")}</h3>
+    ${n.originalTitle&&n.originalTitle!==n.title
+      ? `<details class="mb-3 text-xs muted"><summary class="cursor-pointer">查看原文标题</summary><p class="mt-2">${esc(n.originalTitle)}</p></details>`
+      : ""}
+    <p class="text-slate-300 leading-relaxed mb-3">${esc(n.summary||"暂无摘要")}</p>
+    <div class="flex flex-wrap gap-2 mb-3">
+     <span class="pill">潜在影响：${esc(n.impact||"待分析")}</span>
+     ${assets.map(a=>`<span class="pill">${esc(a)}</span>`).join("")}
+    </div>
+    ${research}
+    <div class="text-sm">${articleLink(n,"阅读原始报道 ↗")}</div>
+   </article>`;
+ }).join("");
 
-document.querySelectorAll(".tab").forEach(button=>{
+ root.querySelectorAll("[data-read-id]").forEach(button=>{
   button.addEventListener("click",()=>{
-    active=button.dataset.channel;
-    try{localStorage.setItem(ACTIVE_KEY,active);}catch(e){}
-    render();
-    window.scrollTo({top:0,behavior:"smooth"});
+   readIds.add(button.getAttribute("data-read-id"));
+   try {
+    localStorage.setItem(readKey,JSON.stringify([...readIds]));
+   } catch(e) {}
+   render();
   });
+ });
+}
+
+function setTab(name) {
+ const keys = ["global","asia","china","earnings"];
+ if (!keys.includes(name)) return;
+
+ active = name;
+
+ document.querySelectorAll("[data-tab]").forEach(button=>{
+  button.classList.toggle("active",button.dataset.tab===name);
+ });
+
+ render();
+}
+
+document.querySelectorAll("[data-tab]").forEach(button=>{
+ button.addEventListener("click",()=>setTab(button.dataset.tab));
 });
 
-["searchInput","importanceFilter","readFilter"].forEach(id=>{
-  $(id).addEventListener(id==="searchInput"?"input":"change",renderNews);
+document.getElementById("searchInput").addEventListener("input",render);
+
+document.getElementById("fontUp").addEventListener("click",()=>{
+ fontSize = Math.min(22,fontSize+1);
+ render();
 });
 
-$("clearFilters").addEventListener("click",()=>{
-  $("searchInput").value="";
-  $("importanceFilter").value="all";
-  $("readFilter").value="all";
-  renderNews();
+document.getElementById("fontDown").addEventListener("click",()=>{
+ fontSize = Math.max(12,fontSize-1);
+ render();
 });
 
-loadRead();
+document.getElementById("clearRead").addEventListener("click",()=>{
+ readIds.clear();
+ try { localStorage.removeItem(readKey); } catch(e) {}
+ render();
+});
 
-try{
-  const saved=localStorage.getItem(ACTIVE_KEY);
-  if(saved&&CHANNELS[saved])active=saved;
-}catch(e){}
+/* 保留手机端左右滑动切换栏目 */
+(()=>{
+ let sx=0,sy=0,started=0,tracking=false;
+ const MIN_X=70,DOMINANCE=2,MAX_MS=900;
+
+ document.addEventListener("touchstart",e=>{
+  if(e.touches.length!==1){tracking=false;return;}
+
+  const target=e.target;
+  if(target.closest("input,textarea,select,button,a,summary,[data-no-swipe]")){
+   tracking=false;
+   return;
+  }
+
+  sx=e.touches[0].clientX;
+  sy=e.touches[0].clientY;
+  started=Date.now();
+  tracking=true;
+ },{passive:true});
+
+ document.addEventListener("touchend",e=>{
+  if(!tracking||!e.changedTouches.length){tracking=false;return;}
+  tracking=false;
+
+  const dx=e.changedTouches[0].clientX-sx;
+  const dy=e.changedTouches[0].clientY-sy;
+  const ax=Math.abs(dx),ay=Math.abs(dy);
+
+  if(Date.now()-started>MAX_MS||ax<MIN_X||ax<=ay*DOMINANCE)return;
+
+  const tabs=["global","asia","china","earnings"];
+  const i=tabs.indexOf(active);
+
+  if(dx<0&&i<tabs.length-1)setTab(tabs[i+1]);
+  else if(dx>0&&i>0)setTab(tabs[i-1]);
+ },{passive:true});
+})();
+
+const data = window.newsData || {};
+
+if(data.updatedAt) {
+ document.getElementById("updateTime").textContent = data.updatedAt;
+}
+
+const stats = data.aiStats;
+document.getElementById("aiStatus").textContent = data.aiEnabled
+ ? `🟢 Gemini 已配置 · ${data.aiModel||"模型未标注"}${
+    stats ? ` · 本次成功 ${stats.successes||0}/${stats.attempts||0}` : ""
+   }`
+ : "🟠 未检测到 Gemini API 密钥状态";
 
 render();
-})();
 </script>
 </body>
 </html>
