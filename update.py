@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, quote
+from urllib.parse import urlencode, quote, urlparse, urlunparse, parse_qsl
 import xml.etree.ElementTree as ET
 
 BASE=Path(__file__).resolve().parent
@@ -15,12 +15,14 @@ MAX_AI_CALLS=3; RETRIES=1
 LIMITS={"global":20,"asia":10,"china":10,"earnings":10}
 # 国际、亚太、国内财经新闻只保留24小时内；财报新闻保留72小时内。
 MAX_NEWS_AGE_HOURS={"global":24,"asia":24,"china":24,"earnings":72}
-def rss(q):
- return "https://news.google.com/rss/search?"+urlencode({"q":q,"hl":"zh-CN","gl":"US","ceid":"US:zh-Hans"})
+def rss(q, region="US", language="zh-Hans"):
+ # 中国新闻使用中国区 Google News，避免美国区中文搜索漏掉国内报道。
+ ceid = f"{region}:{language}"
+ return "https://news.google.com/rss/search?"+urlencode({"q":q,"hl":"zh-CN","gl":region,"ceid":ceid})
 FEEDS={
 "global":[("CNBC World","https://www.cnbc.com/id/100727362/device/rss/rss.html"),("CNBC Finance","https://www.cnbc.com/id/10000664/device/rss/rss.html"),("BBC World","https://feeds.bbci.co.uk/news/world/rss.xml"),("Google News 国际财经",rss("global finance economy markets stocks"))],
 "asia":[("中央社财经","https://feeds.feedburner.com/rsscna/finance"),("Nikkei Asia","https://asia.nikkei.com/rss/feed/nar"),("The Japan Times","https://www.japantimes.co.jp/feed/"),("Google News 亚太财经",rss("Asia Pacific finance economy markets China Japan Korea Taiwan Singapore"))],
-"china":[("Google News 中国财经",rss("中国财经 OR 中国经济 OR A股 OR 人民币 OR 中国央行 OR 港股")),("Google News 中国股市",rss("A股 OR 沪深股市 OR 中国上市公司 OR 中国金融市场"))],
+"china":[("Google News 中国财经",rss("中国财经 OR 中国经济 OR A股 OR 人民币 OR 中国央行 OR 港股", "CN")),("Google News 中国股市",rss("A股 OR 沪深股市 OR 中国上市公司 OR 中国金融市场", "CN"))],
 "earnings":[("CNBC Finance","https://www.cnbc.com/id/10000664/device/rss/rss.html"),("CNBC Earnings","https://www.cnbc.com/id/15839135/device/rss/rss.html"),("MarketWatch","https://feeds.marketwatch.com/marketwatch/marketpulse/"),("Google News 企业财报",rss("company earnings revenue profit quarterly results forecast"))]}
 def clean(x):
  x=html.unescape(str(x or "")); x=re.sub(r"<[^>]+>"," ",x); return re.sub(r"\s+"," ",x).strip()
@@ -243,25 +245,53 @@ def classify(items,ch):
  "china":r"中国|人民币|A股|沪深|港股|央行|中国经济|China|Chinese|yuan|Shanghai|Shenzhen|PBOC|CSI 300",
  "earnings":r"earnings|revenue|profit|quarter|forecast|guidance|results|财报|业绩|营收|利润|季度|盈利"}
  return [x for x in items if ch not in patterns or re.search(patterns[ch],x["title"]+" "+x.get("summary",""),re.I)]
+def canonical_url(url):
+ """移除常见跟踪参数，统一同一新闻的链接形式。"""
+ try:
+  u=urlparse((url or "").strip())
+  if not u.scheme or not u.netloc:return ""
+  host=u.netloc.lower().removeprefix("www.")
+  path=re.sub(r"/+", "/", u.path or "/").rstrip("/")
+  ignored={"utm_source","utm_medium","utm_campaign","utm_term","utm_content","fbclid","gclid","ocid","cmpid","guccounter"}
+  query=sorted((k,v) for k,v in parse_qsl(u.query,keep_blank_values=True) if k.lower() not in ignored)
+  return urlunparse((u.scheme.lower(),host,path,"",urlencode(query),""))
+ except Exception:return (url or "").strip().lower()
+def normalized_title(title):
+ t=html.unescape(clean(title)).lower()
+ t=re.sub(r"\s*[-|｜–—:]\s*[^-|｜–—:]{1,50}$", "", t)
+ return re.sub(r"[\W_]+", "", t, flags=re.UNICODE)
+def same_story(title_key, seen_titles):
+ # 精确重复 + 轻度改写的标题重复；中文短标题避免过度误判。
+ from difflib import SequenceMatcher
+ if not title_key:return False
+ for old in seen_titles:
+  if title_key==old:return True
+  if min(len(title_key),len(old))>=18 and SequenceMatcher(None,title_key,old).ratio()>=0.91:return True
+ return False
 def build(ch,cache,budget):
- gathered=[];seen=set();titles=set()
+ gathered=[];seen_links=set();seen_titles=[]
  for src,url in FEEDS[ch]:
   for x in parse_feed(src,url):
-   t=clean(x["title"]).lower();link=x["url"].strip()
-   if not link or not t or link in seen or t in titles:continue
-   seen.add(link);titles.add(t);x["_date"]=date(x.get("published"));gathered.append(x)
- now=datetime.now(timezone.utc);gathered=classify(gathered,ch)
+   orig=clean(x.get("title",""));link=canonical_url(x.get("url",""));tkey=normalized_title(orig)
+   if not link or not tkey or link in seen_links or same_story(tkey,seen_titles):continue
+   seen_links.add(link);seen_titles.append(tkey);x["_date"]=date(x.get("published"));gathered.append(x)
+ now=datetime.now(timezone.utc)
+ # 国内新闻源已限定为中国区及中国财经关键词，不再用宽泛英文关键词二次筛掉中文新闻。
+ if ch != "china":gathered=classify(gathered,ch)
  cutoff=now-timedelta(hours=MAX_NEWS_AGE_HOURS[ch])
  # 严格时效过滤：缺少可靠发布时间、超过时限或发布时间在未来的新闻均不展示。
  gathered=[x for x in gathered if x.get("_date") is not None and cutoff<=x["_date"]<=now]
  gathered.sort(key=lambda x:x["_date"],reverse=True)
- out=[]
+ out=[];shown_titles=[];shown_links=set()
  for x in gathered:
   if len(out)>=LIMITS[ch]:break
   orig=x["title"];summ=x.get("summary","")
-  # 保持标题中文显示；不改动标题内容，只将英文标题翻译成简体中文。
-  title=translate(orig)
-  summary=translate(summ)
+  # 标题保持中文显示；仅翻译英文标题，不改写已有中文标题。
+  title=translate(orig) if not chinese(orig) else orig
+  final_key=normalized_title(title);final_link=canonical_url(x.get("url",""))
+  if not final_key or final_link in shown_links or same_story(final_key,shown_titles):continue
+  shown_links.add(final_link);shown_titles.append(final_key)
+  summary=translate(summ) if summ and not chinese(summ) else summ
   n={"title":title or orig,"originalTitle":orig,"summary":(summary or summ)[:900],"source":x["source"],"url":x["url"],
   "publishedAt":x["_date"].astimezone(TZ).strftime("%Y-%m-%d %H:%M"),"timestamp":int(x["_date"].timestamp()),"impact":"待分析","asset":[],"analysis":"","risk":"",
   "coreLogic":"","marketImpact":"","transmission":"","timeHorizon":"","scenarios":[],"evidence":[],"confidence":"","aiStatus":"未分析","channel":ch}
