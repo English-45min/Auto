@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0f19">
 <meta name="google" content="notranslate">
-<title>财经与时政焦点看板</title>
+<title>财经时政新闻助手</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 :root{color-scheme:dark}
@@ -25,7 +25,6 @@ a:hover{text-decoration:underline}
 input{outline:none}
 input:focus{border-color:#f59e0b}
 
-/* 标题自适应：手机端最多显示 2 行，宽屏单行 */
 .adaptive-title {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -52,8 +51,6 @@ input:focus{border-color:#f59e0b}
 .priority-medium{border-color:#b45309!important;box-shadow:inset 4px 0 #f59e0b}
 .priority-low{border-color:#334155!important}
 .score-badge{display:inline-block;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:900;background:#3f1d0d;color:#fdba74}
-.evidence-badge{display:inline-block;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:800;background:#1e293b;color:#cbd5e1}
-.featured-meta{font-size:.82rem;color:#cbd5e1;line-height:1.6}
 .research-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .research-box{background:#0b1220;border:1px solid #263244;border-radius:9px;padding:10px;min-width:0}
 .research-box h4{font-size:.85em;font-weight:800;color:#7dd3fc;margin:0 0 6px}
@@ -73,11 +70,11 @@ input:focus{border-color:#f59e0b}
 <header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
  <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
   <div>
-   <h1 class="text-xl sm:text-2xl font-black">📈 TERMINAL // 财经与时政焦点</h1>
-   <p class="muted text-sm mt-1">全球公信力媒体 · 深度分析 · 纯净直达</p>
+   <h1 class="text-xl sm:text-2xl font-black">📈 TERMINAL // 财经时政新闻助手</h1>
+   <p class="muted text-sm mt-1">全球公信力媒体 · 宏观深度分析 · 纯净直达</p>
   </div>
   <div class="text-xs muted">
-   最近更新：<span id="updateTime">2026-10-24 16:56:22</span>
+   最近更新：<span id="updateTime">实时同步中</span>
    <div id="aiStatus" class="mt-1">AI 状态读取中</div>
   </div>
  </div>
@@ -98,8 +95,8 @@ input:focus{border-color:#f59e0b}
   <button class="tab" data-tab="earnings" type="button">📊 核心财报 Top 10</button>
  </nav>
 
- <!-- TOP 3 重点新闻独立展示区 -->
- <section id="featuredWrap" class="featured-wrap">
+ <!-- TOP 3 重点新闻置顶区（只有当新闻总数大于 3 条时才显示） -->
+ <section id="featuredWrap" class="featured-wrap" style="display:none;">
   <div class="flex flex-wrap items-center justify-between gap-2">
    <h2 class="featured-title">🔥 当日重点新闻 · TOP 3</h2>
    <span class="pill">精选高权重事件</span>
@@ -113,7 +110,7 @@ input:focus{border-color:#f59e0b}
  </div>
 
  <p class="muted text-xs mb-4">
-  提示：下方展示常规新闻流（已自动剔除上方已置顶的 TOP 3，避免重复）；手机端可左右滑动切换栏目。
+  提示：手机端可左右滑动切换栏目。
  </p>
 
  <div id="newsList" class="space-y-4" aria-live="polite">
@@ -122,18 +119,20 @@ input:focus{border-color:#f59e0b}
 
  <footer class="muted text-xs mt-8 leading-relaxed">
   免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。
-  <p class="mt-1">© 2026 财经焦点看板</p>
+  <p class="mt-1">© 2026 财经时政新闻助手</p>
  </footer>
 </main>
 
 <!-- NEWS_DATA_START -->
-<script>window.newsData = {"global": [{"title": "中国央行研究将隔夜利率作为主要政策利率 - 路透中文网", "originalTitle": "China's central bank studies making overnight rate its main policy rate - Reuters", "summary": "中国央行研究将隔夜利率作为主要政策利率 路透", "source": "Reuters", "url": "https://news.google.com/rss/articles/CBMiwwFBVV95cUxQQkZxcExIWnlGa1B2TFhUcjFWNDlzOWxQUUJnZkp3NlpJX3lwZXBvN05BN0xoRzhucmFJTWZwTUpDWUVPTzhpTWNnSGxYMDNCRjdYT0RacU1DWFEyclZHS3I2SDFUdWRkRE0wS0M2N1ZuZ3B6YjBENGlDU2R1R1FrMTdTWnJ1Z2pCUnVnM0FHWVh5X0dpRWxhbjJYS2J4X29CaEtLQWJaNFVWbEdRUG1fMEFRWlp4YmFOM0NDRkRlM0NjaE0?oc=5", "publishedAt": "2026-10-19 21:28", "timestamp": 1792416539, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.01"}], "asia": [{"title": "池田泉州和滋贺县将在最新的日本合并中合并", "originalTitle": "Senshu Ikeda and Shiga to merge in latest Japan consolidation", "summary": "池田泉州和滋贺银行正在就合并业务进行谈判，预计最快将于下周发布公告。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/business/2026/10/24/shiga-bank-senshu-ikeda-merger-talks/", "publishedAt": "2026-10-24 16:21", "timestamp": 1792830060, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.01"}], "china": [{"title": "中国央行研究将隔夜利率作为主要政策利率 - 路透中文网", "originalTitle": "China's central bank studies making overnight rate its main policy rate - Reuters", "summary": "中国央行研究将隔夜利率作为主要政策利率 路透", "source": "Reuters (China)", "url": "https://news.google.com/rss/articles/CBMiwwFBVV95cUxQQkZxcExIWnlGa1B2TFhUcjFWNDlzOWxQUUJnZkp3NlpJX3lwZXBvN05BN0xoRzhucmFJTWZwTUpDWUVPTzhpTWNnSGxYMDNCRjdYT0RacU1DWFEyclZHS3I2SDFUdWRkRE0wS0M2N1ZuZ3B6YjBENGlDU2R1R1FrMTdTWnJ1Z2pCUnVnM0FHWVh5X0dpRWxhbjJYS2J4X29CaEtLQWJaNFVWbEdRUG1fMEFRWlp4YmFOM0NDRkRlM0NjaE0?oc=5", "publishedAt": "2026-10-19 21:28", "timestamp": 1792416539, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.01"}], "earnings": [{"title": "康卡斯特盈利超出预期，媒体收入抵消了连接方面的疲软", "originalTitle": "Comcast beats earnings expectations as media revenue offsets weakness in connectivity", "summary": "康卡斯特正在将其媒体业务分拆为一家独立的上市公司。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/22/comcast-cmcsa-earnings-q3-2026.html", "publishedAt": "2026-10-23 04:04", "timestamp": 1792699491, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.01"}], "updatedAt": "2026-10-24 16:56:22", "aiEnabled": true, "aiModel": "gemini-3.8-flash", "aiStats": {"attempts": 4, "successes": 0, "failures": 4, "maxPerRun": 16}};</script>
+<script>
+  window.newsData = window.newsData || { "global": [], "asia": [], "china": [], "earnings": [] };
+</script>
 <!-- NEWS_DATA_END -->
 
 <script>
 "use strict";
 const labels = { global: "国际财经新闻", asia: "亚太财经新闻", china: "国内财经新闻", earnings: "核心财报新闻" };
-const activeKey = "financeDashboardActiveTab_v4";
+const activeKey = "financeDashboardActiveTab_v5";
 const validTabs = ["global", "asia", "china", "earnings"];
 let active = "global";
 
@@ -142,15 +141,7 @@ try {
  if (validTabs.includes(savedTab)) active = savedTab;
 } catch(e) {}
 
-const TOPIC_RULES = [
- {re:/war|invasion|missile|military escalation|ceasefire|armed conflict|战争|入侵|导弹|军事冲突|停火|武装冲突|台海危机/i, points:30},
- {re:/sanction|tariff|trade war|export controls|embargo|制裁|关税|贸易战|出口管制|禁运/i, points:24},
- {re:/emergency|financial crisis|bank failure|capital controls|紧急措施|金融危机|银行倒闭|资本管制/i, points:26},
- {re:/central bank|interest rate|rate cut|rate hike|Federal Reserve|央行|利率|降息|加息|美联储/i, points:20},
- {re:/GDP|inflation|CPI|unemployment|recession|通胀|消费者物价|失业|经济衰退/i, points:12}
-];
-
-const readKey = "financeDashboardRead_v4";
+const readKey = "financeDashboardRead_v5";
 let readIds = new Set();
 try { readIds = new Set(JSON.parse(localStorage.getItem(readKey) || "[]")); } catch(e) {}
 
@@ -166,29 +157,8 @@ function safeUrl(v) {
 
 function articleLink(n) {
  const href = String(n.url || "");
- if (!href || href === "#") {
-  return '<span class="muted text-xs">暂无可用原文链接</span>';
- }
+ if (!href || href === "#") return '<span class="muted text-xs">暂无可用原文链接</span>';
  return '<a href="' + esc(safeUrl(href)) + '" target="_blank" rel="noopener noreferrer">查看原始报道 ↗</a>';
-}
-
-function importance(n) {
- const text = [n.title, n.originalTitle, n.summary].join(" ");
- let score = 10;
- for (const r of TOPIC_RULES) {
-  if (r.re.test(text)) score += r.points;
- }
- const age = Number(n.timestamp || 0) ? Math.max(0, (Date.now() / 1000 - Number(n.timestamp)) / 3600) : 48;
- if (age < 6) score += 15;
- else if (age < 24) score += 10;
- else if (age < 48) score += 5;
- return Math.min(100, score);
-}
-
-function ranked(items) {
- if (!Array.isArray(items)) return [];
- return items.map((n, i) => ({ ...n, _score: importance(n), _originalIndex: i }))
-  .sort((a, b) => b._score - a._score || Number(b.timestamp || 0) - Number(a.timestamp || 0));
 }
 
 function list(items) {
@@ -200,112 +170,118 @@ function list(items) {
 
 function getRankedData() {
  const all = (typeof window.newsData !== "undefined" && window.newsData && Array.isArray(window.newsData[active])) ? window.newsData[active] : [];
- return ranked(all);
+ return all;
 }
 
-function renderFeatured() {
- const allRanked = getRankedData();
- const top3 = allRanked.slice(0, 3);
- const root = document.getElementById("featuredList");
- if (!root) return;
+function renderAIResearch(n) {
+ if (!n.analysis) return '';
+ return `
+  <section class="ai mt-3 mb-3">
+   <div class="font-bold text-cyan-300 mb-2">🧭 AI 深度宏观与时政分析 <span class="pill">${esc(n.confidence || "置信度未标注")}</span></div>
+   <p class="leading-relaxed mb-3">${esc(n.analysis)}</p>
+   <div class="research-grid">
+    <div class="research-box"><h4>📌 核心逻辑</h4><p>${esc(n.coreLogic || "暂无。")}</p></div>
+    <div class="research-box"><h4>📈 潜在市场影响</h4><p>${esc(n.marketImpact || n.impact || "暂无法判断。")}</p></div>
+    <div class="research-box"><h4>🔗 传导机制</h4><p>${esc(n.transmission || "当前信息不足。")}</p></div>
+    <div class="research-box"><h4>⏳ 影响周期</h4><p>${esc(n.timeHorizon || "暂不确定。")}</p></div>
+    <div class="research-box"><h4>🧾 证据线索</h4>${list(n.evidence)}</div>
+    <div class="research-box"><h4>⚖️ 情景分析</h4>${list(n.scenarios)}</div>
+    <div class="research-box research-wide"><h4>⚠️ 风险与缺口</h4><p>${esc(n.risk || "尚未识别。")}</p></div>
+   </div>
+  </section>`;
+}
 
- if (!top3.length) {
-  root.innerHTML = '<p class="muted text-sm mt-3">本栏目暂时没有可展示的重点新闻。</p>';
-  return;
- }
+function renderCard(n, i, listLen, isFeatured = false) {
+ const rid = active + "_" + String(n.url || n.title || i);
+ const read = readIds.has(rid);
+ const assets = Array.isArray(n.asset) ? n.asset : [];
+ const score = n._importance || 50;
+ const level = score >= 65 ? "高" : score >= 45 ? "中" : "常规";
 
- root.innerHTML = top3.map((n, i) => {
-  const level = n._score >= 65 ? "高" : n._score >= 45 ? "中" : "常规";
+ if (isFeatured) {
   return `
    <article class="featured-card priority-${level === "高" ? "high" : level === "中" ? "medium" : "low"}">
     <div class="flex flex-wrap gap-2 items-center mb-2">
-     <span class="score-badge">TOP ${i + 1} · ${n._score}/100</span>
+     <span class="score-badge">TOP ${i + 1} · ${score}/100</span>
      <span class="pill">重要性：${level}</span>
-     <span class="pill">${esc(n.source || "权威媒体")}</span>
+     <span class="pill">${esc(n.source || "国际权威媒体")}</span>
     </div>
     <h3 class="adaptive-title font-bold text-slate-100 mb-2">${esc(n.title || "无标题")}</h3>
     <p class="featured-meta mt-2">${esc(n.summary || "暂无摘要")}</p>
+    
+    <div class="flex flex-wrap gap-2 mt-3 mb-2">
+     <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
+     ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
+    </div>
+
+    ${renderAIResearch(n)}
     <div class="mt-3 text-sm">${articleLink(n)}</div>
    </article>`;
- }).join("");
+ }
+
+ return `
+  <article class="card ${read ? "read" : ""} priority-${level === "高" ? "high" : level === "中" ? "medium" : "low"}">
+   <div class="flex flex-wrap justify-between gap-2 items-center mb-3">
+    <div class="flex flex-wrap gap-2 items-center">
+     <span class="score-badge">重要性 ${score}/100 · ${level}</span>
+     <span class="pill">${esc(n.id || ("NO." + (listLen - i)))}</span>
+     <span class="pill">${esc(n.source || "国际权威媒体")}</span>
+     <span class="pill">${esc(n.publishedAt || "")}</span>
+    </div>
+    <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">${read ? "✓ 已读" : "标记已读"}</button>
+   </div>
+   
+   <h3 class="adaptive-title font-bold text-slate-100 mb-2" title="${esc(n.title || "")}">${esc(n.title || "无标题")}</h3>
+
+   <p class="text-slate-300 leading-relaxed mb-3">${esc(n.summary || "暂无摘要")}</p>
+   
+   <div class="flex flex-wrap gap-2 mb-3">
+    <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
+    ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
+   </div>
+
+   ${renderAIResearch(n)}
+   <div class="text-sm">${articleLink(n)}</div>
+  </article>`;
 }
 
 function render() {
  const container = document.getElementById("newsList");
+ const featuredWrap = document.getElementById("featuredWrap");
+ const featuredList = document.getElementById("featuredList");
  if (!container) return;
 
- const allRanked = getRankedData();
- // 核心优化：常规列表自动截取索引从 3 开始的非 TOP 3 新闻，彻底杜绝重复！
- const nonTop3 = allRanked.slice(3);
-
+ const all = getRankedData();
  const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
- const items = nonTop3.filter(n => [
+ const filtered = all.filter(n => [
   n.title, n.summary, n.source, (n.asset || []).join(" "),
   n.analysis, n.coreLogic, n.marketImpact, n.transmission, n.risk, n.originalTitle
  ].join(" ").toLowerCase().includes(q));
 
  document.getElementById("sectionTitle").textContent = labels[active] || "财经新闻";
- document.getElementById("count").textContent = `显示常规资讯 ${items.length} 条 (已排除上方 TOP 3)`;
 
- renderFeatured();
+ // 智能判断：如果新闻总数大于 3 条，则顶部展示 TOP 3，下方展示剩余常规新闻；否则顶部隐藏，全部在下方展示！
+ const useFeatured = filtered.length > 3 && !q;
+ 
+ if (featuredWrap) {
+  if (useFeatured) {
+   featuredWrap.style.display = "block";
+   const top3 = filtered.slice(0, 3);
+   if (featuredList) featuredList.innerHTML = top3.map((n, i) => renderCard(n, i, top3.length, true)).join("");
+  } else {
+   featuredWrap.style.display = "none";
+  }
+ }
 
- if (!items.length) {
-  container.innerHTML = `<div class="card muted">${nonTop3.length ? "没有找到符合搜索条件的新闻。" : "当前栏目常规资讯较少或均已在上方 TOP 3 展示。"}</div>`;
+ const regularItems = useFeatured ? filtered.slice(3) : filtered;
+ document.getElementById("count").textContent = `显示资讯 ${regularItems.length} 条`;
+
+ if (!regularItems.length) {
+  container.innerHTML = `<div class="card muted">当前栏目暂无更多资讯。</div>`;
   return;
  }
 
- container.innerHTML = items.map((n, i) => {
-  const rid = active + "_" + String(n.url || n.title || i);
-  const read = readIds.has(rid);
-  const assets = Array.isArray(n.asset) ? n.asset : [];
-  const level = n._score >= 65 ? "高" : n._score >= 45 ? "中" : "常规";
-
-  const research = n.analysis ? `
-   <section class="ai mb-3">
-    <div class="font-bold text-cyan-300 mb-2">🧭 AI 分层研究分析 <span class="pill">${esc(n.confidence || "置信度未标注")}</span></div>
-    <p class="leading-relaxed mb-3">${esc(n.analysis)}</p>
-    <div class="research-grid">
-     <div class="research-box"><h4>📌 核心逻辑</h4><p>${esc(n.coreLogic || "暂无。")}</p></div>
-     <div class="research-box"><h4>📈 潜在市场影响</h4><p>${esc(n.marketImpact || n.impact || "暂无法判断。")}</p></div>
-     <div class="research-box"><h4>🔗 传导机制</h4><p>${esc(n.transmission || "当前信息不足。")}</p></div>
-     <div class="research-box"><h4>⏳ 影响周期</h4><p>${esc(n.timeHorizon || "暂不确定。")}</p></div>
-     <div class="research-box"><h4>🧾 证据线索</h4>${list(n.evidence)}</div>
-     <div class="research-box"><h4>⚖️ 情景分析</h4>${list(n.scenarios)}</div>
-     <div class="research-box research-wide"><h4>⚠️ 风险与缺口</h4><p>${esc(n.risk || "尚未识别。")}</p></div>
-    </div>
-   </section>` : '';
-
-  return `
-   <article class="card ${read ? "read" : ""} priority-${level === "高" ? "high" : level === "中" ? "medium" : "low"}">
-    <div class="flex flex-wrap justify-between gap-2 items-center mb-3">
-     <div class="flex flex-wrap gap-2 items-center">
-      <span class="score-badge">重要性 ${n._score}/100 · ${level}</span>
-      <span class="pill">${esc(n.id || ("NO." + (items.length - i)))}</span>
-      <span class="pill">${esc(n.source || "权威媒体")}</span>
-      <span class="pill">${esc(n.publishedAt || "")}</span>
-     </div>
-     <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">${read ? "✓ 已读" : "标记已读"}</button>
-    </div>
-    
-    <h3 class="adaptive-title font-bold text-slate-100 mb-2 ${read ? "read-title" : ""}" title="${esc(n.title || "")}">${esc(n.title || "无标题")}</h3>
-
-    ${n.originalTitle && n.originalTitle !== n.title ? `
-     <details class="mb-3 text-xs muted">
-      <summary class="cursor-pointer">查看原文标题</summary>
-      <p class="mt-2">${esc(n.originalTitle)}</p>
-     </details>` : ""}
-
-    <p class="text-slate-300 leading-relaxed mb-3">${esc(n.summary || "暂无摘要")}</p>
-    
-    <div class="flex flex-wrap gap-2 mb-3">
-     <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
-     ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
-    </div>
-
-    ${research}
-    <div class="text-sm">${articleLink(n)}</div>
-   </article>`;
- }).join("");
+ container.innerHTML = regularItems.map((n, i) => renderCard(n, i, regularItems.length, false)).join("");
 
  container.querySelectorAll("[data-read-id]").forEach(button => {
   button.addEventListener("click", () => {
@@ -334,40 +310,27 @@ document.querySelectorAll("[data-tab]").forEach(button => {
 const searchInput = document.getElementById("searchInput");
 if (searchInput) searchInput.addEventListener("input", render);
 
-/* 手机左右滑动切换栏目手势监听 */
+/* 手机左右滑动切换栏目 */
 (() => {
  let sx = 0, sy = 0, started = 0, tracking = false;
  const MIN_X = 70, DOMINANCE = 2, MAX_MS = 900;
-
  document.addEventListener("touchstart", e => {
   if (e.touches.length !== 1) { tracking = false; return; }
-  const target = e.target;
-  if (target.closest("input, textarea, select, button, a, summary, [data-no-swipe]")) {
-   tracking = false;
-   return;
-  }
-  sx = e.touches[0].clientX;
-  sy = e.touches[0].clientY;
-  started = Date.now();
-  tracking = true;
+  if (e.target.closest("input, textarea, select, button, a, summary")) { tracking = false; return; }
+  sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  started = Date.now(); tracking = true;
  }, { passive: true });
 
  document.addEventListener("touchend", e => {
   if (!tracking || !e.changedTouches.length) { tracking = false; return; }
   tracking = false;
-
   const dx = e.changedTouches[0].clientX - sx;
   const dy = e.changedTouches[0].clientY - sy;
   const ax = Math.abs(dx), ay = Math.abs(dy);
-
   if (Date.now() - started > MAX_MS || ax < MIN_X || ax <= ay * DOMINANCE) return;
-
   const i = validTabs.indexOf(active);
-  if (dx < 0 && i < validTabs.length - 1) {
-   setTab(validTabs[i + 1]);
-  } else if (dx > 0 && i > 0) {
-   setTab(validTabs[i - 1]);
-  }
+  if (dx < 0 && i < validTabs.length - 1) setTab(validTabs[i + 1]);
+  else if (dx > 0 && i > 0) setTab(validTabs[i - 1]);
  }, { passive: true });
 })();
 
@@ -380,7 +343,7 @@ const st = window.newsData?.aiStats;
 const aiStatusEl = document.getElementById("aiStatus");
 if (aiStatusEl) {
  aiStatusEl.textContent = window.newsData?.aiEnabled
-  ? `🟢 Gemini 已配置 · ${window.newsData.aiModel || "模型"}${st ? ` · 成功 ${st.successes}/${st.attempts}` : ""}`
+  ? `🟢 Gemini 已配置 · ${window.newsData.aiModel || "gemini-1.5-flash"}${st ? ` · 成功 ${st.successes}/${st.attempts}` : ""}`
   : "🟠 未检测到 Gemini API 密钥";
 }
 
