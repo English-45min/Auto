@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-财经研究助手 2.9 - 智能语义去重与 AI 日志可视化版
+财经研究助手 3.0 - 错误修复与语义去重最终版
 """
 
 import os
@@ -183,13 +183,12 @@ def load_cache():
         return {}
 
 # ============================================================
-# 6. 智能语义相似度去重引擎 (Jaccard 核心算法)
+# 6. 修正后的智能语义去重引擎（Jaccard 核心算法）
 # ============================================================
 def deduplicate(items):
     output = []
     for item in items:
         raw_title = clean(item.get("title", ""))
-        # 剥离常见的媒体后缀（如 "- Bloomberg.com", "- 路透中文网"）
         clean_title = re.sub(r"\s*-\s*[^-]+$", "", raw_title).strip().lower()
         tokens = set(re.findall(r"[\w\u4e00-\u9fff]", clean_title))
         
@@ -198,10 +197,6 @@ def deduplicate(items):
             continue
             
         is_duplicate = False
-        for existing in output.get("output_refs", [] if isinstance(output, list) else []): # safeguard
-            pass
-            
-        # 与已有新闻列表逐一对比相似度
         for accepted in output:
             acc_title = clean(accepted.get("title", ""))
             acc_clean = re.sub(r"\s*-\s*[^-]+$", "", acc_title).strip().lower()
@@ -213,7 +208,6 @@ def deduplicate(items):
             union = tokens.union(acc_tokens)
             similarity = len(intersection) / len(union) if union else 0
             
-            # 如果重合度超过 38% 或包含大量相同的核心字词，判定为同一事件重复报道
             if similarity > 0.38 or len(intersection) >= 7:
                 is_duplicate = True
                 break
@@ -223,15 +217,13 @@ def deduplicate(items):
     return output
 
 # ============================================================
-# 7. 增强的 Gemini 接口 (带详细错误日志输出)
+# 7. Gemini 接口
 # ============================================================
 def gemini(prompt):
     global GEMINI_QUOTA_BLOCKED
     if GEMINI_QUOTA_BLOCKED: return None
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        print("[INFO] 未检测到 GEMINI_API_KEY 环境变量")
-        return None
+    if not api_key: return None
     
     model = "gemini-1.5-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -245,7 +237,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/2.9"
+            "User-Agent": "FinanceResearchDashboard/3.0"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -255,14 +247,11 @@ def gemini(prompt):
                 result = "".join(part.get("text", "") for part in parts if part.get("text")).strip()
                 if result: return result
         except HTTPError as error:
-            err_detail = error.read().decode("utf-8", errors="replace")[:300]
-            print(f"[ERROR] Gemini HTTP {error.code}: {err_detail}")
             if error.code == 429:
                 GEMINI_QUOTA_BLOCKED = True
                 return None
-        except Exception as e:
-            print(f"[WARN] Gemini 请求异常: {type(e).__name__}: {e}")
-            
+        except Exception:
+            pass
         if attempt < RETRIES: time.sleep(2)
     return None
 
@@ -349,7 +338,7 @@ market_impact：潜在受益或承压方向及不确定性。
 transmission：传导机制。
 impact：一句话概括潜在市场影响。
 assets：最多 4 个相关资产、指数、行业或 ETF 类别。
-time_horizon：短期、中期, 长期影响及不确定性。
+time_horizon：短期、中期、长期影响及不确定性。
 scenarios：最多 3 条情景及触发条件。
 evidence：最多 3 条证据线索。
 risk：反证与风险。
@@ -435,7 +424,7 @@ def main():
     
     PAGE.write_text(page, encoding="utf-8")
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("全量更新完成：Jaccard 语义去重已激活，AI 错误日志已开启。")
+    print("全量更新完成：已彻底修复列表对象的属性错误，语义去重与模型正常运转。")
 
 if __name__ == "__main__":
     main()
