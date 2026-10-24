@@ -265,7 +265,7 @@ def deduplicate(items):
     
     for item in items:
         title_key = normalize_title(item.get("title", ""))
-        link_key = (item.get("url"） or "").strip().rstrip("/").lower()
+        link_key = (item.get("url") or "").strip().rstrip("/").lower()
         fingerprint = get_event_fingerprint(item.get("title", ""))
         
         if not title_key: continue
