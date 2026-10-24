@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-财经研究助手 2.4 - 纯净直达版
-新闻采集、时效过滤、重要性排序、中文翻译、链接直达和 Gemini 分析。
-已完全移除国内搜索引擎备用入口，坚持全球公信力媒体原文直达。
+财经研究助手 2.5 - 稳定高效 AI 增强版
+新闻采集、时效过滤、重要性排序、中文翻译、智能防限流延时与 Gemini 分析。
 """
 
 import os
@@ -26,7 +25,9 @@ BASE = Path(__file__).resolve().parent
 PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
 TZ = timezone(timedelta(hours=8))
-MAX_AI_CALLS = 3
+
+# 调整 AI 调用次数为 5 次，配合智能延时，既保证重点新闻有 AI 解读，又不会超额限流
+MAX_AI_CALLS = 5 
 RETRIES = 1
 AI_TIMEOUT = 18
 MAX_NEWS_AGE_DAYS = 5
@@ -131,7 +132,7 @@ def get(url, timeout=18, headers=None):
     return body
 
 # ============================================================
-# 5. 新闻链接处理（纯净直达，拒绝任何大陆搜索引擎）
+# 5. 新闻链接处理（纯净直达）
 # ============================================================
 def extract_article_url(url):
     if not url or not is_http_url(url):
@@ -173,7 +174,6 @@ def extract_article_url(url):
     return ""
 
 def prepare_article_links(item):
-    """确保所有链接直接指向新闻原文或 Google News 链接，绝对不走国内搜索。"""
     original_url = (item.get("url") or "").strip()
     if not is_http_url(original_url):
         item["url"] = ""
@@ -288,6 +288,7 @@ def gemini(prompt):
         return None
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
+        print("[INFO] 未检测到 GEMINI_API_KEY")
         return None
     model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
     url = "https://generativelanguage.googleapis.com/v1beta/models/" + quote(model, safe="-._") + ":generateContent"
@@ -300,7 +301,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/2.4",
+            "User-Agent": "FinanceResearchDashboard/2.5",
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -311,15 +312,17 @@ def gemini(prompt):
                 if result:
                     return result
         except HTTPError as error:
+            print(f"[ERROR] Gemini HTTP {error.code}")
             if error.code == 429:
                 GEMINI_QUOTA_BLOCKED = True
+                print("[INFO] 触发 429 限流，本次暂停后续 AI 请求。")
                 return None
             if error.code not in (408, 500, 502, 503, 504):
                 return None
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[WARN] Gemini 请求异常: {e}")
         if attempt < RETRIES:
-            time.sleep(2)
+            time.sleep(3)
     return None
 
 def parse_ai(raw):
@@ -445,6 +448,10 @@ confidence：信心等级。
 摘要：{item.get('summary', '')[:1200]}
 """
     budget["attempts"] += 1
+    
+    # 核心优化：每次调用前强制延时 5 秒，完美避开 API 的 429 频率限制
+    time.sleep(5)
+    
     ai = parse_ai(gemini(prompt))
     if ai and ai.get("analysis") and ai.get("coreLogic"):
         cache[cache_key] = ai
@@ -470,6 +477,7 @@ def build(channel, cache, budget):
         item["_importance"] = score
         item["_importanceReasons"] = reasons
     
+    # 按重要性从高到低排序，确保 AI 的额度优先留给最重要的前几条新闻
     gathered.sort(key=lambda x: (x.get("_importance", 0), x["_date"].timestamp()), reverse=True)
     
     output = []
