@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-财经与时政新闻助手 3.5 - 严守 24 小时新鲜资讯版
+财经与时政新闻助手 3.6 - 突破单条限制与智能时间兜底版
 """
 
 import os
@@ -25,7 +25,7 @@ TZ = timezone(timedelta(hours=8))
 MAX_AI_CALLS = 12 
 RETRIES = 1
 AI_TIMEOUT = 20
-MAX_NEWS_AGE_HOURS = 24  # 严格限制为 24 小时内的新鲜资讯
+MAX_NEWS_AGE_HOURS = 48  # 放宽至 48 小时，确保充足新闻源
 GEMINI_QUOTA_BLOCKED = False
 
 LIMITS = {
@@ -220,7 +220,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/3.5"
+            "User-Agent": "FinanceResearchDashboard/3.6"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -290,8 +290,8 @@ def importance_score(item):
     published = item.get("_date")
     if published:
         age_hours = max(0, (datetime.now(timezone.utc) - published).total_seconds() / 3600)
-        if age_hours < 6: score += 20
-        elif age_hours < 12: score += 12
+        if age_hours < 12: score += 20
+        elif age_hours < 24: score += 12
     return min(score, 100)
 
 def insight(item, cache, budget):
@@ -335,8 +335,11 @@ def build(channel, cache, budget):
     for src, url in FEEDS[channel]:
         for x in parse_feed(src, url):
             dt = parse_date(x.get("published"))
-            # 严格 24 小时时效过滤：如果没有时间或超出 24 小时，则剔除
-            if dt is None or not (cutoff <= dt <= now):
+            # 智能兜底：如果时间解析失败，默认赋予当前时间，防止被一刀切过滤
+            if dt is None:
+                dt = now
+            # 宽容的时间窗口过滤
+            if not (cutoff <= dt <= now + timedelta(hours=2)):
                 continue
             x["_date"] = dt
             gathered.append(x)
