@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-财经研究助手 3.1 - TOP 3 全面深度渲染版
+财经与时政新闻助手 3.2 - 纯国际大媒体与独立视角版
+严格排除所有国内国有媒体，全面采用路透、彭博、WSJ、FT等全球顶级公信力大媒体，
+实现 TOP 3 全面深度渲染、智能去重与纯净原文直达。
 """
 
 import os
@@ -25,7 +27,6 @@ PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
 TZ = timezone(timedelta(hours=8))
 
-# 核心修改：将单次最大 AI 调用额度提升至 16 次，确保每个栏目的 TOP 3 都能 100% 跑出深度 AI 分析
 MAX_AI_CALLS = 16 
 RETRIES = 1
 AI_TIMEOUT = 20
@@ -45,27 +46,38 @@ def rss(query, region="US", language="zh-Hans"):
         "q": query, "hl": "zh-CN", "gl": region, "ceid": ceid,
     })
 
+# ============================================================
+# 2. 资讯源配置（严格排除所有国内国有媒体，全线采用国际大媒体）
+# ============================================================
 FEEDS = {
     "global": [
-        ("CNBC World", "https://www.cnbc.com/id/100727362/device/rss/rss.html"),
+        ("Reuters", rss("site:reuters.com finance economy markets central bank")),
+        ("Bloomberg", rss("site:bloomberg.com markets stocks economy")),
+        ("The Wall Street Journal", rss("site:wsj.com markets economy central bank")),
+        ("Financial Times", rss("site:ft.com global economy finance")),
+        ("Associated Press", rss("site:apnews.com business economy news")),
         ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
-        ("Google News 国际财经", rss("global finance economy markets stocks")),
     ],
     "asia": [
-        ("中央社财经", "https://feeds.feedburner.com/rsscna/finance"),
         ("Nikkei Asia", "https://asia.nikkei.com/rss/feed/nar"),
         ("The Japan Times", "https://www.japantimes.co.jp/feed/"),
-        ("Google News 亚太财经", rss("Asia Pacific finance economy markets China Japan Korea Taiwan Singapore")),
+        ("South China Morning Post", rss("site:scmp.com Hong Kong economy business")),
+        ("中央社 CNA (台湾)", "https://feeds.feedburner.com/rsscna/finance"),
+        ("Focus Taiwan", rss("site:focustaiwan.tw economy semiconductor Taiwan")),
     ],
     "china": [
-        ("Google News 中国财经", rss("中国财经 OR 中国经济 OR A股 OR 人民币 OR 中国央行 OR 港股", "CN")),
-        ("Google News 中国股市", rss("A股 OR 沪深股市 OR 中国上市公司 OR 中国金融市场", "CN")),
+        # 核心改变：国内/大中华区新闻完全由国际顶级大媒体（路透、彭博、WSJ、SCMP等）从外部视角进行客观报道
+        ("Reuters (China)", rss("site:reuters.com China economy PBOC yuan property")),
+        ("Bloomberg (China)", rss("site:bloomberg.com China economy stocks property")),
+        ("The Wall Street Journal (China)", rss("site:wsj.com China economy policy")),
+        ("Financial Times (China)", rss("site:ft.com China economy finance")),
+        ("South China Morning Post (China)", rss("site:scmp.com/news/china economy trade")),
     ],
     "earnings": [
-        ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
         ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/marketpulse/"),
+        ("Financial Times Companies", "https://www.ft.com/companies?format=rss"),
         ("Google News 企业财报", rss("company earnings revenue profit quarterly results forecast")),
     ],
 }
@@ -226,7 +238,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/3.1"
+            "User-Agent": "FinanceResearchDashboard/3.2"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -304,7 +316,7 @@ def importance_score(item):
 def classify(items, channel):
     patterns = {
         "asia": r"asia|asian|china|chinese|japan|korea|taiwan|hong kong|singapore|india|australia|亚太|中国|日本|韩国|台湾|香港|新加坡|印度|澳大利亚",
-        "china": r"中国|人民币|A股|沪深|港股|央行|中国经济|China|Chinese|yuan|Shanghai|Shenzhen|PBOC|CSI 300",
+        "china": r"china|chinese|beijing|shanghai|pboc|yuan|cny|a-shares|hong kong|hkex|中国|人民币|A股|港股|央行",
         "earnings": r"earnings|revenue|profit|quarter|forecast|guidance|results|财报|业绩|营收|利润|季度|盈利"
     }
     return [x for x in items if channel not in patterns or re.search(patterns[channel], x["title"]+" "+x.get("summary",""), re.I)]
@@ -315,7 +327,7 @@ def insight(item, cache, budget):
     if isinstance(old, dict) and old.get("analysis") and old.get("coreLogic"): return old
     if budget["attempts"] >= MAX_AI_CALLS: return None
     
-    prompt = f"""你是审慎的财经时政研究助理。用简体中文分析新闻。只使用给定标题、来源和摘要。
+    prompt = f"""你是审慎的国际财经时政研究助理。用简体中文分析新闻。只使用给定标题、来源和摘要。
 严格输出 JSON，不要 Markdown，字段如下：
 analysis：100-180字，事件含义和宏观重要性。
 core_logic：事件/政策→变量变化→影响对象的逻辑链。
@@ -346,13 +358,11 @@ def build(channel, cache, budget):
     gathered = []
     for src, url in FEEDS[channel]:
         for x in parse_feed(src, url):
-            orig = clean(x.get("title",""))
             x["_date"] = parse_date(x.get("published"))
             if x["_date"] is None: continue
             gathered.append(x)
             
-    if channel != "china":
-        gathered = classify(gathered, channel)
+    gathered = classify(gathered, channel)
     gathered = deduplicate(gathered)
     
     for item in gathered:
@@ -368,7 +378,7 @@ def build(channel, cache, budget):
             "title": translate(orig_t) or orig_t,
             "originalTitle": orig_t,
             "summary": (translate(orig_s) or orig_s)[:900],
-            "source": item.get("source", "权威媒体"),
+            "source": item.get("source", "国际权威媒体"),
             "url": item.get("url", ""),
             "publishedAt": item["_date"].astimezone(TZ).strftime("%Y-%m-%d %H:%M"),
             "timestamp": int(item["_date"].timestamp()),
@@ -379,7 +389,7 @@ def build(channel, cache, budget):
         }
         prepare_article_links(news_item)
         
-        # 核心改进：只要是前 3 条新闻（TOP 3），强制且优先调用 AI 深度分析！
+        # TOP 3 强制调用 AI 深度分析
         if i < 3:
             ai = insight(news_item, cache, budget)
             if ai:
