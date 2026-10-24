@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-财经与时政新闻助手 3.9 - 精准分类与满血 AI 渲染最终版
+财经与时政新闻助手 4.0 - AI 稳定重试与内容填充最终版
 """
 
 import os
@@ -22,10 +22,9 @@ PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
 TZ = timezone(timedelta(hours=8))
 
-# 将 AI 调用上限提升至 20 次，确保每个栏目的 TOP 3 都能完美跑完
-MAX_AI_CALLS = 20 
-RETRIES = 1
-AI_TIMEOUT = 20
+MAX_AI_CALLS = 16 
+RETRIES = 2  # 增加一次重试机制，确保 AI 成功率
+AI_TIMEOUT = 25
 MAX_NEWS_AGE_HOURS = 72
 GEMINI_QUOTA_BLOCKED = False
 
@@ -60,6 +59,7 @@ FEEDS = {
         ("Reuters (China)", rss("site:reuters.com China economy PBOC yuan property A-shares")),
         ("Bloomberg (China)", rss("site:bloomberg.com China economy stocks property PBOC")),
         ("South China Morning Post", rss("site:scmp.com China economy business PBOC")),
+        ("CNBC (China)", rss("site:cnbc.com China economy markets")),
     ],
     "earnings": [
         ("CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
@@ -201,11 +201,10 @@ def deduplicate(items):
             output.append(item)
     return output
 
-# 严格的板块分类过滤器，防止国际时政流入国内板块
 def classify(items, channel):
     patterns = {
         "asia": r"asia|asian|china|chinese|japan|korea|taiwan|hong kong|singapore|india|australia|亚太|中国|日本|韩国|台湾|香港|新加坡|印度|澳大利亚",
-        "china": r"china|chinese|beijing|shanghai|pboc|yuan|cny|a-shares|hong kong|hkex|property|developer|中国|人民币|A股|港股|央行|房地产业|证监会",
+        "china": r"china|chinese|beijing|shanghai|pboc|yuan|cny|a-shares|hong kong|hkex|property|developer|中国|人民币|A股|港股|央行|地产|证监会|经济",
         "earnings": r"earnings|revenue|profit|quarter|forecast|guidance|results|财报|业绩|营收|利润|季度|盈利"
     }
     if channel not in patterns:
@@ -215,11 +214,8 @@ def classify(items, channel):
     for x in items:
         text = (x["title"] + " " + x.get("summary", "")).lower()
         if re.search(patterns[channel], text, re.I):
-            # 如果是 china 板块，额外排除纯地缘政治、美加关税等无关内容
-            if channel == "china" and re.search(r"ukraine|zelensky|canada|tariff|israel|gaza|乌克兰|泽连斯基|加沙", text, re.I):
-                continue
             filtered.append(x)
-    return filtered
+    return filtered if filtered else items  # 如果过滤后为空，自动回退兜底，确保有新闻展示
 
 def gemini(prompt):
     global GEMINI_QUOTA_BLOCKED
@@ -239,7 +235,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/3.9"
+            "User-Agent": "FinanceResearchDashboard/4.0"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -254,7 +250,7 @@ def gemini(prompt):
                 return None
         except Exception:
             pass
-        if attempt < RETRIES: time.sleep(2)
+        if attempt < RETRIES: time.sleep(3)
     return None
 
 def parse_ai(raw):
@@ -337,7 +333,7 @@ confidence：低/中/高并说明充分程度。
 摘要：{item.get('summary','')[:1200]}"""
     
     budget["attempts"] += 1
-    time.sleep(2)  # 2秒缓冲，保证 API 连贯稳定
+    time.sleep(3)  # 稳定缓冲期，确保 API 顺利响应
     ai = parse_ai(gemini(prompt))
     if ai and ai["analysis"] and ai["coreLogic"]:
         cache[ck] = ai
@@ -387,7 +383,7 @@ def build(channel, cache, budget):
         }
         prepare_article_links(news_item)
         
-        # 对每个栏目的前 3 条重点新闻触发 AI 深度分析
+        # 触发 AI 深度分析
         if i < 3:
             ai = insight(news_item, cache, budget)
             if ai:
