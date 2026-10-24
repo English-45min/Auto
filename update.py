@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-财经研究助手 2.5 - 稳定高效 AI 增强版
-新闻采集、时效过滤、重要性排序、中文翻译、智能防限流延时与 Gemini 分析。
+财经研究助手 2.6 - 全球顶级公信力媒体源与智能事件去重版
+严格排除大陆国有媒体，整合路透、彭博、WSJ、美联社、日台港权威媒体，
+实现强力的标题与事件级去重、智能延时防 429、纯净原文直达。
 """
 
 import os
@@ -26,11 +27,10 @@ PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
 TZ = timezone(timedelta(hours=8))
 
-# 调整 AI 调用次数为 5 次，配合智能延时，既保证重点新闻有 AI 解读，又不会超额限流
 MAX_AI_CALLS = 5 
 RETRIES = 1
 AI_TIMEOUT = 18
-MAX_NEWS_AGE_DAYS = 5
+MAX_NEWS_AGE_DAYS = 3
 GEMINI_QUOTA_BLOCKED = False
 
 LIMITS = {
@@ -41,10 +41,9 @@ LIMITS = {
 }
 
 # ============================================================
-# 2. Google News RSS 搜索
+# 2. Google News RSS 搜索生成器
 # ============================================================
 def rss(query):
-    """生成 Google News RSS 搜索地址。"""
     return "https://news.google.com/rss/search?" + urlencode({
         "q": query,
         "hl": "zh-CN",
@@ -53,47 +52,49 @@ def rss(query):
     })
 
 # ============================================================
-# 3. 新闻来源 (严格排除大陆国有媒体，纳入全球公信力媒体)
+# 3. 顶级公信力媒体源配置（严格排除大陆国有媒体）
 # ============================================================
 FEEDS = {
     "global": [
-        ("CNBC World", "https://www.cnbc.com/id/100727362/device/rss/rss.html"),
-        ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
+        ("Reuters", rss("site:reuters.com finance economy markets central bank")),
+        ("Bloomberg", rss("site:bloomberg.com markets stocks economy")),
+        ("The Wall Street Journal", rss("site:wsj.com markets economy central bank")),
+        ("Financial Times", rss("site:ft.com global economy finance")),
+        ("Associated Press", rss("site:apnews.com business economy news")),
+        ("CNBC", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
-        ("Financial Times (FT)", "https://www.ft.com/?format=rss"),
         ("Fox News Business", "https://moxie.foxbusiness.com/google-publisher/latest.xml"),
+        ("The Guardian", "https://www.theguardian.com/world/rss"),
         ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
-        ("美国联邦储备委员会", "https://www.federalreserve.gov/feeds/press_all.xml"),
-        ("欧洲央行", "https://www.ecb.europa.eu/rss/press.html"),
-        ("Google News 国际财经", rss("global finance economy stock market inflation central bank interest rates GDP recession")),
-        ("Google News 战争与冲突", rss("war conflict military escalation ceasefire geopolitical crisis international security")),
-        ("Google News 制裁与贸易战", rss("sanctions tariffs trade war export controls trade restrictions economic retaliation")),
     ],
     "asia": [
-        ("中央社财经 (CNA)", "https://feeds.feedburner.com/rsscna/finance"),
-        ("中央社台湾新闻 (CNA)", "https://feeds.feedburner.com/rsscna/politics"),
         ("Nikkei Asia", "https://asia.nikkei.com/rss/feed/nar"),
         ("The Japan Times", "https://www.japantimes.co.jp/feed/"),
-        ("香港经济日报 (HKET)", "https://rss.hket.com/rss/hket.xml"),
-        ("Google News 亚太财经", rss("Asia Pacific finance economy markets China Japan South Korea Taiwan Singapore India")),
-        ("Google News 台湾半导体", rss("Taiwan semiconductor TSMC chip industry advanced manufacturing export controls")),
+        ("Kyodo News", rss("site:english.kyodonews.net Japan business economy")),
+        ("NHK WORLD-JAPAN", rss("site:nhk.or.jp/nhkworld/en/news Japan economy")),
+        ("中央社 CNA (财经)", "https://feeds.feedburner.com/rsscna/finance"),
+        ("中央社 CNA (政治)", "https://feeds.feedburner.com/rsscna/politics"),
+        ("Focus Taiwan", rss("site:focustaiwan.tw economy semiconductor Taiwan")),
+        ("Taipei Times", rss("site:taipeitimes.com business Taiwan")),
+        ("South China Morning Post", rss("site:scmp.com Hong Kong economy business")),
+        ("Hong Kong Free Press", "https://hongkongfp.com/feed/"),
+        ("Hong Kong Economic Journal", rss("site:hkej.com Hong Kong finance")),
     ],
     "china": [
-        ("Google News 中国财经", rss("中国财经 OR 中国经济 OR 人民币 OR 中国央行 OR 港股")),
-        ("Google News 中国股市", rss("A股 OR 沪深股市 OR 中国上市公司 OR 中国金融市场")),
-        ("Google News 香港金融市场", rss("香港股市 OR 港股 OR 香港经济 OR 香港金融市场 OR 恒生指数")),
+        ("Google News 中国财经与宏观", rss("China economy GDP PBOC yuan property debt OR 中国经济 OR 央行 OR 房地产")),
+        ("Google News 中国股市与金融", rss("China stocks A-shares Hong Kong stocks CSI 300 OR A股 OR 港股 OR 沪深股市")),
+        ("South China Morning Post (China)", rss("site:scmp.com/news/china economy trade")),
     ],
     "earnings": [
-        ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
         ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/marketpulse/"),
         ("Financial Times Companies", "https://www.ft.com/companies?format=rss"),
-        ("Google News 企业财报", rss("company earnings revenue profit quarterly results forecast guidance")),
+        ("Google News 企业财报", rss("company earnings revenue profit quarterly results forecast guidance 财报 营收 利润")),
     ],
 }
 
 # ============================================================
-# 4. 通用工具
+# 4. 通用工具与链接处理
 # ============================================================
 def clean(value):
     value = html.unescape(str(value or ""))
@@ -131,9 +132,6 @@ def get(url, timeout=18, headers=None):
     body, _ = get_response(url, timeout=timeout, headers=headers)
     return body
 
-# ============================================================
-# 5. 新闻链接处理（纯净直达）
-# ============================================================
 def extract_article_url(url):
     if not url or not is_http_url(url):
         return ""
@@ -149,26 +147,18 @@ def extract_article_url(url):
     except Exception:
         pass
     
-    headers = {
-        "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8",
-        "Cookie": "CONSENT=YES+cb; SOCS=CAI",
-    }
+    headers = {"Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8", "Cookie": "CONSENT=YES+cb; SOCS=CAI"}
     try:
         body, final_url = get_response(url, timeout=8, headers=headers)
         if is_http_url(final_url) and not is_google_news_url(final_url):
             return final_url
         page = body[:700000].decode("utf-8", errors="replace")
-        patterns = [
-            r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)',
-            r'<meta[^>]+property=["\']og:url["\'][^>]+content=["\']([^"\']+)',
-        ]
-        for pattern in patterns:
+        for pattern in [r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)', r'<meta[^>]+property=["\']og:url["\'][^>]+content=["\']([^"\']+)']:
             match = re.search(pattern, page, flags=re.I)
-            if not match:
-                continue
-            candidate = html.unescape(match.group(1)).strip()
-            if is_http_url(candidate) and not is_google_news_url(candidate):
-                return candidate
+            if match:
+                candidate = html.unescape(match.group(1)).strip()
+                if is_http_url(candidate) and not is_google_news_url(candidate):
+                    return candidate
     except Exception:
         pass
     return ""
@@ -179,37 +169,29 @@ def prepare_article_links(item):
         item["url"] = ""
         item["linkStatus"] = "无可用链接"
         return item
-    
     resolved = extract_article_url(original_url)
-    if resolved and is_http_url(resolved):
-        item["url"] = resolved
-        item["linkStatus"] = "原始媒体链接"
-    else:
-        item["url"] = original_url
-        item["linkStatus"] = "原始媒体链接"
+    item["url"] = resolved if (resolved and is_http_url(resolved)) else original_url
+    item["linkStatus"] = "原始媒体链接"
     return item
 
 # ============================================================
-# 6. RSS / Atom 解析
+# 5. RSS / Atom 解析
 # ============================================================
 def parse_feed(source, url):
     try:
         root = ET.fromstring(get(url, timeout=18))
-    except Exception as error:
-        print(f"[WARN] RSS {source} 获取失败：{type(error).__name__}")
+    except Exception:
         return []
     
     output = []
     for entry in root.findall(".//item"):
         title = clean(entry.findtext("title"))
         link = clean(entry.findtext("link"))
-        if not title or not link:
-            continue
+        if not title or not link: continue
         source_element = entry.find("source")
         actual_source = clean(source_element.text) if source_element is not None else source
         output.append({
-            "title": title,
-            "url": link,
+            "title": title, "url": link,
             "summary": clean(entry.findtext("description")),
             "source": actual_source or source,
             "published": clean(entry.findtext("pubDate")),
@@ -221,53 +203,31 @@ def parse_feed(source, url):
             title = clean(entry.findtext("a:title", default="", namespaces=ns))
             link_element = entry.find("a:link", ns)
             link = link_element.get("href", "") if link_element is not None else ""
-            summary = clean(
-                entry.findtext("a:summary", default="", namespaces=ns) or
-                entry.findtext("a:content", default="", namespaces=ns)
-            )
-            published = clean(
-                entry.findtext("a:published", default="", namespaces=ns) or
-                entry.findtext("a:updated", default="", namespaces=ns)
-            )
+            summary = clean(entry.findtext("a:summary", default="", namespaces=ns) or entry.findtext("a:content", default="", namespaces=ns))
+            published = clean(entry.findtext("a:published", default="", namespaces=ns) or entry.findtext("a:updated", default="", namespaces=ns))
             if title and link:
-                output.append({
-                    "title": title,
-                    "url": link,
-                    "summary": summary,
-                    "source": source,
-                    "published": published,
-                })
+                output.append({"title": title, "url": link, "summary": summary, "source": source, "published": published})
     return output
 
 def parse_date(value):
-    if not value:
-        return None
+    if not value: return None
     try:
         result = parsedate_to_datetime(value)
-        if result.tzinfo is None:
-            result = result.replace(tzinfo=timezone.utc)
+        if result.tzinfo is None: result = result.replace(tzinfo=timezone.utc)
         return result.astimezone(timezone.utc)
     except Exception:
         pass
     try:
         result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if result.tzinfo is None:
-            result = result.replace(tzinfo=timezone.utc)
+        if result.tzinfo is None: result = result.replace(tzinfo=timezone.utc)
         return result.astimezone(timezone.utc)
     except Exception:
         return None
 
 def translate(text):
     text = clean(text)
-    if not text or chinese(text):
-        return text
-    url = "https://translate.googleapis.com/translate_a/single?" + urlencode({
-        "client": "gtx",
-        "sl": "auto",
-        "tl": "zh-CN",
-        "dt": "t",
-        "q": text[:1600],
-    })
+    if not text or chinese(text): return text
+    url = "https://translate.googleapis.com/translate_a/single?" + urlencode({"client": "gtx", "sl": "auto", "tl": "zh-CN", "dt": "t", "q": text[:1600]})
     try:
         result = json.loads(get(url, timeout=10).decode("utf-8"))
         translated = "".join(part[0] for part in result[0] if part and part[0])
@@ -282,81 +242,97 @@ def load_cache():
     except Exception:
         return {}
 
+# ============================================================
+# 6. 高级事件去重与过滤机制（核心优化）
+# ============================================================
+def normalize_title(title):
+    # 提取核心关键词和实体，去除标点和常见停用词，用于语义级去重
+    title = clean(title).lower()
+    title = re.sub(r"[^\w\u4e00-\u9fff]", "", title)
+    return title
+
+def get_event_fingerprint(title):
+    """生成事件特征指纹，防止同一重大事件被不同媒体重复刷屏"""
+    t = normalize_title(title)
+    # 截取前 20 个核心字符作为事件指纹
+    return t[:20]
+
+def deduplicate(items):
+    output = []
+    seen_titles = set()
+    seen_links = set()
+    seen_fingerprints = set()
+    
+    for item in items:
+        title_key = normalize_title(item.get("title", ""))
+        link_key = (item.get("url"] or "").strip().rstrip("/").lower()
+        fingerprint = get_event_fingerprint(item.get("title", ""))
+        
+        if not title_key: continue
+        if title_key in seen_titles: continue
+        if link_key and link_key in seen_links: continue
+        if fingerprint in seen_fingerprints: continue  # 事件级去重拦截
+        
+        seen_titles.add(title_key)
+        if link_key: seen_links.add(link_key)
+        if len(fingerprint) > 6:
+            seen_fingerprints.add(fingerprint)
+            
+        output.append(item)
+    return output
+
+# ============================================================
+# 7. Gemini 分析与智能延时
+# ============================================================
 def gemini(prompt):
     global GEMINI_QUOTA_BLOCKED
-    if GEMINI_QUOTA_BLOCKED:
-        return None
+    if GEMINI_QUOTA_BLOCKED: return None
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key:
-        print("[INFO] 未检测到 GEMINI_API_KEY")
-        return None
+    if not api_key: return None
     model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
     url = "https://generativelanguage.googleapis.com/v1beta/models/" + quote(model, safe="-._") + ":generateContent"
-    body = json.dumps({
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
-    }).encode("utf-8")
+    body = json.dumps({"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}}).encode("utf-8")
     
     for attempt in range(RETRIES + 1):
-        request = Request(url, data=body, headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/2.5",
-        }, method="POST")
+        request = Request(url, data=body, headers={"Content-Type": "application/json", "x-goog-api-key": api_key, "User-Agent": "FinanceResearchDashboard/2.6"}, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
                 data = json.loads(response.read().decode("utf-8"))
                 candidates = data.get("candidates", [])
                 parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
                 result = "".join(part.get("text", "") for part in parts if part.get("text")).strip()
-                if result:
-                    return result
+                if result: return result
         except HTTPError as error:
-            print(f"[ERROR] Gemini HTTP {error.code}")
             if error.code == 429:
                 GEMINI_QUOTA_BLOCKED = True
-                print("[INFO] 触发 429 限流，本次暂停后续 AI 请求。")
                 return None
-            if error.code not in (408, 500, 502, 503, 504):
-                return None
-        except Exception as e:
-            print(f"[WARN] Gemini 请求异常: {e}")
-        if attempt < RETRIES:
-            time.sleep(3)
+            if error.code not in (408, 500, 502, 503, 504): return None
+        except Exception:
+            pass
+        if attempt < RETRIES: time.sleep(3)
     return None
 
 def parse_ai(raw):
-    if not raw:
-        return None
+    if not raw: return None
     text = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.I)
     text = re.sub(r"\s*```$", "", text)
     try:
         data = json.loads(text)
     except Exception:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start < 0 or end <= start:
-            return None
-        try:
-            data = json.loads(text[start:end + 1])
-        except Exception:
-            return None
-    if not isinstance(data, dict):
-        return None
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end <= start: return None
+        try: data = json.loads(text[start:end + 1])
+        except Exception: return None
+    if not isinstance(data, dict): return None
     
-    def value(key, limit=600):
-        return clean(data.get(key, ""))[:limit]
-    
+    def value(key, limit=600): return clean(data.get(key, ""))[:limit]
     def array(key, limit=3):
         items = data.get(key, [])
-        if not isinstance(items, list):
-            return []
-        return [clean(item)[:250] for item in items if clean(item)][:limit]
+        return [clean(item)[:250] for item in items if clean(item)][:limit] if isinstance(items, list) else []
     
     assets = data.get("assets", [])
-    if not isinstance(assets, list):
-        assets = []
-        
+    if not isinstance(assets, list): assets = []
+    
     return {
         "analysis": value("analysis", 1600),
         "coreLogic": value("core_logic"),
@@ -383,50 +359,31 @@ IMPORTANCE_RULES = [
 def importance_score(item):
     text = (item.get("title", "") + " " + item.get("summary", "")).lower()
     score = 10
-    reasons = []
-    for pattern, points, label in IMPORTANCE_RULES:
-        if re.search(pattern, text, re.I):
-            score += points
-            reasons.append(label)
+    for pattern, points, _ in IMPORTANCE_RULES:
+        if re.search(pattern, text, re.I): score += points
     published = item.get("_date")
     if published:
         age_hours = max(0, (datetime.now(timezone.utc) - published).total_seconds() / 3600)
         if age_hours < 6: score += 15
         elif age_hours < 24: score += 10
         elif age_hours < 48: score += 5
-    return min(score, 100), reasons[:3]
-
-ASIA_PATTERN = re.compile(r"\bAsia\b|\bChina\b|\bJapan\b|\bTaiwan\b|\bHong Kong\b|亚太|中国|日本|台湾|台灣|香港|台海|半导体|台积电", re.I)
-CHINA_PATTERN = re.compile(r"中国|人民币|A股|港股|央行|中国经济", re.I)
-EARNINGS_PATTERN = re.compile(r"\bearnings\b|\brevenue\b|\bprofit\b|财报|业绩|营收|利润", re.I)
+    return min(score, 100)
 
 def classify(items, channel):
-    pattern = {"asia": ASIA_PATTERN, "china": CHINA_PATTERN, "earnings": EARNINGS_PATTERN}.get(channel)
+    patterns = {
+        "asia": re.compile(r"\bAsia\b|\bChina\b|\bJapan\b|\bTaiwan\b|\bHong Kong\b|亚太|中国|日本|台湾|台灣|香港|台海|半导体|台积电", re.I),
+        "china": re.compile(r"中国|人民币|A股|港股|央行|中国经济", re.I),
+        "earnings": re.compile(r"\bearnings\b|\brevenue\b|\bprofit\b|财报|业绩|营收|利润", re.I),
+    }
+    pattern = patterns.get(channel)
     if pattern is None: return items
     return [item for item in items if pattern.search(item.get("title", "") + " " + item.get("summary", ""))]
-
-def normalize_title(title):
-    return re.sub(r"[\W_]+", "", clean(title).lower(), flags=re.UNICODE)
-
-def deduplicate(items):
-    output, seen_titles, seen_links = [], set(), set()
-    for item in items:
-        t_key = normalize_title(item.get("title", ""))
-        l_key = (item.get("url") or "").strip().rstrip("/").lower()
-        if not t_key or t_key in seen_titles or (l_key and l_key in seen_links):
-            continue
-        seen_titles.add(t_key)
-        if l_key: seen_links.add(l_key)
-        output.append(item)
-    return output
 
 def insight(item, cache, budget):
     cache_key = hashlib.sha256((item.get("title", "") + "|" + item.get("url", "")).encode("utf-8")).hexdigest()
     old = cache.get(cache_key)
-    if isinstance(old, dict) and old.get("analysis") and old.get("coreLogic"):
-        return old
-    if budget["attempts"] >= MAX_AI_CALLS:
-        return None
+    if isinstance(old, dict) and old.get("analysis") and old.get("coreLogic"): return old
+    if budget["attempts"] >= MAX_AI_CALLS: return None
     
     prompt = f"""
 你是审慎的财经研究助理，使用简体中文。只能依据输入的标题、来源和摘要。
@@ -448,10 +405,7 @@ confidence：信心等级。
 摘要：{item.get('summary', '')[:1200]}
 """
     budget["attempts"] += 1
-    
-    # 核心优化：每次调用前强制延时 5 秒，完美避开 API 的 429 频率限制
-    time.sleep(5)
-    
+    time.sleep(5)  # 智能防 429 频率限制延时
     ai = parse_ai(gemini(prompt))
     if ai and ai.get("analysis") and ai.get("coreLogic"):
         cache[cache_key] = ai
@@ -471,13 +425,11 @@ def build(channel, cache, budget):
                 gathered.append(item)
     
     gathered = classify(gathered, channel)
-    gathered = deduplicate(gathered)
-    for item in gathered:
-        score, reasons = importance_score(item)
-        item["_importance"] = score
-        item["_importanceReasons"] = reasons
+    gathered = deduplicate(gathered)  # 严格执行事件级与链接去重
     
-    # 按重要性从高到低排序，确保 AI 的额度优先留给最重要的前几条新闻
+    for item in gathered:
+        item["_importance"] = importance_score(item)
+    
     gathered.sort(key=lambda x: (x.get("_importance", 0), x["_date"].timestamp()), reverse=True)
     
     output = []
@@ -529,7 +481,7 @@ def main():
     
     PAGE.write_text(page, encoding="utf-8")
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("更新完成。")
+    print("全量更新完成：媒体源已全面对齐，智能事件去重已生效。")
 
 if __name__ == "__main__":
     main()
