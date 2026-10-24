@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-财经与时政新闻助手 3.3 - 模型修复与稳定性最终版
+财经与时政新闻助手 3.5 - 严守 24 小时新鲜资讯版
 """
 
 import os
@@ -25,7 +25,7 @@ TZ = timezone(timedelta(hours=8))
 MAX_AI_CALLS = 12 
 RETRIES = 1
 AI_TIMEOUT = 20
-MAX_NEWS_AGE_DAYS = 3
+MAX_NEWS_AGE_HOURS = 24  # 严格限制为 24 小时内的新鲜资讯
 GEMINI_QUOTA_BLOCKED = False
 
 LIMITS = {
@@ -183,7 +183,7 @@ def deduplicate(items):
         raw_title = clean(item.get("title", ""))
         clean_title = re.sub(r"\s*-\s*[^-]+$", "", raw_title).strip().lower()
         tokens = set(re.findall(r"[\w\u4e00-\u9fff]", clean_title))
-        if len(tokens) < 3:
+        if len(tokens) < 2:
             output.append(item)
             continue
         is_duplicate = False
@@ -195,7 +195,7 @@ def deduplicate(items):
             intersection = tokens.intersection(acc_tokens)
             union = tokens.union(acc_tokens)
             similarity = len(intersection) / len(union) if union else 0
-            if similarity > 0.38 or len(intersection) >= 7:
+            if similarity > 0.45 or len(intersection) >= 8:
                 is_duplicate = True
                 break
         if not is_duplicate:
@@ -208,7 +208,6 @@ def gemini(prompt):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key: return None
     
-    # 强制使用官方标准的稳定模型，彻底解决 0/4 失败问题
     model = "gemini-1.5-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     
@@ -221,7 +220,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/3.3"
+            "User-Agent": "FinanceResearchDashboard/3.5"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -291,18 +290,9 @@ def importance_score(item):
     published = item.get("_date")
     if published:
         age_hours = max(0, (datetime.now(timezone.utc) - published).total_seconds() / 3600)
-        if age_hours < 6: score += 15
-        elif age_hours < 24: score += 10
-        elif age_hours < 48: score += 5
+        if age_hours < 6: score += 20
+        elif age_hours < 12: score += 12
     return min(score, 100)
-
-def classify(items, channel):
-    patterns = {
-        "asia": r"asia|asian|china|chinese|japan|korea|taiwan|hong kong|singapore|india|australia|亚太|中国|日本|韩国|台湾|香港|新加坡|印度|澳大利亚",
-        "china": r"china|chinese|beijing|shanghai|pboc|yuan|cny|a-shares|hong kong|hkex|中国|人民币|A股|港股|央行",
-        "earnings": r"earnings|revenue|profit|quarter|forecast|guidance|results|财报|业绩|营收|利润|季度|盈利"
-    }
-    return [x for x in items if channel not in patterns or re.search(patterns[channel], x["title"]+" "+x.get("summary",""), re.I)]
 
 def insight(item, cache, budget):
     ck = hashlib.sha256((item["title"]+"|"+item["url"]).encode()).hexdigest()
@@ -315,7 +305,7 @@ def insight(item, cache, budget):
 analysis：100-180字，事件含义和宏观重要性。
 core_logic：事件/政策→变量变化→影响对象的逻辑链。
 market_impact：潜在受益或承压方向。
-transmission：传导机制（供需、利率、汇率、政策或风险偏好）。
+transmission：传导机制（供需, 利率, 汇率, 政策或风险偏好）。
 impact：一句话概括潜在市场影响。
 assets：最多4个相关资产、指数、行业或ETF类别。
 time_horizon：短中长期及其依据。
@@ -328,7 +318,7 @@ confidence：低/中/高并说明充分程度。
 摘要：{item.get('summary','')[:1200]}"""
     
     budget["attempts"] += 1
-    time.sleep(3)
+    time.sleep(2)
     ai = parse_ai(gemini(prompt))
     if ai and ai["analysis"] and ai["coreLogic"]:
         cache[ck] = ai
@@ -339,13 +329,18 @@ confidence：低/中/高并说明充分程度。
 
 def build(channel, cache, budget):
     gathered = []
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=MAX_NEWS_AGE_HOURS)
+    
     for src, url in FEEDS[channel]:
         for x in parse_feed(src, url):
-            x["_date"] = parse_date(x.get("published"))
-            if x["_date"] is None: continue
+            dt = parse_date(x.get("published"))
+            # 严格 24 小时时效过滤：如果没有时间或超出 24 小时，则剔除
+            if dt is None or not (cutoff <= dt <= now):
+                continue
+            x["_date"] = dt
             gathered.append(x)
             
-    gathered = classify(gathered, channel)
     gathered = deduplicate(gathered)
     
     for item in gathered:
@@ -368,18 +363,15 @@ def build(channel, cache, budget):
             "impact": "待分析", "asset": [], "analysis": "", "risk": "",
             "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "",
             "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析",
-            "channel": channel
         }
         prepare_article_links(news_item)
         
-        # 只要抓到的新闻，统统调用 AI 进行深度分析，确保 AI 结果满满
         ai = insight(news_item, cache, budget)
         if ai:
             news_item.update(ai)
             news_item["impact"] = ai.get("impact") or ai.get("marketImpact") or "见分层分析"
             news_item["aiStatus"] = "Gemini AI"
-        
-        news_item.pop("channel", None)
+            
         output.append(news_item)
         
     for i, item in enumerate(output):
