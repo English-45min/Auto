@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-财经与时政新闻助手 4.0 - AI 稳定重试与内容填充最终版
+财经与时政新闻助手 6.0 - DeepSeek AI 深度分析版
 """
 
 import os
@@ -15,18 +15,17 @@ from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, quote, urlparse, parse_qs
+from urllib.parse import urlencode, urlparse, parse_qs
 
 BASE = Path(__file__).resolve().parent
 PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
 TZ = timezone(timedelta(hours=8))
 
-MAX_AI_CALLS = 16 
-RETRIES = 2  # 增加一次重试机制，确保 AI 成功率
+MAX_AI_CALLS = 10  # 控制单次最大调用数，确保稳妥
+RETRIES = 1
 AI_TIMEOUT = 25
 MAX_NEWS_AGE_HOURS = 72
-GEMINI_QUOTA_BLOCKED = False
 
 LIMITS = {
     "global": 20,
@@ -57,9 +56,9 @@ FEEDS = {
     ],
     "china": [
         ("Reuters (China)", rss("site:reuters.com China economy PBOC yuan property A-shares")),
-        ("Bloomberg (China)", rss("site:bloomberg.com China economy stocks property PBOC")),
-        ("South China Morning Post", rss("site:scmp.com China economy business PBOC")),
         ("CNBC (China)", rss("site:cnbc.com China economy markets")),
+        ("AP News (China)", rss("site:apnews.com China economy trade")),
+        ("BBC (China)", rss("site:bbc.com/news/world/asia/china economy")),
     ],
     "earnings": [
         ("CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
@@ -90,19 +89,13 @@ def is_google_news_url(url):
     except Exception:
         return False
 
-def get_response(url, timeout=18, headers=None):
-    request_headers = {
+def get(url, timeout=18):
+    request = Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml,application/rss+xml;q=0.9,*/*;q=0.8",
-    }
-    request_headers.update(headers or {})
-    request = Request(url, headers=request_headers)
+    })
     with urlopen(request, timeout=timeout) as response:
-        return response.read(), response.geturl()
-
-def get(url, timeout=18, headers=None):
-    body, _ = get_response(url, timeout=timeout, headers=headers)
-    return body
+        return response.read()
 
 def extract_article_url(url):
     if not url or not is_http_url(url): return ""
@@ -117,13 +110,6 @@ def extract_article_url(url):
     except Exception:
         pass
     return url
-
-def prepare_article_links(item):
-    original_url = (item.get("url") or "").strip()
-    resolved = extract_article_url(original_url)
-    item["url"] = resolved if (resolved and is_http_url(resolved)) else original_url
-    item["linkStatus"] = "原始媒体链接"
-    return item
 
 def parse_feed(source, url):
     try:
@@ -152,12 +138,7 @@ def parse_date(value):
         return result.astimezone(timezone.utc)
     except Exception:
         pass
-    try:
-        result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if result.tzinfo is None: result = result.replace(tzinfo=timezone.utc)
-        return result.astimezone(timezone.utc)
-    except Exception:
-        return None
+    return None
 
 def translate(text):
     text = clean(text)
@@ -203,66 +184,58 @@ def deduplicate(items):
 
 def classify(items, channel):
     patterns = {
-        "asia": r"asia|asian|china|chinese|japan|korea|taiwan|hong kong|singapore|india|australia|亚太|中国|日本|韩国|台湾|香港|新加坡|印度|澳大利亚",
-        "china": r"china|chinese|beijing|shanghai|pboc|yuan|cny|a-shares|hong kong|hkex|property|developer|中国|人民币|A股|港股|央行|地产|证监会|经济",
-        "earnings": r"earnings|revenue|profit|quarter|forecast|guidance|results|财报|业绩|营收|利润|季度|盈利"
+        "asia": r"asia|asian|japan|korea|taiwan|hong kong|singapore|india|australia|亚太|中国|日本|韩国|台湾|香港",
+        "china": r"china|chinese|beijing|shanghai|pboc|yuan|cny|a-shares|hong kong|hkex|property|developer|中国|人民币|A股|港股|央行|地产",
+        "earnings": r"earnings|revenue|profit|quarter|forecast|guidance|results|财报|业绩|营收|利润|季度"
     }
-    if channel not in patterns:
-        return items
-    
-    filtered = []
-    for x in items:
-        text = (x["title"] + " " + x.get("summary", "")).lower()
-        if re.search(patterns[channel], text, re.I):
-            filtered.append(x)
-    return filtered if filtered else items  # 如果过滤后为空，自动回退兜底，确保有新闻展示
+    if channel not in patterns: return items
+    filtered = [x for x in items if re.search(patterns[channel], x["title"] + " " + x.get("summary", ""), re.I)]
+    return filtered if filtered else items
 
-def gemini(prompt):
-    global GEMINI_QUOTA_BLOCKED
-    if GEMINI_QUOTA_BLOCKED: return None
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+# ============================================================
+# DeepSeek API 调用核心函数（完全兼容 OpenAI 标准格式）
+# ============================================================
+def call_deepseek(prompt):
+    api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     if not api_key: return None
     
-    model = "gemini-1.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    
+    url = "https://api.deepseek.com/chat/completions"
     body = json.dumps({
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
+        "model": "deepseek-chat",  # 使用 DeepSeek 主力对话模型
+        "messages": [
+            {"role": "system", "content": "你是由 DeepSeek 驱动的资深国际财经时政研究专家。请严格按照要求输出合法的 JSON 格式。"},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"}  # 强制输出 JSON，彻底杜绝解析失败
     }).encode("utf-8")
     
     for attempt in range(RETRIES + 1):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/4.0"
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "FinanceAssistant/6.0"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
                 data = json.loads(response.read().decode("utf-8"))
-                candidates = data.get("candidates", [])
-                parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
-                result = "".join(part.get("text", "") for part in parts if part.get("text")).strip()
-                if result: return result
-        except HTTPError as error:
-            if error.code == 429:
-                GEMINI_QUOTA_BLOCKED = True
-                return None
+                choices = data.get("choices", [])
+                if choices:
+                    content = choices[0].get("message", {}).get("content", "").strip()
+                    if content: return content
         except Exception:
             pass
-        if attempt < RETRIES: time.sleep(3)
+        if attempt < RETRIES: time.sleep(2)
     return None
 
 def parse_ai(raw):
     if not raw: return None
-    text = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.I)
-    text = re.sub(r"\s*```$", "", text)
     try:
-        data = json.loads(text)
+        data = json.loads(raw)
     except Exception:
-        start, end = text.find("{"), text.rfind("}")
+        start, end = raw.find("{"), raw.rfind("}")
         if start < 0 or end <= start: return None
-        try: data = json.loads(text[start:end + 1])
+        try: data = json.loads(raw[start:end + 1])
         except Exception: return None
     if not isinstance(data, dict): return None
     
@@ -286,15 +259,14 @@ def parse_ai(raw):
         "evidence": array("evidence"),
         "risk": value("risk"),
         "confidence": value("confidence", 100),
-        "provider": "Gemini",
+        "provider": "DeepSeek",
     }
 
 IMPORTANCE_RULES = [
-    (r"war|invasion|missile|military escalation|ceasefire|armed conflict|战争|入侵|导弹|军事冲突|停火|武装冲突|台海危机", 30),
-    (r"sanction|tariff|trade war|export controls|embargo|制裁|关税|贸易战|出口管制|禁运", 24),
-    (r"emergency|financial crisis|bank failure|capital controls|紧急措施|金融危机|银行倒闭|资本管制", 26),
+    (r"war|invasion|missile|military escalation|ceasefire|战争|入侵|导弹|军事冲突|停火", 30),
+    (r"sanction|tariff|trade war|export controls|制裁|关税|贸易战|出口管制", 24),
     (r"central bank|interest rate|rate cut|rate hike|Federal Reserve|央行|利率|降息|加息|美联储", 20),
-    (r"GDP|inflation|CPI|unemployment|recession|通胀|消费者物价|失业|经济衰退", 12),
+    (r"GDP|inflation|CPI|unemployment|recession|通胀|CPI|失业|衰退", 12),
 ]
 
 def importance_score(item):
@@ -302,11 +274,6 @@ def importance_score(item):
     score = 10
     for pattern, points in IMPORTANCE_RULES:
         if re.search(pattern, text, re.I): score += points
-    published = item.get("_date")
-    if published:
-        age_hours = max(0, (datetime.now(timezone.utc) - published).total_seconds() / 3600)
-        if age_hours < 12: score += 20
-        elif age_hours < 24: score += 12
     return min(score, 100)
 
 def insight(item, cache, budget):
@@ -315,26 +282,27 @@ def insight(item, cache, budget):
     if isinstance(old, dict) and old.get("analysis") and old.get("coreLogic"): return old
     if budget["attempts"] >= MAX_AI_CALLS: return None
     
-    prompt = f"""你是审慎的国际财经时政研究助理。用简体中文分析新闻。只使用给定标题、来源和摘要。
-严格输出 JSON，不要 Markdown，字段如下：
-analysis：100-180字，事件含义和宏观重要性。
-core_logic：事件/政策→变量变化→影响对象的逻辑链。
-market_impact：潜在受益或承压方向。
-transmission：传导机制（供需, 利率, 汇率, 政策或风险偏好）。
-impact：一句话概括潜在市场影响。
-assets：最多4个相关资产、指数、行业或ETF类别。
-time_horizon：短中长期及其依据。
-scenarios：最多3条情景及触发条件。
-evidence：最多3条证据线索。
-risk：反证与风险。
-confidence：低/中/高并说明充分程度。
-标题：{item['title']}
-来源：{item['source']}
-摘要：{item.get('summary','')[:1200]}"""
+    prompt = f"""请分析以下国际财经新闻，并严格以 JSON 格式输出（不要包含任何 markdown 代码块符号如 ```json）：
+字段要求：
+- "analysis": 100-180字，事件含义和宏观重要性。
+- "core_logic": 事件/政策到变量变化再到影响对象的逻辑链。
+- "market_impact": 潜在受益或承压方向。
+- "transmission": 传导机制（供需、利率、汇率或风险偏好）。
+- "impact": 一句话概括潜在市场影响。
+- "assets": 最多4个相关资产、指数、行业或ETF类别数组。
+- "time_horizon": 短中长期及其依据。
+- "scenarios": 最多3条情景及触发条件数组。
+- "evidence": 最多3条证据线索数组。
+- "risk": 反证与风险。
+- "confidence": 评估置信度（低/中/高）。
+
+新闻标题：{item['title']}
+新闻来源：{item['source']}
+新闻摘要：{item.get('summary','')[:1200]}"""
     
     budget["attempts"] += 1
-    time.sleep(3)  # 稳定缓冲期，确保 API 顺利响应
-    ai = parse_ai(gemini(prompt))
+    time.sleep(1.5)
+    ai = parse_ai(call_deepseek(prompt))
     if ai and ai["analysis"] and ai["coreLogic"]:
         cache[ck] = ai
         budget["successes"] += 1
@@ -349,11 +317,8 @@ def build(channel, cache, budget):
     
     for src, url in FEEDS[channel]:
         for x in parse_feed(src, url):
-            dt = parse_date(x.get("published"))
-            if dt is None:
-                dt = now
-            if not (cutoff <= dt <= now + timedelta(hours=12)):
-                continue
+            dt = parse_date(x.get("published")) or now
+            if not (cutoff <= dt <= now + timedelta(hours=12)): continue
             x["_date"] = dt
             gathered.append(x)
             
@@ -369,28 +334,30 @@ def build(channel, cache, budget):
     for i, item in enumerate(gathered):
         if len(output) >= LIMITS[channel]: break
         orig_t, orig_s = item.get("title", ""), item.get("summary", "")
+        resolved = extract_article_url(item.get("url", ""))
+        
         news_item = {
             "title": translate(orig_t) or orig_t,
             "originalTitle": orig_t,
             "summary": (translate(orig_s) or orig_s)[:900],
             "source": item.get("source", "国际权威媒体"),
-            "url": item.get("url", ""),
+            "url": resolved if is_http_url(resolved) else item.get("url", ""),
             "publishedAt": item["_date"].astimezone(TZ).strftime("%Y-%m-%d %H:%M"),
             "timestamp": int(item["_date"].timestamp()),
             "impact": "待分析", "asset": [], "analysis": "", "risk": "",
             "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "",
             "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析",
+            "_importance": item["_importance"]
         }
-        prepare_article_links(news_item)
         
-        # 触发 AI 深度分析
-        if i < 3:
+        # 仅对每栏目前 2 条重磅新闻调用 DeepSeek 进行深度分析
+        if i < 2:
             ai = insight(news_item, cache, budget)
             if ai:
                 news_item.update(ai)
                 news_item["impact"] = ai.get("impact") or ai.get("marketImpact") or "见分层分析"
-                news_item["aiStatus"] = "Gemini AI"
-            
+                news_item["aiStatus"] = "DeepSeek AI"
+                
         output.append(news_item)
         
     for i, item in enumerate(output):
@@ -404,10 +371,10 @@ def main():
     if sm not in page or em not in page: return
     
     cache, budget = load_cache(), {"attempts": 0, "successes": 0, "failures": 0}
-    news = {ch: build(ch, cache, budget) for ch in ("global","asia","china","earnings")}
+    news = {ch: build(ch, cache, budget) for ch in ("global", "asia", "china", "earnings")}
     news["updatedAt"] = datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
-    news["aiEnabled"] = bool(os.getenv("GEMINI_API_KEY", "").strip())
-    news["aiModel"] = "gemini-1.5-flash"
+    news["aiEnabled"] = bool(os.getenv("DEEPSEEK_API_KEY", "").strip())
+    news["aiModel"] = "deepseek-chat"
     news["aiStats"] = {**budget, "maxPerRun": MAX_AI_CALLS}
     
     start = page.index(sm) + len(sm)
@@ -418,7 +385,7 @@ def main():
     
     PAGE.write_text(page, encoding="utf-8")
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"更新完成。AI 尝试/成功/失败：{budget['attempts']}/{budget['successes']}/{budget['failures']}")
+    print(f"更新完成。DeepSeek 尝试/成功/失败：{budget['attempts']}/{budget['successes']}/{budget['failures']}")
 
 if __name__ == "__main__":
     main()
