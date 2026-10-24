@@ -64,13 +64,12 @@ input:focus{border-color:#f59e0b}
 </header>
 
 <main class="max-w-6xl mx-auto px-4 py-5">
+
+ <!-- 已移除 A−、A+、清除已读；保留搜索 -->
  <div class="flex flex-wrap gap-2 items-center mb-4">
   <input id="searchInput" type="search"
    class="flex-1 min-w-48 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2"
    placeholder="搜索标题、摘要、来源、逻辑或资产…" aria-label="搜索新闻">
-  <button class="btn" id="fontDown" type="button">A−</button>
-  <button class="btn" id="fontUp" type="button">A+</button>
-  <button class="btn" id="clearRead" type="button">清除已读</button>
  </div>
 
  <nav class="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 mb-5" id="tabs" aria-label="新闻栏目">
@@ -419,22 +418,6 @@ document.querySelectorAll("[data-tab]").forEach(button=>{
 });
 
 document.getElementById("searchInput").addEventListener("input",render);
-
-document.getElementById("fontUp").addEventListener("click",()=>{
- fontSize = Math.min(22,fontSize+1);
- render();
-});
-
-document.getElementById("fontDown").addEventListener("click",()=>{
- fontSize = Math.max(12,fontSize-1);
- render();
-});
-
-document.getElementById("clearRead").addEventListener("click",()=>{
- readIds.clear();
- try { localStorage.removeItem(readKey); } catch(e) {}
- render();
-});
 
 /* 保留手机端左右滑动切换栏目 */
 (()=>{
