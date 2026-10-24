@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-财经与时政新闻助手 3.6 - 突破单条限制与智能时间兜底版
+财经与时政新闻助手 3.7 - 告别单条限制与温和去重最终版
 """
 
 import os
@@ -22,10 +22,10 @@ PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
 TZ = timezone(timedelta(hours=8))
 
-MAX_AI_CALLS = 12 
+MAX_AI_CALLS = 16 
 RETRIES = 1
 AI_TIMEOUT = 20
-MAX_NEWS_AGE_HOURS = 48  # 放宽至 48 小时，确保充足新闻源
+MAX_NEWS_AGE_HOURS = 72  # 3 天时间窗口，确保资讯充足
 GEMINI_QUOTA_BLOCKED = False
 
 LIMITS = {
@@ -178,12 +178,13 @@ def load_cache():
         return {}
 
 def deduplicate(items):
+    """温和去重：只有相似度极高（> 0.85）的重复报道才合并，保留最大资讯量"""
     output = []
     for item in items:
         raw_title = clean(item.get("title", ""))
         clean_title = re.sub(r"\s*-\s*[^-]+$", "", raw_title).strip().lower()
         tokens = set(re.findall(r"[\w\u4e00-\u9fff]", clean_title))
-        if len(tokens) < 2:
+        if len(tokens) < 3:
             output.append(item)
             continue
         is_duplicate = False
@@ -195,7 +196,7 @@ def deduplicate(items):
             intersection = tokens.intersection(acc_tokens)
             union = tokens.union(acc_tokens)
             similarity = len(intersection) / len(union) if union else 0
-            if similarity > 0.45 or len(intersection) >= 8:
+            if similarity > 0.85:  # 提高阈值，避免误杀正常新闻
                 is_duplicate = True
                 break
         if not is_duplicate:
@@ -220,7 +221,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/3.6"
+            "User-Agent": "FinanceResearchDashboard/3.7"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -335,11 +336,9 @@ def build(channel, cache, budget):
     for src, url in FEEDS[channel]:
         for x in parse_feed(src, url):
             dt = parse_date(x.get("published"))
-            # 智能兜底：如果时间解析失败，默认赋予当前时间，防止被一刀切过滤
             if dt is None:
-                dt = now
-            # 宽容的时间窗口过滤
-            if not (cutoff <= dt <= now + timedelta(hours=2)):
+                dt = now  # 智能兜底：无时间戳时默认按最新处理
+            if not (cutoff <= dt <= now + timedelta(hours=12)):
                 continue
             x["_date"] = dt
             gathered.append(x)
