@@ -1,6 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-财经研究助手 3.0 - 错误修复与语义去重最终版
+财经研究助手：新闻自动更新脚本
+文件名：update.py
+
+功能：
+1. 获取国际财经、亚太财经、国内财经及公司财报新闻
+2. 筛选最近三天的新闻
+3. 按重要性评分排序
+4. 中文标题与摘要翻译
+5. Gemini AI 新闻分析，每次运行最多调用 8 次
+6. 缓存 AI 分析，减少重复调用
+7. 对新闻进行相似度去重
+8. 更新 index.html 中的 NEWS_DATA 标记区域
+9. 保留真实原文链接；无法确认时明确标记
+
+依赖：Python 标准库
+环境变量：GEMINI_API_KEY（可选，但 AI 分析需要）
 """
 
 import os
@@ -10,26 +25,29 @@ import time
 import html
 import hashlib
 import xml.etree.ElementTree as ET
+
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, quote, urlparse, parse_qs
+from urllib.parse import urlencode, urlparse, parse_qs
 
-# ============================================================
-# 1. 基本配置
-# ============================================================
+
+# =========================================================
+# 一、基本设置
+# =========================================================
+
 BASE = Path(__file__).resolve().parent
 PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
+
 TZ = timezone(timedelta(hours=8))
 
-MAX_AI_CALLS = 3
+MAX_AI_CALLS = 8
 RETRIES = 1
-AI_TIMEOUT = 20
+AI_TIMEOUT = 25
 MAX_NEWS_AGE_DAYS = 3
-GEMINI_QUOTA_BLOCKED = False
 
 LIMITS = {
     "global": 20,
@@ -38,393 +56,1111 @@ LIMITS = {
     "earnings": 10,
 }
 
-def rss(query):
-    return "https://news.google.com/rss/search?" + urlencode({
-        "q": query, "hl": "zh-CN", "gl": "US", "ceid": "US:zh-Hans",
-    })
+GEMINI_MODEL = "gemini-2.5-flash"
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+
+GEMINI_QUOTA_BLOCKED = False
+
+
+# =========================================================
+# 二、新闻来源
+# =========================================================
+
+def google_rss(query):
+    """生成 Google News RSS 搜索地址。"""
+    params = {
+        "q": query,
+        "hl": "zh-CN",
+        "gl": "US",
+        "ceid": "US:zh-Hans",
+    }
+    return (
+        "https://news.google.com/rss/search?"
+        + urlencode(params)
+    )
+
 
 FEEDS = {
     "global": [
-        ("Reuters", rss("site:reuters.com finance economy markets central bank")),
-        ("Bloomberg", rss("site:bloomberg.com markets stocks economy")),
-        ("The Wall Street Journal", rss("site:wsj.com markets economy central bank")),
-        ("Financial Times", rss("site:ft.com global economy finance")),
-        ("Associated Press", rss("site:apnews.com business economy news")),
-        ("CNBC", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
-        ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
-        ("Fox News Business", "https://moxie.foxbusiness.com/google-publisher/latest.xml"),
+        google_rss(
+            "site:reuters.com markets economy central bank "
+            "war sanctions tariffs oil"
+        ),
+        google_rss(
+            "site:bloomberg.com markets economy finance "
+            "Federal Reserve trade"
+        ),
+        google_rss(
+            "site:ft.com world economy markets inflation"
+        ),
+        google_rss(
+            "site:wsj.com markets economy business"
+        ),
+        google_rss(
+            "site:apnews.com economy business world conflict"
+        ),
+        google_rss(
+            "site:cnbc.com markets economy Federal Reserve"
+        ),
+        google_rss(
+            "site:bbc.com/news business world economy conflict"
+        ),
+        "https://www.cnbc.com/id/10000664/device/rss/rss.html",
+        "https://feeds.bbci.co.uk/news/world/rss.xml",
+        "https://moxie.foxbusiness.com/google-publisher/latest.xml",
     ],
+
     "asia": [
-        ("Nikkei Asia", "https://asia.nikkei.com/rss/feed/nar"),
-        ("The Japan Times", "https://www.japantimes.co.jp/feed/"),
-        ("中央社 CNA", "https://feeds.feedburner.com/rsscna/finance"),
-        ("Focus Taiwan", rss("site:focustaiwan.tw economy semiconductor Taiwan")),
-        ("South China Morning Post", rss("site:scmp.com Hong Kong economy business")),
+        "https://asia.nikkei.com/rss/feed/nar",
+        "https://www.japantimes.co.jp/feed/",
+        "https://feeds.feedburner.com/rsscna/finance",
+        google_rss(
+            "Taiwan economy stocks semiconductors TSMC finance"
+        ),
+        google_rss(
+            "Taiwan cross-strait relations US policy Taiwan Strait"
+        ),
+        google_rss(
+            "Japan economy Bank of Japan yen markets"
+        ),
+        google_rss(
+            "South Korea economy semiconductor exports markets"
+        ),
+        google_rss(
+            "Hong Kong markets economy finance"
+        ),
+        google_rss(
+            "Asia Pacific economy trade tariffs supply chain"
+        ),
+        google_rss(
+            "site:scmp.com business economy markets Asia"
+        ),
     ],
+
     "china": [
-        ("Google News 中国财经与宏观", rss("China economy GDP PBOC yuan property debt OR 中国经济 OR 央行")),
-        ("Google News 中国股市与金融", rss("China stocks A-shares Hong Kong stocks CSI 300 OR A股 OR 港股")),
+        google_rss(
+            "China economy GDP inflation deflation stimulus"
+        ),
+        google_rss(
+            "China stocks A-shares CSI 300 Shanghai Shenzhen"
+        ),
+        google_rss(
+            "China property real estate debt local government"
+        ),
+        google_rss(
+            "People's Bank of China PBOC yuan interest rates"
+        ),
+        google_rss(
+            "China exports imports trade tariffs manufacturing"
+        ),
+        google_rss(
+            "China Hong Kong stocks capital markets regulation"
+        ),
+        google_rss(
+            "中国 宏观经济 GDP 通胀 货币政策"
+        ),
+        google_rss(
+            "中国 A股 沪深300 股市 资本市场"
+        ),
+        google_rss(
+            "中国 房地产 地方债 经济刺激政策"
+        ),
+        google_rss(
+            "人民币 汇率 中国人民银行 利率"
+        ),
     ],
+
     "earnings": [
-        ("CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
-        ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/marketpulse/"),
-        ("Financial Times Companies", "https://www.ft.com/companies?format=rss"),
+        "https://www.cnbc.com/id/15839135/device/rss/rss.html",
+        "https://feeds.marketwatch.com/marketwatch/marketpulse/",
+        "https://www.ft.com/companies?format=rss",
+        google_rss(
+            "company earnings quarterly results revenue profit"
+        ),
+        google_rss(
+            "US technology companies earnings guidance"
+        ),
+        google_rss(
+            "semiconductor company earnings outlook"
+        ),
     ],
 }
 
-def clean(value):
-    value = html.unescape(str(value or ""))
-    value = re.sub(r"<[^>]+>", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
 
-def chinese(text):
+# =========================================================
+# 三、基础工具
+# =========================================================
+
+def now_local():
+    return datetime.now(TZ)
+
+
+def clean(text):
+    """清除 HTML 标签并解码实体。"""
+    if not text:
+        return ""
+
+    text = html.unescape(str(text))
+    text = re.sub(
+        r"(?is)<(script|style).*?>.*?</\1>",
+        " ",
+        text,
+    )
+    text = re.sub(r"(?s)<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text)
+
+    return text.strip()
+
+
+def contains_chinese(text):
     return bool(re.search(r"[\u4e00-\u9fff]", text or ""))
 
+
 def is_http_url(url):
+    if not url:
+        return False
+
     try:
-        parsed = urlparse(str(url or ""))
-        return parsed.scheme in ("http", "https") and bool(parsed.hostname)
+        parsed = urlparse(url)
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
     except Exception:
         return False
+
 
 def is_google_news_url(url):
     try:
         host = (urlparse(url).hostname or "").lower()
-        return host == "news.google.com" or host.endswith(".news.google.com")
+        return host.endswith("news.google.com")
     except Exception:
         return False
 
-def get_response(url, timeout=18, headers=None):
-    request_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml,application/rss+xml;q=0.9,*/*;q=0.8",
-    }
-    request_headers.update(headers or {})
-    request = Request(url, headers=request_headers)
-    with urlopen(request, timeout=timeout) as response:
-        return response.read(), response.geturl()
 
-def get(url, timeout=18, headers=None):
-    body, _ = get_response(url, timeout=timeout, headers=headers)
+def get_response(url, timeout=15):
+    request = Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 "
+                "(compatible; FinanceDashboard/1.0)"
+            ),
+            "Accept": (
+                "application/rss+xml, application/xml, "
+                "text/xml, text/html, */*"
+            ),
+        },
+    )
+
+    with urlopen(request, timeout=timeout) as response:
+        body = response.read()
+        final_url = response.geturl()
+
+    return body, final_url
+
+
+def get(url, timeout=15):
+    body, _ = get_response(url, timeout)
     return body
 
+
+# =========================================================
+# 四、新闻链接处理
+# =========================================================
+
 def extract_article_url(url):
-    if not url or not is_http_url(url): return ""
-    if not is_google_news_url(url): return url
+    """
+    尝试从 Google News URL 参数中提取明确的原文地址。
+
+    无法确认时保留原始地址，不声称它是媒体直链。
+    """
+    if not url:
+        return ""
+
+    url = html.unescape(url.strip())
+
+    if not is_http_url(url):
+        return ""
+
+    if not is_google_news_url(url):
+        return url
+
     try:
         query = parse_qs(urlparse(url).query)
-        for key in ("url", "u", "target", "article_url"):
-            for value in query.get(key, []):
-                candidate = html.unescape(value.strip())
-                if is_http_url(candidate) and not is_google_news_url(candidate):
-                    return candidate
+
+        for key in (
+            "url",
+            "u",
+            "target",
+            "article_url",
+        ):
+            values = query.get(key, [])
+
+            for value in values:
+                value = value.strip()
+
+                if (
+                    is_http_url(value)
+                    and not is_google_news_url(value)
+                ):
+                    return value
+
     except Exception:
         pass
+
     return url
 
+
 def prepare_article_links(item):
-    original_url = (item.get("url") or "").strip()
-    resolved = extract_article_url(original_url)
-    item["url"] = resolved if (resolved and is_http_url(resolved)) else original_url
-    item["linkStatus"] = "原始媒体链接"
+    url = item.get("url", "")
+
+    if not url:
+        item["linkStatus"] = "unavailable"
+        return item
+
+    if is_google_news_url(url):
+        item["linkStatus"] = "aggregator"
+    else:
+        item["linkStatus"] = "original"
+
     return item
 
-def parse_feed(source, url):
-    try:
-        root = ET.fromstring(get(url, timeout=18))
-    except Exception:
-        return []
-    
-    output = []
-    for entry in root.findall(".//item"):
-        title = clean(entry.findtext("title"))
-        link = clean(entry.findtext("link"))
-        if not title or not link: continue
-        source_element = entry.find("source")
-        actual_source = clean(source_element.text) if source_element is not None else source
-        output.append({
-            "title": title, "url": link,
-            "summary": clean(entry.findtext("description")),
-            "source": actual_source or source,
-            "published": clean(entry.findtext("pubDate")),
-        })
-    return output
+
+# =========================================================
+# 五、RSS 解析
+# =========================================================
+
+def local_tag(tag):
+    return tag.rsplit("}", 1)[-1].lower()
+
+
+def child_text(element, names):
+    names = {name.lower() for name in names}
+
+    for child in element.iter():
+        if local_tag(child.tag) in names:
+            value = child.text or ""
+
+            if value.strip():
+                return clean(value)
+
+    return ""
+
 
 def parse_date(value):
-    if not value: return None
+    if not value:
+        return None
+
+    value = value.strip()
+
     try:
-        result = parsedate_to_datetime(value)
-        if result.tzinfo is None: result = result.replace(tzinfo=timezone.utc)
-        return result.astimezone(timezone.utc)
+        dt = parsedate_to_datetime(value)
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        return dt.astimezone(TZ)
+
     except Exception:
         pass
+
     try:
-        result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if result.tzinfo is None: result = result.replace(tzinfo=timezone.utc)
-        return result.astimezone(timezone.utc)
+        value = value.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(value)
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        return dt.astimezone(TZ)
+
     except Exception:
         return None
 
+
+def parse_feed(xml_data, feed_url):
+    results = []
+
+    try:
+        root = ET.fromstring(xml_data)
+    except Exception:
+        return results
+
+    for element in root.iter():
+        tag = local_tag(element.tag)
+
+        if tag not in ("item", "entry"):
+            continue
+
+        title = child_text(element, {"title"})
+        summary = child_text(
+            element,
+            {"description", "summary", "encoded", "content"},
+        )
+
+        link = ""
+        source = ""
+
+        for child in element.iter():
+            child_tag = local_tag(child.tag)
+
+            if child_tag == "link":
+                href = child.attrib.get("href", "").strip()
+                rel = child.attrib.get("rel", "alternate")
+
+                if href and rel in ("alternate", ""):
+                    link = href
+                    break
+
+                if href and not link:
+                    link = href
+
+                if child.text and child.text.strip() and not link:
+                    link = child.text.strip()
+
+            elif child_tag == "source":
+                source = clean(child.text or "")
+
+        if not link:
+            link = feed_url
+
+        published = child_text(
+            element,
+            {
+                "pubdate",
+                "published",
+                "updated",
+                "date",
+            },
+        )
+
+        date_value = parse_date(published)
+
+        if not title:
+            continue
+
+        link = extract_article_url(link)
+
+        if not source:
+            try:
+                host = urlparse(link).hostname or ""
+                source = host.replace("www.", "")
+            except Exception:
+                source = "未知来源"
+
+        results.append({
+            "title": title,
+            "summary": summary,
+            "url": link,
+            "source": source,
+            "published": date_value,
+            "feed": feed_url,
+        })
+
+    return results
+
+
+# =========================================================
+# 六、翻译
+# =========================================================
+
 def translate(text):
     text = clean(text)
-    if not text or chinese(text): return text
-    url = "https://translate.googleapis.com/translate_a/single?" + urlencode({"client": "gtx", "sl": "auto", "tl": "zh-CN", "dt": "t", "q": text[:1600]})
+
+    if not text:
+        return ""
+
+    if contains_chinese(text):
+        return text
+
     try:
-        result = json.loads(get(url, timeout=10).decode("utf-8"))
-        return "".join(part[0] for part in result[0] if part and part[0]) or text
+        endpoint = (
+            "https://translate.googleapis.com/translate_a/single?"
+            + urlencode({
+                "client": "gtx",
+                "sl": "auto",
+                "tl": "zh-CN",
+                "dt": "t",
+                "q": text[:3000],
+            })
+        )
+
+        raw = get(endpoint, timeout=8)
+        data = json.loads(raw.decode("utf-8"))
+
+        translated = "".join(
+            part[0]
+            for part in data[0]
+            if part and part[0]
+        )
+
+        return clean(translated) or text
+
     except Exception:
         return text
 
+
+# =========================================================
+# 七、缓存与去重
+# =========================================================
+
 def load_cache():
+    if not CACHE.exists():
+        return {}
+
     try:
-        data = json.loads(CACHE.read_text(encoding="utf-8"))
+        with CACHE.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+
         return data if isinstance(data, dict) else {}
+
     except Exception:
         return {}
 
-# ============================================================
-# 6. 修正后的智能语义去重引擎（Jaccard 核心算法）
-# ============================================================
-def deduplicate(items):
-    output = []
-    for item in items:
-        raw_title = clean(item.get("title", ""))
-        clean_title = re.sub(r"\s*-\s*[^-]+$", "", raw_title).strip().lower()
-        tokens = set(re.findall(r"[\w\u4e00-\u9fff]", clean_title))
-        
-        if len(tokens) < 3:
-            output.append(item)
-            continue
-            
-        is_duplicate = False
-        for accepted in output:
-            acc_title = clean(accepted.get("title", ""))
-            acc_clean = re.sub(r"\s*-\s*[^-]+$", "", acc_title).strip().lower()
-            acc_tokens = set(re.findall(r"[\w\u4e00-\u9fff]", acc_clean))
-            
-            if not acc_tokens: continue
-            
-            intersection = tokens.intersection(acc_tokens)
-            union = tokens.union(acc_tokens)
-            similarity = len(intersection) / len(union) if union else 0
-            
-            if similarity > 0.38 or len(intersection) >= 7:
-                is_duplicate = True
-                break
-                
-        if not is_duplicate:
-            output.append(item)
-    return output
 
-# ============================================================
-# 7. Gemini 接口
-# ============================================================
-def gemini(prompt):
-    global GEMINI_QUOTA_BLOCKED
-    if GEMINI_QUOTA_BLOCKED: return None
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if not api_key: return None
-    
-    model = "gemini-1.5-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    
-    body = json.dumps({
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
-    }).encode("utf-8")
-    
-    for attempt in range(RETRIES + 1):
-        request = Request(url, data=body, headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/3.0"
-        }, method="POST")
-        try:
-            with urlopen(request, timeout=AI_TIMEOUT) as response:
-                data = json.loads(response.read().decode("utf-8"))
-                candidates = data.get("candidates", [])
-                parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
-                result = "".join(part.get("text", "") for part in parts if part.get("text")).strip()
-                if result: return result
-        except HTTPError as error:
-            if error.code == 429:
-                GEMINI_QUOTA_BLOCKED = True
-                return None
-        except Exception:
-            pass
-        if attempt < RETRIES: time.sleep(2)
-    return None
-
-def parse_ai(raw):
-    if not raw: return None
-    text = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.I)
-    text = re.sub(r"\s*```$", "", text)
+def save_cache(cache):
     try:
-        data = json.loads(text)
-    except Exception:
-        start, end = text.find("{"), text.rfind("}")
-        if start < 0 or end <= start: return None
-        try: data = json.loads(text[start:end + 1])
-        except Exception: return None
-    if not isinstance(data, dict): return None
-    
-    def value(key, limit=600): return clean(data.get(key, ""))[:limit]
-    def array(key, limit=3):
-        items = data.get(key, [])
-        return [clean(item)[:250] for item in items if clean(item)][:limit] if isinstance(items, list) else []
-    
-    assets = data.get("assets", [])
-    if not isinstance(assets, list): assets = []
-    
-    return {
-        "analysis": value("analysis", 1600),
-        "coreLogic": value("core_logic"),
-        "marketImpact": value("market_impact"),
-        "transmission": value("transmission"),
-        "impact": value("impact", 180),
-        "asset": [clean(item)[:80] for item in assets if clean(item)][:4],
-        "timeHorizon": value("time_horizon", 150),
-        "scenarios": array("scenarios"),
-        "evidence": array("evidence"),
-        "risk": value("risk"),
-        "confidence": value("confidence", 100),
-        "provider": "Gemini",
-    }
+        with CACHE.open("w", encoding="utf-8") as file:
+            json.dump(
+                cache,
+                file,
+                ensure_ascii=False,
+                indent=2,
+            )
+    except Exception as exc:
+        print("缓存保存失败：", exc)
+
+
+def normalized_title(title):
+    title = clean(title).lower()
+    title = re.sub(r"https?://\S+", " ", title)
+    title = re.sub(r"[^\w\u4e00-\u9fff]+", " ", title)
+    title = re.sub(r"\s+", " ", title)
+    return title.strip()
+
+
+def token_set(text):
+    text = normalized_title(text)
+
+    # 中文采用字符二元组；英文采用单词
+    if contains_chinese(text):
+        compact = text.replace(" ", "")
+
+        if len(compact) <= 2:
+            return {compact} if compact else set()
+
+        return {
+            compact[i:i + 2]
+            for i in range(len(compact) - 1)
+        }
+
+    return set(text.split())
+
+
+def similarity(a, b):
+    left = token_set(a)
+    right = token_set(b)
+
+    if not left or not right:
+        return 0.0
+
+    return len(left & right) / len(left | right)
+
+
+def deduplicate(items):
+    result = []
+
+    for item in items:
+        duplicate = False
+
+        for existing in result:
+            same_url = (
+                item.get("url")
+                and item.get("url") == existing.get("url")
+            )
+
+            same_title = (
+                similarity(
+                    item.get("title", ""),
+                    existing.get("title", ""),
+                ) > 0.55
+            )
+
+            overlap = (
+                len(
+                    token_set(item.get("title", ""))
+                    & token_set(existing.get("title", ""))
+                ) >= 8
+            )
+
+            if same_url or same_title or overlap:
+                duplicate = True
+                break
+
+        if not duplicate:
+            result.append(item)
+
+    return result
+
+
+# =========================================================
+# 八、新闻重要性评分
+# =========================================================
 
 IMPORTANCE_RULES = [
-    (r"war|invasion|missile|military escalation|ceasefire|armed conflict|战争|入侵|导弹|军事冲突|停火|武装冲突|台海危机", 30),
-    (r"sanction|tariff|trade war|export controls|embargo|制裁|关税|贸易战|出口管制|禁运", 24),
-    (r"emergency|financial crisis|bank failure|capital controls|紧急措施|金融危机|银行倒闭|资本管制", 26),
-    (r"central bank|interest rate|rate cut|rate hike|Federal Reserve|央行|利率|降息|加息|美联储", 20),
-    (r"GDP|inflation|CPI|unemployment|recession|GDP|通胀|消费者物价|失业|经济衰退", 12),
+    (
+        10,
+        [
+            "war", "invasion", "missile", "military escalation",
+            "ceasefire", "armed conflict", "blockade",
+            "战争", "入侵", "导弹", "军事升级", "停火",
+            "武装冲突", "封锁", "台海危机",
+        ],
+    ),
+    (
+        9,
+        [
+            "financial crisis", "bank failure", "emergency meeting",
+            "capital controls", "default", "sovereign debt crisis",
+            "金融危机", "银行倒闭", "紧急会议",
+            "资本管制", "违约", "主权债务危机",
+        ],
+    ),
+    (
+        8,
+        [
+            "sanctions", "tariffs", "export controls",
+            "trade war", "embargo", "oil supply disruption",
+            "central bank intervention", "rate cut", "rate hike",
+            "制裁", "关税", "出口管制", "贸易战", "禁运",
+            "石油供应中断", "央行干预", "降息", "加息",
+        ],
+    ),
+    (
+        7,
+        [
+            "federal reserve", "interest rates", "inflation",
+            "recession", "unemployment", "gdp",
+            "earnings warning", "profit warning",
+            "美联储", "利率", "通胀", "衰退", "失业率",
+            "国内生产总值", "盈利预警",
+        ],
+    ),
+    (
+        6,
+        [
+            "semiconductor", "artificial intelligence",
+            "energy prices", "shipping", "supply chain",
+            "election", "budget", "fiscal stimulus",
+            "半导体", "人工智能", "能源价格", "航运",
+            "供应链", "选举", "预算", "财政刺激",
+        ],
+    ),
 ]
 
-def importance_score(item):
-    text = (item.get("title", "") + " " + item.get("summary", "")).lower()
-    score = 10
-    for pattern, points in IMPORTANCE_RULES:
-        if re.search(pattern, text, re.I): score += points
-    published = item.get("_date")
-    if published:
-        age_hours = max(0, (datetime.now(timezone.utc) - published).total_seconds() / 3600)
-        if age_hours < 6: score += 15
-        elif age_hours < 24: score += 10
-        elif age_hours < 48: score += 5
-    return min(score, 100)
 
-def classify(items, channel):
-    patterns = {
-        "asia": re.compile(r"\bAsia\b|\bChina\b|\bJapan\b|\bTaiwan\b|\bHong Kong\b|亚太|中国|日本|台湾|台灣|香港|台海|半导体|台积电", re.I),
-        "china": re.compile(r"中国|人民币|A股|港股|央行|中国经济", re.I),
-        "earnings": re.compile(r"\bearnings\b|\brevenue\b|\bprofit\b|财报|业绩|营收|利润", re.I),
+def importance_score(item):
+    text = (
+        item.get("title", "")
+        + " "
+        + item.get("summary", "")
+    ).lower()
+
+    score = 1
+
+    for points, keywords in IMPORTANCE_RULES:
+        if any(word.lower() in text for word in keywords):
+            score = max(score, points)
+
+    # 信息量较大的新闻略微加分
+    if len(item.get("summary", "")) > 160:
+        score += 1
+
+    return min(score, 10)
+
+
+# =========================================================
+# 九、栏目分类
+# =========================================================
+
+ASIA_TERMS = [
+    "asia", "asian", "japan", "japanese", "taiwan",
+    "taiwanese", "south korea", "korean", "hong kong",
+    "singapore", "india", "indonesia", "thailand",
+    "malaysia", "philippines", "vietnam", "pacific",
+    "中国", "日本", "台湾", "台海", "韩国", "香港",
+    "新加坡", "印度", "东南亚", "亚太",
+]
+
+CHINA_TERMS = [
+    "china", "chinese", "mainland china", "renminbi",
+    "yuan", "pboc", "people's bank of china",
+    "a-shares", "csi 300", "shanghai composite",
+    "shenzhen", "china property", "china real estate",
+    "中国", "人民币", "央行", "A股", "沪深",
+    "上证", "深证", "房地产", "地方债",
+]
+
+EARNINGS_TERMS = [
+    "earnings", "quarterly results", "revenue",
+    "net profit", "operating profit", "profit warning",
+    "guidance", "quarterly report", "fiscal results",
+    "财报", "业绩", "营收", "净利润", "盈利预警",
+    "季度报告", "业绩指引",
+]
+
+
+def matches_terms(text, terms):
+    lower = text.lower()
+    return any(term.lower() in lower for term in terms)
+
+
+def classify(item, channel):
+    text = (
+        item.get("title", "")
+        + " "
+        + item.get("summary", "")
+        + " "
+        + item.get("source", "")
+    )
+
+    if channel == "china":
+        return matches_terms(text, CHINA_TERMS)
+
+    if channel == "asia":
+        return matches_terms(text, ASIA_TERMS)
+
+    if channel == "earnings":
+        return matches_terms(text, EARNINGS_TERMS)
+
+    if channel == "global":
+        return True
+
+    return False
+
+
+# =========================================================
+# 十、Gemini AI 分析
+# =========================================================
+
+def call_gemini(prompt):
+    global GEMINI_QUOTA_BLOCKED
+
+    if not GEMINI_API_KEY or GEMINI_QUOTA_BLOCKED:
+        return None
+
+    endpoint = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        + GEMINI_MODEL
+        + ":generateContent?key="
+        + GEMINI_API_KEY
+    )
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.2,
+            "responseMimeType": "application/json",
+        },
     }
-    pattern = patterns.get(channel)
-    if pattern is None: return items
-    return [item for item in items if pattern.search(item.get("title", "") + " " + item.get("summary", ""))]
+
+    request = Request(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "FinanceDashboard/1.0",
+        },
+        method="POST",
+    )
+
+    for attempt in range(RETRIES + 1):
+        try:
+            with urlopen(request, timeout=AI_TIMEOUT) as response:
+                result = json.loads(
+                    response.read().decode("utf-8")
+                )
+
+            text = (
+                result.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+            )
+
+            if text:
+                return text
+
+        except HTTPError as exc:
+            if exc.code == 429:
+                GEMINI_QUOTA_BLOCKED = True
+                print("Gemini 配额不足或请求过于频繁，停止本轮 AI 请求。")
+                return None
+
+            print("Gemini HTTP 错误：", exc.code)
+
+        except (URLError, TimeoutError, OSError, ValueError) as exc:
+            print("Gemini 请求失败：", exc)
+
+        if attempt < RETRIES:
+            time.sleep(2)
+
+    return None
+
+
+def parse_ai(text):
+    if not text:
+        return None
+
+    try:
+        data = json.loads(text)
+
+        if not isinstance(data, dict):
+            return None
+
+        fields = [
+            "analysis",
+            "coreLogic",
+            "marketImpact",
+            "transmission",
+            "impact",
+            "asset",
+            "timeHorizon",
+            "scenarios",
+            "evidence",
+            "risk",
+            "confidence",
+        ]
+
+        result = {}
+
+        for field in fields:
+            value = data.get(field, "")
+
+            if isinstance(value, (list, dict)):
+                value = json.dumps(
+                    value,
+                    ensure_ascii=False,
+                )
+
+            result[field] = clean(str(value)) if value else ""
+
+        result["provider"] = "Gemini"
+        return result
+
+    except Exception:
+        return None
+
 
 def insight(item, cache, budget):
-    cache_key = hashlib.sha256((item.get("title", "") + "|" + item.get("url", "")).encode("utf-8")).hexdigest()
-    old = cache.get(cache_key)
-    if isinstance(old, dict) and old.get("analysis") and old.get("coreLogic"): return old
-    if budget["attempts"] >= MAX_AI_CALLS: return None
-    
+    """
+    返回缓存分析，或在预算允许时请求 Gemini。
+    """
+    title = item.get("title", "")
+    url = item.get("url", "")
+
+    key = hashlib.sha256(
+        (title + "|" + url).encode("utf-8")
+    ).hexdigest()
+
+    if key in cache and isinstance(cache[key], dict):
+        return cache[key]
+
+    if budget["attempts"] >= MAX_AI_CALLS:
+        return None
+
+    if not GEMINI_API_KEY or GEMINI_QUOTA_BLOCKED:
+        return None
+
     prompt = f"""
-你是审慎的财经研究助理，使用简体中文。只能依据输入的标题、来源和摘要。
-请只输出合法 JSON，不要 Markdown。
-字段要求：
-analysis：100—180 字新闻解读。
-core_logic：事件→变量变化→影响对象的逻辑链。
-market_impact：潜在受益或承压方向及不确定性。
-transmission：传导机制。
-impact：一句话概括潜在市场影响。
-assets：最多 4 个相关资产、指数、行业或 ETF 类别。
-time_horizon：短期、中期、长期影响及不确定性。
-scenarios：最多 3 条情景及触发条件。
-evidence：最多 3 条证据线索。
-risk：反证与风险。
-confidence：信心等级。
-标题：{item.get('title', '')}
-来源：{item.get('source', '')}
-摘要：{item.get('summary', '')[:1200]}
+你是一名谨慎、专业的中文财经研究分析师。
+
+请根据下面提供的新闻标题和摘要进行分析。
+不要把推测写成事实；信息不足时必须明确说明。
+不要编造新闻细节、数据、引述或来源。
+不要给出保证收益的投资承诺。
+
+新闻标题：{title}
+新闻摘要：{item.get("summary", "")}
+媒体来源：{item.get("source", "")}
+发布时间：{item.get("publishedAt", "")}
+
+请只输出有效 JSON，不要使用 Markdown 代码围栏。
+字段必须包括：
+{{
+  "analysis": "简明中文新闻解读",
+  "coreLogic": "事件的核心逻辑",
+  "marketImpact": "对市场可能产生的影响",
+  "transmission": "影响如何传导至经济或市场",
+  "impact": "影响程度及理由",
+  "asset": "可能相关的资产类别",
+  "timeHorizon": "短期、中期或长期",
+  "scenarios": "可能情景及条件",
+  "evidence": "已知事实与证据边界",
+  "risk": "主要风险及不确定性",
+  "confidence": "高、中或低"
+}}
+
+请使用简洁中文。若无法判断，请明确说明无法判断。
 """
+
     budget["attempts"] += 1
-    time.sleep(4)
-    ai = parse_ai(gemini(prompt))
-    if ai and ai.get("analysis") and ai.get("coreLogic"):
-        cache[cache_key] = ai
+
+    response = call_gemini(prompt)
+    parsed = parse_ai(response)
+
+    if parsed:
+        cache[key] = parsed
         budget["successes"] += 1
-        return ai
+        return parsed
+
     budget["failures"] += 1
     return None
 
+
+# =========================================================
+# 十一、采集并构建新闻栏目
+# =========================================================
+
+def fetch_channel_items(channel):
+    collected = []
+    seen_feeds = set()
+
+    for feed_url in FEEDS.get(channel, []):
+        if feed_url in seen_feeds:
+            continue
+
+        seen_feeds.add(feed_url)
+
+        try:
+            body = get(feed_url, timeout=15)
+            entries = parse_feed(body, feed_url)
+            collected.extend(entries)
+            print(
+                f"[{channel}] 获取 {len(entries)} 条："
+                f"{feed_url}"
+            )
+
+        except Exception as exc:
+            print(
+                f"[{channel}] 来源获取失败："
+                f"{feed_url}；{exc}"
+            )
+
+    return collected
+
+
 def build(channel, cache, budget):
-    gathered = []
-    for source, feed_url in FEEDS[channel]:
-        for item in parse_feed(source, feed_url):
-            item["_date"] = parse_date(item.get("published"))
-            if item["_date"] is None: continue
-            age = (datetime.now(timezone.utc) - item["_date"]).total_seconds()
-            if 0 <= age < MAX_NEWS_AGE_DAYS * 86400:
-                gathered.append(item)
-    
-    gathered = classify(gathered, channel)
-    gathered = deduplicate(gathered)  # 严格执行语义相似度去重
-    
-    for item in gathered:
-        item["_importance"] = importance_score(item)
-    
-    gathered.sort(key=lambda x: (x.get("_importance", 0), x["_date"].timestamp()), reverse=True)
-    
-    output = []
-    for item in gathered:
-        if len(output) >= LIMITS[channel]: break
-        orig_t, orig_s = item.get("title", ""), item.get("summary", "")
-        news_item = {
-            "title": translate(orig_t) or orig_t,
-            "originalTitle": orig_t,
-            "summary": (translate(orig_s) or orig_s)[:900],
-            "source": item.get("source", "权威媒体"),
+    items = fetch_channel_items(channel)
+    current = now_local()
+
+    filtered = []
+
+    for item in items:
+        published = item.get("published")
+
+        # 没有发布时间的条目不直接丢弃，但会降低可信度排序。
+        if published:
+            age = current - published
+
+            if age > timedelta(days=MAX_NEWS_AGE_DAYS):
+                continue
+
+            if age < timedelta(days=-1):
+                continue
+
+        if not classify(item, channel):
+            continue
+
+        item["score"] = importance_score(item)
+        filtered.append(item)
+
+    filtered = deduplicate(filtered)
+
+    filtered.sort(
+        key=lambda x: (
+            x.get("score", 0),
+            x.get("published") or datetime.min.replace(tzinfo=TZ),
+        ),
+        reverse=True,
+    )
+
+    filtered = filtered[:LIMITS.get(channel, 10)]
+
+    result = []
+
+    for index, item in enumerate(filtered, start=1):
+        original_title = clean(item.get("title", ""))
+        original_summary = clean(item.get("summary", ""))
+
+        title_cn = translate(original_title)
+        summary_cn = translate(original_summary)
+
+        published = item.get("published")
+
+        if published:
+            published_at = published.strftime("%Y-%m-%d %H:%M:%S")
+            timestamp = int(published.timestamp() * 1000)
+        else:
+            published_at = ""
+            timestamp = 0
+
+        article = {
+            "id": f"{channel.upper()}-{index:02d}",
+            "rank": index,
+            "importance": item.get("score", 1),
+            "title": title_cn or original_title,
+            "originalTitle": original_title,
+            "summary": summary_cn or original_summary,
+            "source": clean(item.get("source", "")) or "未知来源",
             "url": item.get("url", ""),
-            "publishedAt": item["_date"].astimezone(TZ).strftime("%Y-%m-%d %H:%M"),
-            "timestamp": int(item["_date"].timestamp()),
-            "impact": "待分析", "asset": [], "analysis": "", "risk": "",
-            "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "",
-            "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析",
+            "publishedAt": published_at,
+            "timestamp": timestamp,
+            "analysis": "",
+            "coreLogic": "",
+            "marketImpact": "",
+            "transmission": "",
+            "impact": "",
+            "asset": "",
+            "timeHorizon": "",
+            "scenarios": "",
+            "evidence": "",
+            "risk": "",
+            "confidence": "",
+            "provider": "",
         }
-        prepare_article_links(news_item)
-        ai = insight(news_item, cache, budget)
-        if ai:
-            news_item.update(ai)
-            news_item["impact"] = ai.get("impact") or ai.get("marketImpact") or "见分层分析"
-            news_item["aiStatus"] = "Gemini AI"
-        output.append(news_item)
-        
-    for i, item in enumerate(output):
-        item["id"] = f"NO.{len(output) - i:02d}"
-    return output
+
+        prepare_article_links(article)
+
+        ai_data = insight(article, cache, budget)
+
+        if ai_data:
+            article.update(ai_data)
+
+        result.append(article)
+
+    return result
+
+
+# =========================================================
+# 十二、写入网页
+# =========================================================
 
 def main():
-    if not PAGE.exists(): return
-    page = PAGE.read_text(encoding="utf-8")
-    start_marker, end_marker = "<!-- NEWS_DATA_START -->", "<!-- NEWS_DATA_END -->"
-    if start_marker not in page or end_marker not in page: return
-    
-    cache, budget = load_cache(), {"attempts": 0, "successes": 0, "failures": 0}
-    news = {ch: build(ch, cache, budget) for ch in ("global", "asia", "china", "earnings")}
-    news["updatedAt"] = datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
-    news["aiEnabled"] = bool(os.getenv("GEMINI_API_KEY", "").strip())
-    news["aiModel"] = "gemini-1.5-flash"
-    news["aiStats"] = {**budget, "maxPerRun": MAX_AI_CALLS}
-    
-    start = page.index(start_marker) + len(start_marker)
-    end = page.index(end_marker, start)
-    data_block = "\n<script>window.newsData = " + json.dumps(news, ensure_ascii=False).replace("</", "<\\/") + ";</script>\n"
-    page = page[:start] + data_block + page[end:]
-    page = re.sub(r"""(<span[^>]*id=["']updateTime["'][^>]*>).*?(</span>)""", lambda m: m.group(1) + html.escape(news["updatedAt"]) + m.group(2), page, flags=re.I | re.S)
-    
-    PAGE.write_text(page, encoding="utf-8")
-    CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("全量更新完成：已彻底修复列表对象的属性错误，语义去重与模型正常运转。")
+    if not PAGE.exists():
+        raise FileNotFoundError(
+            f"找不到 {PAGE.name}。"
+            "请确保 update.py 与 index.html 位于同一目录。"
+        )
+
+    page_text = PAGE.read_text(encoding="utf-8")
+
+    start_marker = "<!-- NEWS_DATA_START -->"
+    end_marker = "<!-- NEWS_DATA_END -->"
+
+    if start_marker not in page_text or end_marker not in page_text:
+        raise RuntimeError(
+            "index.html 缺少 NEWS_DATA_START 或 NEWS_DATA_END 标记。"
+            "请检查你使用的 index.html 是否为对应版本。"
+        )
+
+    cache = load_cache()
+
+    budget = {
+        "attempts": 0,
+        "successes": 0,
+        "failures": 0,
+    }
+
+    news_data = {}
+
+    for channel in ("global", "asia", "china", "earnings"):
+        print(f"\n正在更新栏目：{channel}")
+
+        try:
+            news_data[channel] = build(
+                channel,
+                cache,
+                budget,
+            )
+
+        except Exception as exc:
+            print(f"栏目 {channel} 更新失败：{exc}")
+            news_data[channel] = []
+
+    updated_at = now_local().strftime("%Y-%m-%d %H:%M:%S")
+
+    payload = {
+        "updatedAt": updated_at,
+        "aiEnabled": bool(GEMINI_API_KEY),
+        "aiModel": GEMINI_MODEL,
+        "aiStats": {
+            "attempts": budget["attempts"],
+            "successes": budget["successes"],
+            "failures": budget["failures"],
+            "maxPerRun": MAX_AI_CALLS,
+        },
+        "global": news_data.get("global", []),
+        "asia": news_data.get("asia", []),
+        "china": news_data.get("china", []),
+        "earnings": news_data.get("earnings", []),
+    }
+
+    script = (
+        start_marker
+        + "\n<script>\n"
+        + "window.newsData = "
+        + json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        + ";\n</script>\n"
+        + end_marker
+    )
+
+    updated_page = re.sub(
+        re.escape(start_marker)
+        + r".*?"
+        + re.escape(end_marker),
+        lambda _: script,
+        page_text,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+    # 更新时间显示元素（如果当前 index.html 中存在）
+    updated_page = re.sub(
+        r'(<span[^>]*id=["\']updateTime["\'][^>]*>).*?(</span>)',
+        lambda match: (
+            match.group(1)
+            + updated_at
+            + match.group(2)
+        ),
+        updated_page,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    PAGE.write_text(updated_page, encoding="utf-8")
+    save_cache(cache)
+
+    print("\n========== 更新完成 ==========")
+    print("更新时间：", updated_at)
+    print("国际财经：", len(payload["global"]), "条")
+    print("亚太财经：", len(payload["asia"]), "条")
+    print("国内财经：", len(payload["china"]), "条")
+    print("公司财报：", len(payload["earnings"]), "条")
+    print("AI 调用：", budget["attempts"], "/", MAX_AI_CALLS)
+    print("AI 成功：", budget["successes"])
+    print("AI 失败：", budget["failures"])
+    print("网页文件：", PAGE)
+    print("缓存文件：", CACHE)
+
 
 if __name__ == "__main__":
     main()
