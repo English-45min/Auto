@@ -2,392 +2,141 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0f19">
-<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080d18">
 <title>财经与时政焦点看板</title>
+
 <script src="https://cdn.tailwindcss.com"></script>
+
 <style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:#0b0f19;color:#e2e8f0;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
-.tab{padding:.75rem .6rem;border-bottom:2px solid transparent;color:#94a3b8;font-weight:700;cursor:pointer;touch-action:pan-y}
-.tab.active{border-color:#f59e0b;color:#f59e0b}
-.card{background:#111827;border:1px solid #263244;border-radius:14px;padding:16px;overflow-wrap:anywhere}
-.muted{color:#94a3b8}
-.ai{background:#0d2430;border:1px solid #155e75;border-radius:10px;padding:12px}
-.pill{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#1e293b;color:#cbd5e1}
-.read{opacity:.72}
-.btn{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:7px 10px;cursor:pointer}
-.btn:hover{background:#334155}
-a{color:#fbbf24;text-decoration:none}
-a:hover{text-decoration:underline}
-input{outline:none}
-input:focus{border-color:#f59e0b}
+:root {
+  --bg: #080d18;
+  --panel: #101827;
+  --panel2: #141f30;
+  --border: #263448;
+  --text: #e6edf7;
+  --muted: #91a1b8;
+  --orange: #ffad42;
+  --green: #46d6a0;
+  --red: #ff727c;
+  --blue: #72b8ff;
+}
 
-/* 标题自适应：手机端最多显示 2 行，宽屏单行 */
-.adaptive-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Microsoft YaHei", sans-serif;
+  line-height: 1.6;
+}
+
+button, input, select { font: inherit; }
+
+button { cursor: pointer; }
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(8,13,24,.94);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.container {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 0 18px;
+}
+
+.brand {
+  font-weight: 800;
+  letter-spacing: .4px;
+  font-size: 20px;
+}
+
+.brand span { color: var(--orange); }
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.7px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 6px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 14px 0;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  white-space: nowrap;
+  padding: 9px 15px;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 13px;
+}
+
+.tab.active {
+  color: var(--orange);
+  border-color: rgba(255,173,66,.42);
+  background: rgba(255,173,66,.09);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.metric {
+  padding: 15px;
+  min-height: 88px;
+}
+
+.metric-value {
+  font-size: 25px;
+  font-weight: 750;
+  margin-top: 3px;
+}
+
+.muted { color: var(--muted); }
+
+.section-title {
+  font-size: 17px;
+  font-weight: 750;
+}
+
+.small-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.featured {
+  padding: 18px;
+  position: relative;
   overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 1.1em;
-  line-height: 1.55;
-}
-@media (min-width: 640px) {
-  .adaptive-title {
-    display: block;
-    -webkit-line-clamp: unset;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.featured-wrap{border:1px solid #92400e;background:linear-gradient(135deg,#24170b,#111827 65%);border-radius:16px;padding:16px;margin-bottom:22px}
-.featured-title{font-size:1.3rem;font-weight:900;color:#fbbf24;letter-spacing:.02em}
-.featured-card{border:1px solid #854d0e;background:#171b25;border-radius:12px;padding:14px;margin-top:10px}
-.priority-high{border-color:#b91c1c!important;box-shadow:inset 4px 0 #ef4444}
-.priority-medium{border-color:#b45309!important;box-shadow:inset 4px 0 #f59e0b}
-.priority-low{border-color:#334155!important}
-.score-badge{display:inline-block;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:900;background:#3f1d0d;color:#fdba74}
-.evidence-badge{display:inline-block;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:800;background:#1e293b;color:#cbd5e1}
-.featured-meta{font-size:.82rem;color:#cbd5e1;line-height:1.6}
-.research-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.research-box{background:#0b1220;border:1px solid #263244;border-radius:9px;padding:10px;min-width:0}
-.research-box h4{font-size:.85em;font-weight:800;color:#7dd3fc;margin:0 0 6px}
-.research-box p,.research-box li{font-size:.92em;line-height:1.6;color:#dbeafe}
-.research-box ul{padding-left:1.2rem;margin:0}
-.research-wide{grid-column:1/-1}
-@media(max-width:520px){
- .card{padding:12px}
- .tab{font-size:12px;padding:.65rem .18rem}
- .research-grid{grid-template-columns:1fr}
- .research-wide{grid-column:auto}
-}
-</style>
-</head>
-<body>
-
-<header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
- <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-  <div>
-   <h1 class="text-xl sm:text-2xl font-black">📈 TERMINAL // 财经与时政焦点</h1>
-   <p class="muted text-sm mt-1">全球公信力媒体 · 深度分析 · 纯净直达</p>
-  </div>
-  <div class="text-xs muted">
-   最近更新：<span id="updateTime">2026-10-24 15:00:14</span>
-   <div id="aiStatus" class="mt-1">AI 状态读取中</div>
-  </div>
- </div>
-</header>
-
-<main class="max-w-6xl mx-auto px-4 py-5">
- <div class="flex flex-wrap gap-2 items-center mb-4">
-  <input id="searchInput" type="search"
-   class="flex-1 min-w-48 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
-   placeholder="搜索标题、摘要、来源、逻辑或资产…"
-   aria-label="搜索新闻">
- </div>
-
- <nav class="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 mb-5" id="tabs">
-  <button class="tab" data-tab="global" type="button">国际财经 Top 20</button>
-  <button class="tab" data-tab="asia" type="button">亚太财经 Top 10</button>
-  <button class="tab" data-tab="china" type="button">国内财经 Top 10</button>
-  <button class="tab" data-tab="earnings" type="button">📊 核心财报 Top 10</button>
- </nav>
-
- <section id="featuredWrap" class="featured-wrap">
-  <div class="flex flex-wrap items-center justify-between gap-2">
-   <h2 class="featured-title">🔥 当日重点新闻 · TOP 3</h2>
-   <span class="pill">重要性筛选</span>
-  </div>
-  <div id="featuredList"></div>
- </section>
-
- <div class="flex justify-between items-center gap-3 mb-3">
-  <h2 id="sectionTitle" class="text-lg font-bold">国际财经新闻</h2>
-  <span id="count" class="muted text-sm">0 条</span>
- </div>
-
- <p class="muted text-xs mb-4">
-  提示：在手机端可左右滑动切换栏目。
- </p>
-
- <div id="newsList" class="space-y-4" aria-live="polite">
-  <div class="card muted">看板正在初始化……</div>
- </div>
-
- <footer class="muted text-xs mt-8 leading-relaxed">
-  免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。
-  <p class="mt-1">© 2026 财经焦点看板</p>
- </footer>
-</main>
-
-<!-- NEWS_DATA_START -->
-<script>window.newsData = {"global": [{"title": "印度央行前官员表示，使用卢比作为稳定剂可能会损害实体经济 - 路透中文网", "originalTitle": "Using rupee as stabiliser can hurt real economy, ex-Indian central bank official says - Reuters", "summary": "印度央行前官员表示，使用卢比作为稳定剂可能会损害实体经济 路透", "source": "Reuters", "url": "https://news.google.com/rss/articles/CBMiwgFBVV95cUxOWFBSTnBrOGQ5c0tGLS13aFl3YTZ3RTVtNkxVcWpjRF84TUcxMHBwZnZpZkxZR29nTHNKQ3Y4U3NKNkRKNVJvVGFkclo1U183czhXcjNTaDFINzR0eFdpOExLZVVlT1g1S29TdnVSR001QjY2QUwxQ0JaRVhWenR1U2pmZzd1U2FQTzBuZnQ3Mlo5dmlGZVdjelpySk1sMWFacWpGbVdSbUtvc0RhemprbDZmSlMxUzdUcTZXdG5aT29oQQ?oc=5", "publishedAt": "2026-10-22 13:56", "timestamp": 1792648560, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.01"}], "asia": [{"title": "工研院擬工業區建稀土廠 拚2030年50%需求自給自足", "originalTitle": "工研院擬工業區建稀土廠 拚2030年50%需求自給自足", "summary": "工研院張培仁專訪（中央社記者張建中新竹24日電）中國為全球最大稀土生產與出口國，並實施出口管制，引發國際關注。工研院院長張培仁表示，工研院內有稀土實驗線，計劃進一步在工業區內建置示範工廠，並於2030年底達到年產500噸規模，台灣50%需求得以自給自足。", "source": "中央社 CNA", "url": "https://www.cna.com.tw/news/afe/202610240025.aspx", "publishedAt": "2026-10-24 08:53", "timestamp": 1792803238, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.04"}, {"title": "随着成本上升政府将审查汽油补贴", "originalTitle": "Government to review gasoline subsidies as costs mount", "summary": "日本正在向石油批发商提供补贴，将国内普通汽油的平均零售价控制在每升 170 日元左右。", "source": "The Japan Times", "url": "https://www.japantimes.co.jp/news/2026/10/24/japan/gas-subsidies-review/", "publishedAt": "2026-10-24 09:06", "timestamp": 1792803960, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.03"}, {"title": "颱風薔琵釀14.6萬戶停電 台電跨區支援加速搶修", "originalTitle": "颱風薔琵釀14.6萬戶停電 台電跨區支援加速搶修", "summary": "（中央社記者梁家柔台北23日電）颱風薔琵暴風圈逐漸籠罩台灣，截至今天晚間8時，全台曾停電戶數超過14.6萬戶，現已復電逾12.2萬戶，復電率近84%。台電表示，針對主要停電區域已派員積極搶修，也同時啟動跨區支援機制，將在兼顧安全下加速搶修。", "source": "中央社 CNA", "url": "https://www.cna.com.tw/news/afe/202610230262.aspx", "publishedAt": "2026-10-23 21:31", "timestamp": 1792762315, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.02"}, {"title": "憂車載感測器蒐集情報 美軍禁比亞迪進沖繩嘉手納基地", "originalTitle": "憂車載感測器蒐集情報 美軍禁比亞迪進沖繩嘉手納基地", "summary": "（中央社首爾23日綜合外電報導）韓聯社今天報導，在華府將中國汽車製造商比亞迪列入其認定協助中國軍方的企業名單後，美軍出於安全考量，已禁止比亞迪電動車進入美軍駐日本空軍基地。", "source": "中央社 CNA", "url": "https://www.cna.com.tw/news/aopl/202610230253.aspx", "publishedAt": "2026-10-23 20:57", "timestamp": 1792760256, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.01"}], "china": [], "earnings": [{"title": "康卡斯特盈利超出预期，媒体收入抵消了连接方面的疲软", "originalTitle": "Comcast beats earnings expectations as media revenue offsets weakness in connectivity", "summary": "康卡斯特正在将其媒体业务分拆为一家独立的上市公司。", "source": "CNBC Earnings", "url": "https://www.cnbc.com/2026/10/22/comcast-cmcsa-earnings-q3-2026.html", "publishedAt": "2026-10-23 04:04", "timestamp": 1792699491, "impact": "待分析", "asset": [], "analysis": "", "risk": "", "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "", "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析", "linkStatus": "原始媒体链接", "id": "NO.01"}], "updatedAt": "2026-10-24 15:00:14", "aiEnabled": true, "aiModel": "gemini-1.5-flash", "aiStats": {"attempts": 3, "successes": 0, "failures": 3, "maxPerRun": 3}};</script>
-<!-- NEWS_DATA_END -->
-
-<script>
-"use strict";
-const labels = { global: "国际财经新闻", asia: "亚太财经新闻", china: "国内财经新闻", earnings: "核心财报新闻" };
-const activeKey = "financeDashboardActiveTab_v3";
-const validTabs = ["global", "asia", "china", "earnings"];
-let active = "global";
-
-try {
- const savedTab = localStorage.getItem(activeKey);
- if (validTabs.includes(savedTab)) active = savedTab;
-} catch(e) {}
-
-const TOPIC_RULES = [
- {re:/central bank|federal reserve|fed |interest rate|rate cut|rate hike|inflation|CPI|PCE|就业报告|美联储|央行|利率|通胀|非农|货币政策/i, points:24, label:"宏观政策/经济数据"},
- {re:/war|sanction|tariff|trade war|default|crisis|emergency|bank failure|missile|military|invasion|ceasefire|geopolitic|election|coup|conflict|战争|制裁|关税|贸易战|违约|危机|银行倒闭|导弹|军事|入侵|停火|地缘|选举|政变|冲突/i, points:23, label:"地缘/系统性风险"},
- {re:/GDP|recession|bond yield|treasury|dollar|yuan|exchange rate|国债收益率|美元|人民币|汇率|经济衰退/i, points:18, label:"宏观与金融条件"},
- {re:/earnings|revenue|profit|guidance|forecast|财报|营收|利润|业绩指引|盈利预警/i, points:14, label:"企业财报/业绩"},
- {re:/oil|crude|gold|semiconductor|chip|AI |artificial intelligence|能源|原油|黄金|半导体|芯片|人工智能/i, points:10, label:"重要行业/大宗商品"}
-];
-
-const readKey = "financeDashboardRead_v3";
-let readIds = new Set();
-try { readIds = new Set(JSON.parse(localStorage.getItem(readKey) || "[]")); } catch(e) {}
-
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-function safeUrl(v) {
- try {
-  const u = new URL(String(v || ""), location.href);
-  if (["https:", "http:"].includes(u.protocol)) return u.href;
- } catch(e) {}
- return "#";
-}
-
-function articleLink(n) {
- const href = String(n.url || "");
- if (!href || href === "#") {
-  return '<span class="muted text-xs">暂无可用原文链接</span>';
- }
- return '<a href="' + esc(safeUrl(href)) + '" target="_blank" rel="noopener noreferrer">查看原始报道 ↗</a>';
-}
-
-function importance(n) {
- const text = [n.title, n.originalTitle, n.summary].join(" ");
- let score = 20;
- const why = [];
- for (const r of TOPIC_RULES) {
-  if (r.re.test(text)) { score += r.points; why.push(r.label); }
- }
- const age = Number(n.timestamp || 0) ? Math.max(0, (Date.now() / 1000 - Number(n.timestamp)) / 3600) : 48;
- score += age < 12 ? 15 : age < 24 ? 10 : age < 48 ? 5 : 0;
- if (n.url) score += 5;
- score = Math.min(100, score);
- const level = score >= 65 ? "高" : score >= 45 ? "中" : "常规";
- return { score, level, why: why.slice(0, 2) };
-}
-
-function ranked(items) {
- if (!Array.isArray(items)) return [];
- return items.map((n, i) => ({ ...n, _rank: importance(n), _originalIndex: i }))
-  .sort((a, b) => b._rank.score - a._rank.score || Number(b.timestamp || 0) - Number(a.timestamp || 0));
-}
-
-function list(items) {
- if (Array.isArray(items) && items.length) {
-  return "<ul>" + items.map(x => `<li>${esc(x)}</li>`).join("") + "</ul>";
- }
- return "<p>暂无足够信息。</p>";
-}
-
-function renderFeatured() {
- const all = (typeof window.newsData !== "undefined" && window.newsData && Array.isArray(window.newsData[active])) ? window.newsData[active] : [];
- const items = ranked(all).slice(0, 3);
- const root = document.getElementById("featuredList");
- if (!root) return;
-
- if (!items.length) {
-  root.innerHTML = '<p class="muted text-sm mt-3">本栏目暂时没有可展示的重点新闻。</p>';
-  return;
- }
-
- root.innerHTML = items.map((n, i) => {
-  const r = n._rank;
-  return `
-   <article class="featured-card priority-${r.level === "高" ? "high" : r.level === "中" ? "medium" : "low"}">
-    <div class="flex flex-wrap gap-2 items-center mb-2">
-     <span class="score-badge">TOP ${i + 1} · ${r.score}/100</span>
-     <span class="pill">重要性：${r.level}</span>
-    </div>
-    <h3 class="adaptive-title font-bold text-slate-100 mb-2">${esc(n.title || "无标题")}</h3>
-    <p class="featured-meta mt-2">${esc(n.summary || "暂无摘要")}</p>
-    <div class="mt-3 text-sm">${articleLink(n)}</div>
-   </article>`;
- }).join("");
-}
-
-function render() {
- const container = document.getElementById("newsList");
- if (!container) return;
-
- let all = [];
- try {
-  if (typeof window.newsData !== "undefined" && window.newsData && Array.isArray(window.newsData[active])) {
-   all = ranked(window.newsData[active]);
-  }
- } catch(e) { all = []; }
-
- const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
- const items = all.filter(n => [
-  n.title, n.summary, n.source, (n.asset || []).join(" "),
-  n.analysis, n.coreLogic, n.marketImpact, n.transmission, n.risk, n.originalTitle
- ].join(" ").toLowerCase().includes(q));
-
- document.getElementById("sectionTitle").textContent = labels[active] || "财经新闻";
- document.getElementById("count").textContent = `显示 ${items.length} / ${all.length} 条`;
-
- renderFeatured();
-
- if (!items.length) {
-  container.innerHTML = `<div class="card muted">${all.length ? "没有找到符合条件的新闻。" : "当前栏目暂无资讯，请稍后检查 GitHub Actions 自动更新。"}</div>`;
-  return;
- }
-
- container.innerHTML = items.map((n, i) => {
-  const rid = active + "_" + String(n.url || n.title || i);
-  const read = readIds.has(rid);
-  const assets = Array.isArray(n.asset) ? n.asset : [];
-  const rank = n._rank || importance(n);
-
-  const research = n.analysis ? `
-   <section class="ai mb-3">
-    <div class="font-bold text-cyan-300 mb-2">🧭 AI 分层研究分析 <span class="pill">${esc(n.confidence || "置信度未标注")}</span></div>
-    <p class="leading-relaxed mb-3">${esc(n.analysis)}</p>
-    <div class="research-grid">
-     <div class="research-box"><h4>📌 核心逻辑</h4><p>${esc(n.coreLogic || "暂无。")}</p></div>
-     <div class="research-box"><h4>📈 潜在市场影响</h4><p>${esc(n.marketImpact || n.impact || "暂无法判断。")}</p></div>
-     <div class="research-box"><h4>🔗 传导机制</h4><p>${esc(n.transmission || "当前信息不足。")}</p></div>
-     <div class="research-box"><h4>⏳ 影响周期</h4><p>${esc(n.timeHorizon || "暂不确定。")}</p></div>
-     <div class="research-box"><h4>🧾 证据线索</h4>${list(n.evidence)}</div>
-     <div class="research-box"><h4>⚖️ 情景分析</h4>${list(n.scenarios)}</div>
-     <div class="research-box research-wide"><h4>⚠️ 风险与缺口</h4><p>${esc(n.risk || "尚未识别。")}</p></div>
-    </div>
-   </section>` : '';
-
-  return `
-   <article class="card ${read ? "read" : ""} priority-${rank.level === "高" ? "high" : rank.level === "中" ? "medium" : "low"}">
-    <div class="flex flex-wrap justify-between gap-2 items-center mb-3">
-     <div class="flex flex-wrap gap-2 items-center">
-      <span class="score-badge">重要性 ${rank.score}/100 · ${rank.level}</span>
-      <span class="pill">${esc(n.id || ("NO." + (items.length - i)))}</span>
-      <span class="pill">${esc(n.source || "权威媒体")}</span>
-      <span class="pill">${esc(n.publishedAt || "")}</span>
-     </div>
-     <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">${read ? "✓ 已读" : "标记已读"}</button>
-    </div>
-    
-    <h3 class="adaptive-title font-bold text-slate-100 mb-2 ${read ? "read-title" : ""}" title="${esc(n.title || "")}">${esc(n.title || "无标题")}</h3>
-
-    ${n.originalTitle && n.originalTitle !== n.title ? `
-     <details class="mb-3 text-xs muted">
-      <summary class="cursor-pointer">查看原文标题</summary>
-      <p class="mt-2">${esc(n.originalTitle)}</p>
-     </details>` : ""}
-
-    <p class="text-slate-300 leading-relaxed mb-3">${esc(n.summary || "暂无摘要")}</p>
-    
-    <div class="flex flex-wrap gap-2 mb-3">
-     <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
-     ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
-    </div>
-
-    ${research}
-    <div class="text-sm">${articleLink(n)}</div>
-   </article>`;
- }).join("");
-
- container.querySelectorAll("[data-read-id]").forEach(button => {
-  button.addEventListener("click", () => {
-   readIds.add(button.getAttribute("data-read-id"));
-   try { localStorage.setItem(readKey, JSON.stringify([...readIds])); } catch(e) {}
-   render();
-  });
- });
-}
-
-function setTab(name) {
- if (!validTabs.includes(name)) return;
- active = name;
- try { localStorage.setItem(activeKey, name); } catch(e) {}
- document.querySelectorAll("[data-tab]").forEach(button => {
-  button.classList.toggle("active", button.dataset.tab === name);
- });
- render();
- window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-document.querySelectorAll("[data-tab]").forEach(button => {
- button.addEventListener("click", () => setTab(button.dataset.tab));
-});
-
-const searchInput = document.getElementById("searchInput");
-if (searchInput) searchInput.addEventListener("input", render);
-
-/* 恢复手机左右滑动切换栏目手势监听 */
-(() => {
- let sx = 0, sy = 0, started = 0, tracking = false;
- const MIN_X = 70, DOMINANCE = 2, MAX_MS = 900;
-
- document.addEventListener("touchstart", e => {
-  if (e.touches.length !== 1) { tracking = false; return; }
-  const target = e.target;
-  if (target.closest("input, textarea, select, button, a, summary, [data-no-swipe]")) {
-   tracking = false;
-   return;
-  }
-  sx = e.touches[0].clientX;
-  sy = e.touches[0].clientY;
-  started = Date.now();
-  tracking = true;
- }, { passive: true });
-
- document.addEventListener("touchend", e => {
-  if (!tracking || !e.changedTouches.length) { tracking = false; return; }
-  tracking = false;
-
-  const dx = e.changedTouches[0].clientX - sx;
-  const dy = e.changedTouches[0].clientY - sy;
-  const ax = Math.abs(dx), ay = Math.abs(dy);
-
-  if (Date.now() - started > MAX_MS || ax < MIN_X || ax <= ay * DOMINANCE) return;
-
-  const i = validTabs.indexOf(active);
-  if (dx < 0 && i < validTabs.length - 1) {
-   setTab(validTabs[i + 1]);
-  } else if (dx > 0 && i > 0) {
-   setTab(validTabs[i - 1]);
-  }
- }, { passive: true });
-})();
-
-if (typeof window.newsData !== "undefined" && window.newsData?.updatedAt) {
- const ut = document.getElementById("updateTime");
- if (ut) ut.textContent = window.newsData.updatedAt;
-}
-
-const st = window.newsData?.aiStats;
-const aiStatusEl = document.getElementById("aiStatus");
-if (aiStatusEl) {
- aiStatusEl.textContent = window.newsData?.aiEnabled
-  ? `🟢 Gemini 已配置 · ${window.newsData.aiModel || "模型"}${st ? ` · 成功 ${st.successes}/${st.attempts}` : ""}`
-  : "🟠 未检测到 Gemini API 密钥";
-}
-
-document.querySelectorAll("[data-tab]").forEach(button => {
- button.classList.toggle("active", button.dataset.tab === active);
-});
-
-document.addEventListener("DOMContentLoaded", render);
-render();
-</script>
-</body>
-</html>
+  background:
+    radial-gradient(ellipse at top right, rgba(255,173,66,.11), transparent 50%),
+    var
