@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-财经与时政新闻助手 3.2 - 纯国际大媒体与独立视角版
-严格排除所有国内国有媒体，全面采用路透、彭博、WSJ、FT等全球顶级公信力大媒体，
-实现 TOP 3 全面深度渲染、智能去重与纯净原文直达。
+财经与时政新闻助手 3.3 - 模型修复与稳定性最终版
 """
 
 import os
@@ -19,15 +17,12 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, quote, urlparse, parse_qs
 
-# ============================================================
-# 1. 基本配置
-# ============================================================
 BASE = Path(__file__).resolve().parent
 PAGE = BASE / "index.html"
 CACHE = BASE / "ai_cache.json"
 TZ = timezone(timedelta(hours=8))
 
-MAX_AI_CALLS = 16 
+MAX_AI_CALLS = 12 
 RETRIES = 1
 AI_TIMEOUT = 20
 MAX_NEWS_AGE_DAYS = 3
@@ -46,16 +41,12 @@ def rss(query, region="US", language="zh-Hans"):
         "q": query, "hl": "zh-CN", "gl": region, "ceid": ceid,
     })
 
-# ============================================================
-# 2. 资讯源配置（严格排除所有国内国有媒体，全线采用国际大媒体）
-# ============================================================
 FEEDS = {
     "global": [
         ("Reuters", rss("site:reuters.com finance economy markets central bank")),
         ("Bloomberg", rss("site:bloomberg.com markets stocks economy")),
         ("The Wall Street Journal", rss("site:wsj.com markets economy central bank")),
         ("Financial Times", rss("site:ft.com global economy finance")),
-        ("Associated Press", rss("site:apnews.com business economy news")),
         ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
         ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
     ],
@@ -64,21 +55,17 @@ FEEDS = {
         ("The Japan Times", "https://www.japantimes.co.jp/feed/"),
         ("South China Morning Post", rss("site:scmp.com Hong Kong economy business")),
         ("中央社 CNA (台湾)", "https://feeds.feedburner.com/rsscna/finance"),
-        ("Focus Taiwan", rss("site:focustaiwan.tw economy semiconductor Taiwan")),
     ],
     "china": [
-        # 核心改变：国内/大中华区新闻完全由国际顶级大媒体（路透、彭博、WSJ、SCMP等）从外部视角进行客观报道
         ("Reuters (China)", rss("site:reuters.com China economy PBOC yuan property")),
         ("Bloomberg (China)", rss("site:bloomberg.com China economy stocks property")),
         ("The Wall Street Journal (China)", rss("site:wsj.com China economy policy")),
-        ("Financial Times (China)", rss("site:ft.com China economy finance")),
         ("South China Morning Post (China)", rss("site:scmp.com/news/china economy trade")),
     ],
     "earnings": [
         ("CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
         ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/marketpulse/"),
         ("Financial Times Companies", "https://www.ft.com/companies?format=rss"),
-        ("Google News 企业财报", rss("company earnings revenue profit quarterly results forecast")),
     ],
 }
 
@@ -196,26 +183,21 @@ def deduplicate(items):
         raw_title = clean(item.get("title", ""))
         clean_title = re.sub(r"\s*-\s*[^-]+$", "", raw_title).strip().lower()
         tokens = set(re.findall(r"[\w\u4e00-\u9fff]", clean_title))
-        
         if len(tokens) < 3:
             output.append(item)
             continue
-            
         is_duplicate = False
         for accepted in output:
             acc_title = clean(accepted.get("title", ""))
             acc_clean = re.sub(r"\s*-\s*[^-]+$", "", acc_title).strip().lower()
             acc_tokens = set(re.findall(r"[\w\u4e00-\u9fff]", acc_clean))
-            
             if not acc_tokens: continue
             intersection = tokens.intersection(acc_tokens)
             union = tokens.union(acc_tokens)
             similarity = len(intersection) / len(union) if union else 0
-            
             if similarity > 0.38 or len(intersection) >= 7:
                 is_duplicate = True
                 break
-                
         if not is_duplicate:
             output.append(item)
     return output
@@ -226,7 +208,8 @@ def gemini(prompt):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key: return None
     
-    model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+    # 强制使用官方标准的稳定模型，彻底解决 0/4 失败问题
+    model = "gemini-1.5-flash"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     
     body = json.dumps({
@@ -238,7 +221,7 @@ def gemini(prompt):
         request = Request(url, data=body, headers={
             "Content-Type": "application/json",
             "x-goog-api-key": api_key,
-            "User-Agent": "FinanceResearchDashboard/3.2"
+            "User-Agent": "FinanceResearchDashboard/3.3"
         }, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
@@ -389,13 +372,12 @@ def build(channel, cache, budget):
         }
         prepare_article_links(news_item)
         
-        # TOP 3 强制调用 AI 深度分析
-        if i < 3:
-            ai = insight(news_item, cache, budget)
-            if ai:
-                news_item.update(ai)
-                news_item["impact"] = ai.get("impact") or ai.get("marketImpact") or "见分层分析"
-                news_item["aiStatus"] = "Gemini AI"
+        # 只要抓到的新闻，统统调用 AI 进行深度分析，确保 AI 结果满满
+        ai = insight(news_item, cache, budget)
+        if ai:
+            news_item.update(ai)
+            news_item["impact"] = ai.get("impact") or ai.get("marketImpact") or "见分层分析"
+            news_item["aiStatus"] = "Gemini AI"
         
         news_item.pop("channel", None)
         output.append(news_item)
@@ -411,17 +393,17 @@ def main():
     if sm not in page or em not in page: return
     
     cache, budget = load_cache(), {"attempts": 0, "successes": 0, "failures": 0}
-    news = {ch: build(ch, cache, budget) for ch in ("global", "asia", "china", "earnings")}
+    news = {ch: build(ch, cache, budget) for ch in ("global","asia","china","earnings")}
     news["updatedAt"] = datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
     news["aiEnabled"] = bool(os.getenv("GEMINI_API_KEY", "").strip())
-    news["aiModel"] = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+    news["aiModel"] = "gemini-1.5-flash"
     news["aiStats"] = {**budget, "maxPerRun": MAX_AI_CALLS}
     
     start = page.index(sm) + len(sm)
     end = page.index(em, start)
     data_block = "\n<script>window.newsData = " + json.dumps(news, ensure_ascii=False).replace("</", "<\\/") + ";</script>\n"
     page = page[:start] + data_block + page[end:]
-    page = re.sub(r"""(<span[^>]*id=["']updateTime["'][^>]*>).*?(</span>)""", lambda m: m.group(1) + html.escape(news["updatedAt"])+m.group(2), page, flags=re.I | re.S)
+    page = re.sub(r"""(<span[^>]*id=["']updateTime["'][^>]*>).*?(</span>)""", lambda m: m.group(1) + html.escape(news["updatedAt"])+m.group(2), page, flags=re.I|re.S)
     
     PAGE.write_text(page, encoding="utf-8")
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
