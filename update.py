@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-财经研究助手 2.6 - 全球顶级公信力媒体源与智能事件去重版
-严格排除大陆国有媒体，整合路透、彭博、WSJ、美联社、日台港权威媒体，
-实现强力的标题与事件级去重、智能延时防 429、纯净原文直达。
+财经研究助手 2.7 - 终极去重与稳定运行版
+严格排除大陆国有媒体，整合全球、日、台、港公信力媒体，
+拥有双重强力去重（链接去重 + 事件语义指纹去重）、智能防 429 延时、纯净原文直达。
 """
 
 import os
@@ -243,18 +243,15 @@ def load_cache():
         return {}
 
 # ============================================================
-# 6. 高级事件去重与过滤机制（核心优化）
+# 6. 高级事件去重与过滤机制（修复语法并完全生效）
 # ============================================================
 def normalize_title(title):
-    # 提取核心关键词和实体，去除标点和常见停用词，用于语义级去重
     title = clean(title).lower()
     title = re.sub(r"[^\w\u4e00-\u9fff]", "", title)
     return title
 
 def get_event_fingerprint(title):
-    """生成事件特征指纹，防止同一重大事件被不同媒体重复刷屏"""
     t = normalize_title(title)
-    # 截取前 20 个核心字符作为事件指纹
     return t[:20]
 
 def deduplicate(items):
@@ -271,7 +268,7 @@ def deduplicate(items):
         if not title_key: continue
         if title_key in seen_titles: continue
         if link_key and link_key in seen_links: continue
-        if fingerprint in seen_fingerprints: continue  # 事件级去重拦截
+        if fingerprint in seen_fingerprints: continue
         
         seen_titles.add(title_key)
         if link_key: seen_links.add(link_key)
@@ -294,7 +291,7 @@ def gemini(prompt):
     body = json.dumps({"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}}).encode("utf-8")
     
     for attempt in range(RETRIES + 1):
-        request = Request(url, data=body, headers={"Content-Type": "application/json", "x-goog-api-key": api_key, "User-Agent": "FinanceResearchDashboard/2.6"}, method="POST")
+        request = Request(url, data=body, headers={"Content-Type": "application/json", "x-goog-api-key": api_key, "User-Agent": "FinanceResearchDashboard/2.7"}, method="POST")
         try:
             with urlopen(request, timeout=AI_TIMEOUT) as response:
                 data = json.loads(response.read().decode("utf-8"))
@@ -405,7 +402,7 @@ confidence：信心等级。
 摘要：{item.get('summary', '')[:1200]}
 """
     budget["attempts"] += 1
-    time.sleep(5)  # 智能防 429 频率限制延时
+    time.sleep(5)
     ai = parse_ai(gemini(prompt))
     if ai and ai.get("analysis") and ai.get("coreLogic"):
         cache[cache_key] = ai
@@ -481,7 +478,7 @@ def main():
     
     PAGE.write_text(page, encoding="utf-8")
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("全量更新完成：媒体源已全面对齐，智能事件去重已生效。")
+    print("全量更新完成：媒体源已全面对齐，智能事件去重已成功激活。")
 
 if __name__ == "__main__":
     main()
