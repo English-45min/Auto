@@ -39,6 +39,11 @@ jobs:
             exit 1
           }
 
+      - name: 清理旧缓存以强制刷新头版
+        run: |
+          rm ai_cache.json || true
+          echo "✅ 已手动删除 AI 缓存文件，下次运行将强制请求 DeepSeek。"
+
       - name: 执行 Python 数据更新脚本
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -72,16 +77,17 @@ jobs:
           print("DeepSeek 已配置：", data.get("aiEnabled", False))
           PY
 
-      - name: 提交更新后的网页和 AI 缓存
+      - name: 提交更新后的网页和新缓存
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add index.html ai_cache.json
+          # 确保添加新的 ai_cache.json，虽然刚才删除了旧的，脚本运行后会生成新的
+          git add index.html ai_cache.json || true
 
           if git diff --cached --quiet; then
             echo "没有新的网页或缓存变化，无需提交。"
           else
-            git commit -m "auto: update finance news and AI insights"
+            git commit -m "auto: update finance news (forced cache refresh)"
             git push
           fi
