@@ -10,37 +10,29 @@ TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 def fetch_twitter_posts():
     print("🐦 正在从自建服务器拉取 X (Twitter) 财经与科技爆文...")
     
-    # 扩展后的关键词：涵盖 AI、科技、美股、财经、投资、创业等中文圈核心话题
-    keywords = "AI OR 科技 OR 美股 OR 财经 OR 投资 OR 创业 OR 程序员"
-    
-    # 适当放宽阅读量门槛（min_faves:50），确保能抓取到足够多的候选内容
-    url = f"{RSSHUB_URL}/twitter/keyword/{keywords}+min_faves:50"
+    # 采用标准精简的关键词，提高 RSSHub 的搜索成功率
+    keywords = "AI OR 科技 OR 美股"
+    url = f"{RSSHUB_URL}/twitter/keyword/{keywords}"
     print(f"正在抓取: {url}")
     
     feed = feedparser.parse(url)
     posts = []
     
     if not feed.entries:
-        print("⚠️ 提示: 当前未抓取到符合条件的推文，请稍后再试。")
+        print("⚠️ 提示: RSSHub 未返回任何推文，请检查 RSSHub 状态或关键词。")
         return posts
 
     for entry in feed.entries:
-        # 提取点赞数/阅读量特征（若 RSSHub 标题或正文中包含点赞数，可在此解析；此处以基础互动及长度判定）
         title = entry.title
-        
-        # 获取推文作者
         author = getattr(entry, 'author', 'X 优质用户')
         
-        # 提取并扩充正文内容显示长度（最多展示 200 个字，让看板内容更饱满）
-        summary = getattr(entry, 'summary', '')
-        content = summary[:200] + "..." if len(summary) > 200 else summary
-        
-        # 获取原文链接
+        # 获取推文完整正文内容（限制 300 字，保证饱满）
+        summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
+        content = summary[:300] + "..." if len(summary) > 300 else summary
         link = entry.link
         
-        # 模拟评估阅读量（如果标题或链接中带有高互动标识，或者根据浏览量估算）
-        # 这里默认将包含热门或特定长文的判定为高赞，或者通过文本特征标记 50w+ 爆帖
-        is_viral = "爆" in title or "50w" in title or len(summary) > 150
+        # 简单判定爆帖条件（可根据需要拓展）
+        is_viral = len(summary) > 120 or "http" in summary
         
         posts.append({
             "title": title,
@@ -53,25 +45,23 @@ def fetch_twitter_posts():
     return posts
 
 def format_board(posts):
-    # 按照排版要求整理成看板形式
     board = "📊 <b>【X (Twitter) 中文财经与科技热点爆文看板】</b>\n"
     board += "───────────────────────────\n\n"
     
     if not posts:
-        board += "⚠️ 暂时没有抓取到新鲜出炉的爆文，稍后为您重新探测。\n"
-    
-    # 最多展示前 10 条精华推文
-    for i, post in enumerate(posts[:10], 1):
-        if post["is_viral"]:
-            board += f"🔥 <b>[50万+爆帖]</b> <b>#{i} {post['author']}</b>：{post['title']}\n"
-            if post['content']:
-                board += f"💡 <i>{post['content']}</i>\n"
-            board += f"🔗 <a href='{post['link']}'>点击查看原文</a>\n\n"
-        else:
-            board += f"📌 <b>#{i} {post['author']}</b>：{post['title']}\n"
-            if post['content']:
-                board += f"💬 <i>{post['content']}</i>\n"
-            board += f"🔗 <a href='{post['link']}'>点击查看原文</a>\n\n"
+        board += "⚠️ 过去一段时间未探测到新鲜推文，请稍后再试。\n\n"
+    else:
+        for i, post in enumerate(posts[:10], 1):
+            if post["is_viral"]:
+                board += f"🔥 <b>[50万+爆帖]</b> <b>#{i} {post['author']}</b>\n"
+                if post['content']:
+                    board += f"💡 {post['content']}\n"
+                board += f"🔗 <a href='{post['link']}'>点击查看原文</a>\n\n"
+            else:
+                board += f"📌 <b>#{i} {post['author']}</b>\n"
+                if post['content']:
+                    board += f"💬 {post['content']}\n"
+                board += f"🔗 <a href='{post['link']}'>点击查看原文</a>\n\n"
             
     board += "───────────────────────────\n"
     board += "🤖 <i>数据源自自建 Vultr RSSHub 节点自动监控</i>"
@@ -99,4 +89,6 @@ def send_telegram(text):
 if __name__ == "__main__":
     posts = fetch_twitter_posts()
     board_content = format_board(posts)
+    
+    # 无论是否有新推文，都执行推送，方便验证管道连通性
     send_telegram(board_content)
