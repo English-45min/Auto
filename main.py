@@ -13,23 +13,22 @@ CAR_TYPES = os.getenv('CAR_TYPES', '旅行车 混动 SUV')
 CAR_BUDGET = os.getenv('CAR_BUDGET', '15万内')
 
 def fetch_car_news_and_deals():
-    print(f"🚗 正在通过高稳定性知乎/全网热榜监控汽车与二手车话题...")
+    print(f"🚗 正在检索二手车与车圈热点（配置：{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}）...")
     
-    # 使用知乎热搜/综合热榜，其包含大量车主真实讨论、二手车避坑和买车建议
+    # 采用高稳健性源，防止空数据
     url = f"{RSSHUB_URL}/zhihu/hotlist"
     feed = feedparser.parse(url)
     
     items = []
+    keywords_filter = ["车", "SUV", "混动", "二手", "丰田", "福特", "奥迪", "本田", "马自达", "沃尔沃", "买车", "落地"]
+    
     for entry in feed.entries:
         title = entry.title
         summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
         link = entry.link
         
-        # 智能筛选：如果标题或摘要中包含汽车相关词汇，优先挑出来展示
-        keywords_filter = ["车", "SUV", "混动", "二手", "丰田", "福特", "奥迪", "本田", "马自达", "沃尔沃", "买车", "落地"]
         is_car_related = any(kw in title for kw in keywords_filter)
-        
-        if is_car_related or len(items) < 3: # 确保至少有内容输出
+        if is_car_related or len(items) < 3:
             content = summary[:120] + "..." if len(summary) > 120 else summary
             items.append({
                 "title": title,
@@ -39,7 +38,7 @@ def fetch_car_news_and_deals():
             if len(items) >= 5:
                 break
 
-    print(f"✅ 成功抓取汽车/车源行情: {len(items)} 条")
+    print(f"✅ 成功提取汽车板块数据: {len(items)} 条")
     return items
 
 def fetch_twitter_posts():
@@ -55,16 +54,17 @@ def fetch_twitter_posts():
             "title": entry.title,
             "link": entry.link
         })
+    print(f"✅ 成功提取 X 爆文数据: {len(posts)} 条")
     return posts
 
 def format_combined_board(car_items, posts):
     board = "📊 <b>【个人专属多功能智能雷达看板】</b>\n"
     board += "───────────────────────────\n\n"
     
-    # 板块一：汽车/二手车行情监控
-    board += f"🚗 <b>【汽车与二手车全网讨论雷达】</b> (<code>{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}</code>)\n"
+    # 板块一：汽车/二手车雷达
+    board += f"🚗 <b>【二手车与汽车行情雷达】</b> (<code>{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}</code>)\n"
     if not car_items:
-        board += "<i>暂-无最新行情资讯</i>\n\n"
+        board += "<i>暂无相关行情资讯</i>\n\n"
     else:
         for i, item in enumerate(car_items, 1):
             board += f"🔥 <b>#{i} {item['title']}</b>\n"
@@ -83,7 +83,7 @@ def format_combined_board(car_items, posts):
             board += f"🔹 <a href='{post['link']}'>{post['title']}</a>\n"
             
     board += "\n───────────────────────────\n"
-    board += "🤖 <i>Vultr 节点自动监控 | 已切换至全网高稳定性数据源</i>"
+    board += "🤖 <i>Vultr 节点自动监控 | 双模块并行推送已生效</i>"
     return board
 
 def send_telegram(text):
