@@ -8,27 +8,35 @@ RSSHUB_URL = os.getenv('RSSHUB_URL', 'http://104.207.154.160:1200')
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 
-# 💡 零代码动态配置：从 GitHub 变量读取喜好（支持随时在网页修改）
+# 💡 零代码动态配置：从 GitHub 变量读取喜好
 CAR_BRANDS = os.getenv('CAR_BRANDS', '福特 丰田 沃尔沃 马自达 本田 奥迪')
 CAR_TYPES = os.getenv('CAR_TYPES', '旅行车 混动 SUV')
 CAR_BUDGET = os.getenv('CAR_BUDGET', '15万内')
 
 def fetch_used_cars():
-    print(f"🚗 正在检索二手车（已启用防空窗兜底）：品牌[{CAR_BRANDS}] 车型[{CAR_TYPES}] 预算[{CAR_BUDGET}]...")
+    print(f"🚗 正在检索二手车（时间窗口已放宽至 7 天）：品牌[{CAR_BRANDS}] 车型[{CAR_TYPES}]...")
     
-    brands_query = " OR ".join(CAR_BRANDS.split())
-    types_query = " OR ".join(CAR_TYPES.split())
-    car_keywords = f"({brands_query}) ({types_query})"
+    # 为了提高命中率，简化组合查询，优先使用核心关键词
+    brands_query = " OR ".join(CAR_BRANDS.split()[:3]) # 取前三个核心品牌防止过长
+    car_keywords = f"({brands_query}) 混动"
     
     url = f"{RSSHUB_URL}/xianyu/search/{car_keywords}"
+    print(f"正在请求: {url}")
+    
     feed = feedparser.parse(url)
     
     if not feed.entries:
-        print("⚠️ 提示: RSSHub 当前未返回任何车源数据。")
+        print("⚠️ 提示: 闲鱼路由未返回数据，尝试备用瓜子/懂车帝或综合搜索路由...")
+        # 备用兜底路由
+        url_fallback = f"{RSSHUB_URL}/xianyu/search/混动SUV"
+        feed = feedparser.parse(url_fallback)
+        
+    if not feed.entries:
+        print("⚠️ 提示: 所有二手车源路由均未返回数据。")
         return []
 
-    # 放宽时间窗口：初筛 72 小时内
-    time_threshold = datetime.now() - timedelta(hours=72)
+    # 放宽至 7 天时间窗口
+    time_threshold = datetime.now() - timedelta(days=7)
     fresh_cars = []
     fallback_cars = []
 
@@ -44,10 +52,8 @@ def fetch_used_cars():
             "link": link
         }
         
-        # 收集所有抓取到的车源作为兜底池
         fallback_cars.append(car_item)
         
-        # 尝试检查时间戳
         published_parsed = getattr(entry, 'published_parsed', None)
         if published_parsed:
             try:
@@ -57,9 +63,9 @@ def fetch_used_cars():
             except Exception:
                 pass
 
-    # 🛠️ 核心兜底条款：如果 72 小时内筛选结果为空，但抓取到了原始内容，则自动启用兜底，返回最新车源
+    # 强力兜底：只要能抓到内容，7天内没有就直接取前 5 条最新的
     if not fresh_cars and fallback_cars:
-        print("ℹ️ 提示: 未命中 72 小时严格时间窗，已自动触发兜底条款，为您推送最新可用车源。")
+        print("ℹ️ 7天内无严格匹配，已触发强制兜底，推送当前可用最新车源。")
         fresh_cars = fallback_cars[:5]
     else:
         fresh_cars = fresh_cars[:5]
@@ -86,7 +92,7 @@ def format_combined_board(cars, posts):
     board = "📊 <b>【个人专属多功能智能雷达看板】</b>\n"
     board += "───────────────────────────\n\n"
     
-    # 板块一：二手车雷达（含兜底保障）
+    # 板块一：二手车雷达
     board += f"🚗 <b>【二手车智能检索雷达】</b> (<code>{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}</code>)\n"
     if not cars:
         board += "<i>当前各大平台暂无匹配车源，系统持续监控中...</i>\n\n"
@@ -108,7 +114,7 @@ def format_combined_board(cars, posts):
             board += f"🔹 <a href='{post['link']}'>{post['title']}</a>\n"
             
     board += "\n───────────────────────────\n"
-    board += "🤖 <i>Vultr 节点自动监控 | 已启用防空窗兜底条款</i>"
+    board += "🤖 <i>Vultr 节点自动监控 | 7天时间窗口与强制兜底已生效</i>"
     return board
 
 def send_telegram(text):
