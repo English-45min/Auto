@@ -4,7 +4,7 @@ name: Telegram Auto Push
 on:
   schedule:
     # 按照 cron 表达式设置定时（此处为每天 UTC 时间 01:00，即北京时间每天早上 09:00）
-    - cron: '0 1 * * *'
+    - cron: '0 1 12* * *'
   workflow_dispatch: # 允许你在 GitHub 网页上手动点击按钮触发测试
 
 jobs:
