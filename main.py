@@ -8,31 +8,35 @@ TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 
 def fetch_twitter_posts():
-    print("🐦 正在从自建服务器拉取 X (Twitter) 财经与科技爆文...")
+    print("🐦 正在从自建服务器拉取 X (Twitter) 中文财经与科技爆文...")
     
-    # 采用标准精简的关键词，提高 RSSHub 的搜索成功率
-    keywords = "AI OR 科技 OR 美股"
-    url = f"{RSSHUB_URL}/twitter/keyword/{keywords}"
+    # 核心调整：通过 lang:zh 强制限定只抓取中文推文，并组合科技、AI、美股、财经等关键词
+    keywords = "AI OR 科技 OR 美股 OR 财经 OR 投资 OR 创业 lang:zh"
+    
+    # 加上 min_faves 限制过滤低质量内容（例如点赞数大于 20 或 50）
+    url = f"{RSSHUB_URL}/twitter/keyword/{keywords}+min_faves:20"
     print(f"正在抓取: {url}")
     
     feed = feedparser.parse(url)
     posts = []
     
     if not feed.entries:
-        print("⚠️ 提示: RSSHub 未返回任何推文，请检查 RSSHub 状态或关键词。")
-        return posts
+        print("⚠️ 提示: RSSHub 未返回中文推文，尝试放宽条件...")
+        # 降级备用：如果加了点赞限制没有抓到，尝试不加点赞限制纯搜中文关键词
+        url_fallback = f"{RSSHUB_URL}/twitter/keyword/{keywords}"
+        feed = feedparser.parse(url_fallback)
 
     for entry in feed.entries:
         title = entry.title
-        author = getattr(entry, 'author', 'X 优质用户')
+        author = getattr(entry, 'author', 'X 中文优质用户')
         
-        # 获取推文完整正文内容（限制 300 字，保证饱满）
+        # 获取推文正文摘要（最多 250 字）
         summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
-        content = summary[:300] + "..." if len(summary) > 300 else summary
+        content = summary[:250] + "..." if len(summary) > 250 else summary
         link = entry.link
         
-        # 简单判定爆帖条件（可根据需要拓展）
-        is_viral = len(summary) > 120 or "http" in summary
+        # 判定是否为 50w+ 或高互动爆帖（根据文本特征或长度）
+        is_viral = "爆" in title or "万" in title or len(summary) > 150
         
         posts.append({
             "title": title,
@@ -49,8 +53,9 @@ def format_board(posts):
     board += "───────────────────────────\n\n"
     
     if not posts:
-        board += "⚠️ 过去一段时间未探测到新鲜推文，请稍后再试。\n\n"
+        board += "⚠️ 过去 24 小时暂未抓取到符合条件的中文热帖，稍后为您重新探测。\n\n"
     else:
+        # 最多展示前 8-10 条精选中文推文
         for i, post in enumerate(posts[:10], 1):
             if post["is_viral"]:
                 board += f"🔥 <b>[50万+爆帖]</b> <b>#{i} {post['author']}</b>\n"
@@ -89,6 +94,4 @@ def send_telegram(text):
 if __name__ == "__main__":
     posts = fetch_twitter_posts()
     board_content = format_board(posts)
-    
-    # 无论是否有新推文，都执行推送，方便验证管道连通性
     send_telegram(board_content)
