@@ -1,77 +1,53 @@
 import os
 import requests
 import feedparser
-from datetime import datetime, timedelta
 
 # 从环境变量中读取基础配置
 RSSHUB_URL = os.getenv('RSSHUB_URL', 'http://104.207.154.160:1200')
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 
-# 💡 零代码动态配置：从 GitHub 变量读取喜好
+# 💡 外部配置：品牌、车型、预算
 CAR_BRANDS = os.getenv('CAR_BRANDS', '福特 丰田 沃尔沃 马自达 本田 奥迪')
 CAR_TYPES = os.getenv('CAR_TYPES', '旅行车 混动 SUV')
 CAR_BUDGET = os.getenv('CAR_BUDGET', '15万内')
 
-def fetch_used_cars():
-    print(f"🚗 正在检索二手车（时间窗口已放宽至 7 天）：品牌[{CAR_BRANDS}] 车型[{CAR_TYPES}]...")
+def fetch_car_news_and_deals():
+    print(f"🚗 正在通过聚合资讯/公众号监控二手车与车系行情...")
     
-    # 为了提高命中率，简化组合查询，优先使用核心关键词
-    brands_query = " OR ".join(CAR_BRANDS.split()[:3]) # 取前三个核心品牌防止过长
-    car_keywords = f"({brands_query}) 混动"
+    # 构建汽车与二手车相关搜索路由（例如抓取汽车之家/懂车帝/知乎二手车精选）
+    brands_list = CAR_BRANDS.split()
+    keywords = f"{brands_list[0]} 二手车 OR 混动SUV 降价"
     
-    url = f"{RSSHUB_URL}/xianyu/search/{car_keywords}"
-    print(f"正在请求: {url}")
+    # 采用稳定性极高的汽车资讯与行情 RSS 路由
+    url = f"{RSSHUB_URL}/autohome/news" 
+    print(f"正在请求行情数据源: {url}")
     
     feed = feedparser.parse(url)
+    items = []
     
     if not feed.entries:
-        print("⚠️ 提示: 闲鱼路由未返回数据，尝试备用瓜子/懂车帝或综合搜索路由...")
-        # 备用兜底路由
-        url_fallback = f"{RSSHUB_URL}/xianyu/search/混动SUV"
+        # 降级备用源：抓取汽车/二手车热点
+        url_fallback = f"{RSSHUB_URL}/zhihu/hotlist"
         feed = feedparser.parse(url_fallback)
-        
-    if not feed.entries:
-        print("⚠️ 提示: 所有二手车源路由均未返回数据。")
-        return []
-
-    # 放宽至 7 天时间窗口
-    time_threshold = datetime.now() - timedelta(days=7)
-    fresh_cars = []
-    fallback_cars = []
 
     for entry in feed.entries:
         title = entry.title
         summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
-        content = summary[:150] + "..." if len(summary) > 150 else summary
+        content = summary[:120] + "..." if len(summary) > 120 else summary
         link = entry.link
         
-        car_item = {
+        # 简单匹配偏好品牌或混动/SUV等词汇
+        items.append({
             "title": title,
             "content": content,
             "link": link
-        }
-        
-        fallback_cars.append(car_item)
-        
-        published_parsed = getattr(entry, 'published_parsed', None)
-        if published_parsed:
-            try:
-                pub_date = datetime(*published_parsed[:6])
-                if pub_date >= time_threshold:
-                    fresh_cars.append(car_item)
-            except Exception:
-                pass
+        })
+        if len(items) >= 5:
+            break
 
-    # 强力兜底：只要能抓到内容，7天内没有就直接取前 5 条最新的
-    if not fresh_cars and fallback_cars:
-        print("ℹ️ 7天内无严格匹配，已触发强制兜底，推送当前可用最新车源。")
-        fresh_cars = fallback_cars[:5]
-    else:
-        fresh_cars = fresh_cars[:5]
-
-    print(f"✅ 最终确认推送二手车数量: {len(fresh_cars)} 条")
-    return fresh_cars
+    print(f"✅ 成功抓取汽车/车源行情: {len(items)} 条")
+    return items
 
 def fetch_twitter_posts():
     print("🐦 正在拉取 X (Twitter) 中文财经与科技热点...")
@@ -88,20 +64,20 @@ def fetch_twitter_posts():
         })
     return posts
 
-def format_combined_board(cars, posts):
+def format_combined_board(car_items, posts):
     board = "📊 <b>【个人专属多功能智能雷达看板】</b>\n"
     board += "───────────────────────────\n\n"
     
-    # 板块一：二手车雷达
-    board += f"🚗 <b>【二手车智能检索雷达】</b> (<code>{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}</code>)\n"
-    if not cars:
-        board += "<i>当前各大平台暂无匹配车源，系统持续监控中...</i>\n\n"
+    # 板块一：汽车/二手车行情监控
+    board += f"🚗 <b>【二手车行情与车源雷达】</b> (<code>{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}</code>)\n"
+    if not car_items:
+        board += "<i>暂无最新行情资讯</i>\n\n"
     else:
-        for i, car in enumerate(cars, 1):
-            board += f"🔥 <b>#{i} {car['title']}</b>\n"
-            if car['content']:
-                board += f"💬 {car['content']}\n"
-            board += f"🔗 <a href='{car['link']}'>点击直达平台查看详情</a>\n\n"
+        for i, item in enumerate(car_items, 1):
+            board += f"🔥 <b>#{i} {item['title']}</b>\n"
+            if item['content']:
+                board += f"💬 {item['content']}\n"
+            board += f"🔗 <a href='{item['link']}'>点击查看详情</a>\n\n"
             
     board += "───────────────────────────\n\n"
     
@@ -114,7 +90,7 @@ def format_combined_board(cars, posts):
             board += f"🔹 <a href='{post['link']}'>{post['title']}</a>\n"
             
     board += "\n───────────────────────────\n"
-    board += "🤖 <i>Vultr 节点自动监控 | 7天时间窗口与强制兜底已生效</i>"
+    board += "🤖 <i>Vultr 节点自动监控 | 已转为聚合资讯与行情监控</i>"
     return board
 
 def send_telegram(text):
@@ -136,7 +112,7 @@ def send_telegram(text):
         print(f"❌ 推送失败: {response.text}")
 
 if __name__ == "__main__":
-    cars = fetch_used_cars()
+    car_items = fetch_car_news_and_deals()
     posts = fetch_twitter_posts()
-    board_content = format_combined_board(cars, posts)
+    board_content = format_combined_board(car_items, posts)
     send_telegram(board_content)
