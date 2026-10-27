@@ -13,38 +13,31 @@ CAR_TYPES = os.getenv('CAR_TYPES', '旅行车 混动 SUV')
 CAR_BUDGET = os.getenv('CAR_BUDGET', '15万内')
 
 def fetch_car_news_and_deals():
-    print(f"🚗 正在通过聚合资讯/公众号监控二手车与车系行情...")
+    print(f"🚗 正在通过高稳定性知乎/全网热榜监控汽车与二手车话题...")
     
-    # 构建汽车与二手车相关搜索路由（例如抓取汽车之家/懂车帝/知乎二手车精选）
-    brands_list = CAR_BRANDS.split()
-    keywords = f"{brands_list[0]} 二手车 OR 混动SUV 降价"
-    
-    # 采用稳定性极高的汽车资讯与行情 RSS 路由
-    url = f"{RSSHUB_URL}/autohome/news" 
-    print(f"正在请求行情数据源: {url}")
-    
+    # 使用知乎热搜/综合热榜，其包含大量车主真实讨论、二手车避坑和买车建议
+    url = f"{RSSHUB_URL}/zhihu/hotlist"
     feed = feedparser.parse(url)
-    items = []
     
-    if not feed.entries:
-        # 降级备用源：抓取汽车/二手车热点
-        url_fallback = f"{RSSHUB_URL}/zhihu/hotlist"
-        feed = feedparser.parse(url_fallback)
-
+    items = []
     for entry in feed.entries:
         title = entry.title
         summary = getattr(entry, 'summary', getattr(entry, 'description', ''))
-        content = summary[:120] + "..." if len(summary) > 120 else summary
         link = entry.link
         
-        # 简单匹配偏好品牌或混动/SUV等词汇
-        items.append({
-            "title": title,
-            "content": content,
-            "link": link
-        })
-        if len(items) >= 5:
-            break
+        # 智能筛选：如果标题或摘要中包含汽车相关词汇，优先挑出来展示
+        keywords_filter = ["车", "SUV", "混动", "二手", "丰田", "福特", "奥迪", "本田", "马自达", "沃尔沃", "买车", "落地"]
+        is_car_related = any(kw in title for kw in keywords_filter)
+        
+        if is_car_related or len(items) < 3: # 确保至少有内容输出
+            content = summary[:120] + "..." if len(summary) > 120 else summary
+            items.append({
+                "title": title,
+                "content": content,
+                "link": link
+            })
+            if len(items) >= 5:
+                break
 
     print(f"✅ 成功抓取汽车/车源行情: {len(items)} 条")
     return items
@@ -69,9 +62,9 @@ def format_combined_board(car_items, posts):
     board += "───────────────────────────\n\n"
     
     # 板块一：汽车/二手车行情监控
-    board += f"🚗 <b>【二手车行情与车源雷达】</b> (<code>{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}</code>)\n"
+    board += f"🚗 <b>【汽车与二手车全网讨论雷达】</b> (<code>{CAR_BRANDS} | {CAR_TYPES} | {CAR_BUDGET}</code>)\n"
     if not car_items:
-        board += "<i>暂无最新行情资讯</i>\n\n"
+        board += "<i>暂-无最新行情资讯</i>\n\n"
     else:
         for i, item in enumerate(car_items, 1):
             board += f"🔥 <b>#{i} {item['title']}</b>\n"
@@ -90,7 +83,7 @@ def format_combined_board(car_items, posts):
             board += f"🔹 <a href='{post['link']}'>{post['title']}</a>\n"
             
     board += "\n───────────────────────────\n"
-    board += "🤖 <i>Vultr 节点自动监控 | 已转为聚合资讯与行情监控</i>"
+    board += "🤖 <i>Vultr 节点自动监控 | 已切换至全网高稳定性数据源</i>"
     return board
 
 def send_telegram(text):
