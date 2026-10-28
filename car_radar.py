@@ -1,453 +1,586 @@
-
 # -*- coding: utf-8 -*-
-"""免费二手车搜索雷达：Bing RSS + Telegram + SQLite 去重。"""
+"""
+二手车雷达：每日搜索、筛选、去重，并推送 Telegram。
+配置文件：car_radar_config.json
+"""
 
-import os
-import re
-import time
 import html
 import json
-import hashlib
+import re
 import sqlite3
-import urllib.request
+import time
 import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 
-from datetime import datetime, timezone, timedelta
-from urllib.parse import urlparse
+from datetime import date, datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
+CONFIG_FILE = BASE_DIR / "car_radar_config.json"
 DB_FILE = BASE_DIR / "car_radar.sqlite3"
-TZ = timezone(timedelta(hours=8))
+BEIJING_TZ = timezone(timedelta(hours=8))
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("TG_BOT_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TG_CHAT_ID")
-
-MAX_PRICE = 150000
-MIN_DATE = "2019-01-01"
-MAX_PUSH = 8
-BING_URL = "https://www.bing.com/search"
-
-# 域名使用后缀匹配，允许平台的子域名。
-PLATFORMS = {
+# 每个平台只接受对应的域名，减少搜索引擎返回无关网页的情况
+PLATFORM_DOMAINS = {
     "瓜子二手车": ["guazi.com"],
     "懂车帝": ["dongchedi.com"],
     "58同城": ["58.com"],
     "闲鱼": ["goofish.com", "xianyu.com", "2.taobao.com"],
 }
 
-VEHICLES = [
-    {
-        "name": "沃尔沃 S60 T4/T5（2020年款）",
-        "terms": ['"S60 T4"', '"S60 T5"', '"S60T4"', '"S60T5"'],
-        "aliases": ["S60 T4", "S60T4", "S60 T5", "S60T5"],
-        "required_year": 2020,
-        "year_from": None,
-    },
-    {
-        "name": "马自达 CX-50 智行版",
-        "terms": ['"CX-50 智行"', '"CX50 智行"', '"CX-50"'],
-        "aliases": ["CX-50", "CX50"],
-        "required_year": None,
-        "year_from": None,
-    },
-    {
-        "name": "丰田 RAV4 荣放",
-        "terms": ['"RAV4 荣放"', '"RAV4"'],
-        "aliases": ["RAV4", "荣放"],
-        "required_year": None,
-        "year_from": None,
-    },
-    {
-        "name": "特斯拉 Model 3（2023年及以后）",
-        "terms": ['"特斯拉 Model 3"', '"Tesla Model 3"', '"Model 3"'],
-        "aliases": ["Model 3", "Model3", "特斯拉"],
-        "required_year": None,
-        "year_from": 2023,
-    },
-    {
-        "name": "福特蒙迪欧双擎运动版",
-        "terms": ['"蒙迪欧双擎运动"', '"蒙迪欧 双擎 运动"'],
-        "aliases": ["蒙迪欧", "双擎", "运动"],
-        "required_year": None,
-        "year_from": None,
-    },
-]
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
+)
 
 
 def log(message):
-    now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[北京时间 {now}] {message}")
+    now = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{now}] {message}", flush=True)
 
 
-def fetch_url(url, timeout=20):
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
-                          "AppleWebKit/537.36 Chrome/124 Safari/537.36",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.5",
-        },
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return response.read()
+def load_config():
+    if not CONFIG_FILE.exists():
+        raise FileNotFoundError(
+            f"找不到配置文件：{CONFIG_FILE.name}。请先新建该文件。"
+        )
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    config.setdefault("min_price", None)
+    config.setdefault("max_price", 150000)
+    config.setdefault("production_date_from", "2019-01-01")
+    config.setdefault("production_date_to", None)
+    config.setdefault("listing_age_days", None)
+    config.setdefault("listing_age_custom_days", None)
+    config.setdefault("platforms", list(PLATFORM_DOMAINS.keys()))
+    config.setdefault("vehicles", [])
+    config.setdefault("match_mode", "relaxed")
+    return config
 
 
-def clean(value):
-    value = re.sub(r"<[^>]*>", " ", value or "")
-    return re.sub(r"\s+", " ", html.unescape(value)).strip()
+def init_db():
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sent_listings (
+                url TEXT PRIMARY KEY,
+                sent_at TEXT NOT NULL
+            )
+        """)
 
 
-def parse_rss(raw, source):
+def normalize_url(url):
+    """去掉常见追踪参数，尽可能让同一条广告只推送一次。"""
     try:
-        root = ET.fromstring(raw)
-    except ET.ParseError as exc:
-        log(f"RSS 解析失败：{exc}")
-        return []
-
-    result = []
-    for node in root.findall(".//item"):
-        title = clean(node.findtext("title", default=""))
-        link = (node.findtext("link", default="") or "").strip()
-        desc = clean(node.findtext("description", default=""))
-        if title and link:
-            result.append({
-                "title": title,
-                "content": desc,
-                "url": link,
-                "source": source,
-                "id": node.findtext("guid", default="") or link,
-            })
-
-    if not result:
-        ns = {"a": "http://www.w3.org/2005/Atom"}
-        for node in root.findall(".//a:entry", ns):
-            title = clean(node.findtext("a:title", default="", namespaces=ns))
-            desc = clean(node.findtext("a:summary", default="", namespaces=ns))
-            link_node = node.find("a:link", ns)
-            link = link_node.get("href", "") if link_node is not None else ""
-            if title and link:
-                result.append({
-                    "title": title,
-                    "content": desc,
-                    "url": link,
-                    "source": source,
-                    "id": link,
-                })
-    return result
+        p = urllib.parse.urlsplit(url)
+        if not p.scheme or not p.netloc:
+            return url
+        return urllib.parse.urlunsplit(
+            (p.scheme, p.netloc.lower(), p.path.rstrip("/"), "", "")
+        )
+    except Exception:
+        return url
 
 
-def build_queries():
-    """每个车型分别搜索每个平台，避免复杂 OR 条件导致漏结果。"""
-    for vehicle in VEHICLES:
-        for platform, domains in PLATFORMS.items():
-            domain = domains[0]
-            # 不限定价格、年份等可能尚未被搜索摘要收录的字段。
-            term = " OR ".join(vehicle["terms"])
-            query = f"site:{domain} 二手车 {term}"
-            yield vehicle, platform, query
+def url_matches_platform(url, platform):
+    try:
+        host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    except Exception:
+        return False
+    return any(
+        host == domain or host.endswith("." + domain)
+        for domain in PLATFORM_DOMAINS.get(platform, [])
+    )
 
 
-def search_bing(query, platform):
+def fetch_rss(query):
     params = urllib.parse.urlencode({
         "q": query,
         "format": "rss",
-        "count": 10,
+        "count": "10",
+        "setlang": "zh-hans",
+        "cc": "cn",
     })
-    url = f"{BING_URL}?{params}"
-    try:
-        entries = parse_rss(fetch_url(url), platform)
-        log(f"  搜索返回 {len(entries)} 条")
-        return entries
-    except Exception as exc:
-        log(f"  搜索失败：{type(exc).__name__}: {exc}")
-        return []
+    url = "https://www.bing.com/search?" + params
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/rss+xml,application/xml,text/xml,*/*",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        raw = response.read()
+    root = ET.fromstring(raw)
+    items = []
+    for item in root.findall(".//item"):
+        title = html.unescape(item.findtext("title", default="")).strip()
+        link = item.findtext("link", default="").strip()
+        description = html.unescape(
+            item.findtext("description", default="")
+        ).strip()
+        pub_date = item.findtext("pubDate", default="").strip()
+        items.append({
+            "title": title,
+            "url": normalize_url(link),
+            "description": description,
+            "pub_date": pub_date,
+        })
+    return items
 
 
-def identify_platform(url):
-    host = (urlparse(url).hostname or "").lower()
-    for name, domains in PLATFORMS.items():
-        if any(host == d or host.endswith("." + d) for d in domains):
-            return name
-    return None
+def combined_text(item):
+    return f"{item.get('title', '')} {item.get('description', '')}"
 
 
-def contains_vehicle(text, vehicle):
-    text = (text or "").casefold()
-    return any(term.casefold() in text for term in vehicle["aliases"])
+def vehicle_matches(text, vehicle):
+    """按车型关键词匹配；不匹配车型的网页直接排除。"""
+    text_lower = text.lower()
+    brand = str(vehicle.get("brand", "")).strip()
+    model = str(vehicle.get("model", "")).strip()
+
+    if brand and brand.lower() not in text_lower:
+        # 部分中文车型名可用常见英文品牌名补充匹配
+        brand_aliases = {
+            "沃尔沃": ["volvo"],
+            "马自达": ["mazda"],
+            "丰田": ["toyota"],
+            "特斯拉": ["tesla"],
+            "福特": ["ford"],
+        }
+        aliases = brand_aliases.get(brand, [])
+        if not any(alias in text_lower for alias in aliases):
+            return False
+
+    # 对每个车型设置相对明确的别名规则
+    if model == "S60 T4/T5":
+        return (
+            ("s60" in text_lower or "s 60" in text_lower)
+            and (
+                "t4" in text_lower
+                or "t5" in text_lower
+                or "沃尔沃" in text_lower
+                or "volvo" in text_lower
+            )
+        )
+    if model == "V60":
+        return "v60" in text_lower or "v 60" in text_lower
+    if model == "CX-50 智行版":
+        return (
+            ("cx-50" in text_lower or "cx50" in text_lower)
+            and ("马自达" in text_lower or "mazda" in text_lower)
+        )
+    if model == "RAV4 荣放":
+        return (
+            "rav4" in text_lower
+            or "荣放" in text_lower
+            or "荣枫" in text_lower
+        )
+    if model == "Model 3":
+        return (
+            ("model 3" in text_lower or "model3" in text_lower)
+            and ("特斯拉" in text_lower or "tesla" in text_lower)
+        )
+    if model == "蒙迪欧双擎运动版":
+        return (
+            ("蒙迪欧" in text_lower or "mondeo" in text_lower)
+            and ("双擎" in text_lower or "混动" in text_lower or "hybrid" in text_lower)
+        )
+
+    # 自定义车型的兜底规则：品牌和车型都要命中
+    return bool(model) and model.lower() in text_lower
 
 
 def parse_price(text):
-    text = (text or "").replace(",", "").replace("，", "")
+    """返回人民币元；没有明确价格时返回 None。"""
     patterns = [
-        r"(?:售价|价格|报价|仅售|卖价)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*万元?",
-        r"(\d+(?:\.\d+)?)\s*万元",
-        r"(\d+(?:\.\d+)?)\s*万(?!公里)",
-        r"(?:售价|价格|报价|仅售)\s*[:：]?\s*(\d{4,7})\s*元",
+        r"(?:售价|价格|报价|仅售|卖价)?\s*([0-9]+(?:\.[0-9]+)?)\s*万元",
+        r"(?:售价|价格|报价|仅售|卖价)\s*[:：]?\s*([0-9]+(?:\.[0-9]+)?)\s*万(?:元)?",
+        r"￥\s*([0-9,]+)(?:\s*元)?",
+        r"¥\s*([0-9,]+)(?:\s*元)?",
+        r"([0-9,]+)\s*元",
     ]
     for pattern in patterns:
-        m = re.search(pattern, text)
-        if not m:
+        match = re.search(pattern, text, re.I)
+        if match:
+            try:
+                value = float(match.group(1).replace(",", ""))
+                if "万" in match.group(0):
+                    value *= 10000
+                if 1000 <= value <= 100000000:
+                    return int(value)
+            except ValueError:
+                pass
+    return None
+
+
+def parse_production_date(text):
+    """
+    只识别明确标注的生产/出厂日期。
+    不会把上牌年份或车型年款冒充生产日期。
+    """
+    patterns = [
+        r"(?:生产日期|出厂日期|生产时间)\s*[:：]?\s*"
+        r"(20\d{2})[年./-](\d{1,2})(?:[月./-](\d{1,2})日?)?",
+        r"(?:生产日期|出厂日期|生产时间)\s*[:：]?\s*"
+        r"(20\d{2})年",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
             continue
         try:
-            value = float(m.group(1))
-            if "元" in m.group(0) and "万" not in m.group(0):
-                value = int(value)
-            else:
-                value *= 10000
-            if 1000 <= value <= 100000000:
-                return int(value)
+            year = int(match.group(1))
+            month = int(match.group(2)) if match.lastindex >= 2 else 1
+            day = int(match.group(3)) if match.lastindex >= 3 and match.group(3) else 1
+            return date(year, month, day)
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+def parse_model_year(text):
+    """提取明确的车型年款；不将普通生产年份直接当作车型年款。"""
+    patterns = [
+        r"(20\d{2})\s*年款",
+        r"(20\d{2})\s*款",
+        r"(20\d{2})款",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            year = int(match.group(1))
+            if 2010 <= year <= date.today().year + 1:
+                return year
+    return None
+
+
+def parse_listing_date(item):
+    """尝试解析搜索结果的发布时间或摘要中的上架时间。"""
+    pub_date = item.get("pub_date", "")
+    if pub_date:
+        try:
+            dt = parsedate_to_datetime(pub_date)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(BEIJING_TZ).date()
+        except Exception:
+            pass
+
+    text = combined_text(item)
+    today = datetime.now(BEIJING_TZ).date()
+
+    if "今天" in text or "刚刚" in text:
+        return today
+    if "昨天" in text:
+        return today - timedelta(days=1)
+
+    match = re.search(r"(\d{1,3})\s*天前", text)
+    if match:
+        return today - timedelta(days=int(match.group(1)))
+
+    match = re.search(r"(20\d{2})[年./-](\d{1,2})[月./-](\d{1,2})日?", text)
+    if match:
+        try:
+            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
         except ValueError:
             pass
     return None
 
 
-def parse_production_date(text):
-    patterns = [
-        r"(?:生产日期|出厂日期)\s*[:：]?\s*(20\d{2})[-年/.](\d{1,2})[-月/.](\d{1,2})日?",
-        r"(?:生产日期|出厂日期)\s*[:：]?\s*(20\d{2})年",
-    ]
-    m = re.search(patterns[0], text or "")
-    if m:
-        try:
-            y, mo, d = map(int, m.groups())
-            return datetime(y, mo, d).date().isoformat()
-        except ValueError:
-            return None
-    m = re.search(patterns[1], text or "")
-    if m:
-        return f"{m.group(1)}-01-01"
-    return None
+def evaluate(item, vehicle, config):
+    """返回 (是否保留, 待核实字段, 解析信息)。"""
+    text = combined_text(item)
+    pending = []
 
-
-def parse_year(text):
-    for pattern in [r"(20\d{2})\s*年款", r"(20\d{2})款"]:
-        m = re.search(pattern, text or "")
-        if m:
-            return int(m.group(1))
-    return None
-
-
-def evaluate(item, vehicle):
-    title = item["title"]
-    text = f"{title} {item['content']}"
-    url = item["url"]
-    platform = identify_platform(url)
-
-    if not platform:
-        return None, "链接不是四个平台之一"
-
-    if not contains_vehicle(text, vehicle):
-        # 搜索引擎可能将车型关键词放在查询中，但标题摘要未体现。
-        return None, "标题和摘要没有识别到车型关键词"
+    if not vehicle_matches(text, vehicle):
+        return False, [], {}
 
     price = parse_price(text)
-    prod_date = parse_production_date(text)
-    year = parse_year(text)
+    production_date = parse_production_date(text)
+    model_year = parse_model_year(text)
+    listing_date = parse_listing_date(item)
 
-    if price is not None and price > MAX_PRICE:
-        return None, "明确超过15万元"
+    min_price = config.get("min_price")
+    max_price = config.get("max_price")
 
-    if prod_date and prod_date < MIN_DATE:
-        return None, "明确早于2019年生产"
-
-    required = vehicle["required_year"]
-    year_from = vehicle["year_from"]
-
-    if required is not None and year is not None and year != required:
-        return None, f"明确不是{required}年款"
-
-    if year_from is not None and year is not None and year < year_from:
-        return None, f"明确早于{year_from}年款"
-
-    if year_from is not None and prod_date and int(prod_date[:4]) < year_from:
-        return None, f"明确早于{year_from}年生产"
-
-    pending = []
     if price is None:
-        pending.append("售价待核实")
-    if prod_date is None:
+        pending.append("价格待核实")
+    else:
+        if min_price is not None and price < int(min_price):
+            return False, [], {}
+        if max_price is not None and price > int(max_price):
+            return False, [], {}
+
+    if production_date is None:
         pending.append("生产日期待核实")
-    if required is not None and year is None:
-        pending.append(f"{required}年款待核实")
-    if year_from is not None and year is None:
-        pending.append(f"{year_from}年及以后年款待核实")
+    else:
+        start = config.get("production_date_from")
+        end = config.get("production_date_to")
+        if start and production_date < date.fromisoformat(start):
+            return False, [], {}
+        if end and production_date > date.fromisoformat(end):
+            return False, [], {}
 
-    return {
-        "title": title,
-        "url": url,
-        "platform": platform,
-        "vehicle": vehicle["name"],
+    year_from = vehicle.get("year_from")
+    year_to = vehicle.get("year_to")
+    if model_year is None:
+        pending.append("车型年款待核实")
+    else:
+        if year_from is not None and model_year < int(year_from):
+            return False, [], {}
+        if year_to is not None and model_year > int(year_to):
+            return False, [], {}
+
+    age_limit = config.get("listing_age_days")
+    if age_limit == "custom":
+        age_limit = config.get("listing_age_custom_days")
+    if age_limit not in (None, "", "unlimited"):
+        try:
+            age_limit = int(age_limit)
+            if listing_date is None:
+                pending.append("上架时间待核实")
+            elif (datetime.now(BEIJING_TZ).date() - listing_date).days > age_limit:
+                return False, [], {}
+        except (ValueError, TypeError):
+            pass
+
+    # strict 模式：价格、生产日期、车型年款缺失时不推送
+    if config.get("match_mode", "relaxed") == "strict":
+        if price is None or production_date is None or model_year is None:
+            return False, [], {}
+
+    details = {
         "price": price,
-        "production_date": prod_date,
-        "year": year,
-        "pending": pending,
-    }, None
+        "production_date": production_date,
+        "model_year": model_year,
+        "listing_date": listing_date,
+    }
+    return True, pending, details
 
 
-def send_telegram(message):
-    if not BOT_TOKEN or not CHAT_ID:
-        log("错误：未找到 Telegram Bot Token 或 Chat ID Secrets")
-        return False
+def already_sent(url):
+    with sqlite3.connect(DB_FILE) as conn:
+        return conn.execute(
+            "SELECT 1 FROM sent_listings WHERE url = ?", (url,)
+        ).fetchone() is not None
 
+
+def mark_sent(url):
+    with sqlite3.connect(DB_FILE) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO sent_listings(url, sent_at) VALUES (?, ?)",
+            (url, datetime.now(BEIJING_TZ).isoformat()),
+        )
+
+
+def telegram_send(message):
+    token = (
+        __import__("os").environ.get("TG_BOT_TOKEN")
+        or __import__("os").environ.get("TELEGRAM_BOT_TOKEN")
+    )
+    chat_id = (
+        __import__("os").environ.get("TG_CHAT_ID")
+        or __import__("os").environ.get("TELEGRAM_CHAT_ID")
+    )
+    if not token or not chat_id:
+        raise RuntimeError(
+            "未找到 Telegram 密钥。请在 GitHub Secrets 设置 TG_BOT_TOKEN 和 TG_CHAT_ID。"
+        )
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = urllib.parse.urlencode({
-        "chat_id": CHAT_ID,
+        "chat_id": chat_id,
         "text": message,
         "parse_mode": "HTML",
-        "disable_web_page_preview": "true",
-    }).encode()
-
+        "disable_web_page_preview": "false",
+    }).encode("utf-8")
     request = urllib.request.Request(
-        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+        url,
         data=payload,
+        headers={"User-Agent": USER_AGENT},
         method="POST",
     )
-
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        if data.get("ok"):
-            log("Telegram 推送成功")
-            return True
-        log(f"Telegram 返回错误：{data}")
-    except Exception as exc:
-        log(f"Telegram 推送失败：{type(exc).__name__}: {exc}")
-    return False
+    with urllib.request.urlopen(request, timeout=25) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    if not result.get("ok"):
+        raise RuntimeError(f"Telegram 返回失败：{result}")
+    return True
 
 
-def make_message(item):
-    price = f"约 ¥{item['price']:,}" if item["price"] is not None else "待核实"
-    prod_date = item["production_date"] or "待核实"
-    year = f"{item['year']}年款" if item["year"] else "待核实"
-    pending = "、".join(item["pending"]) if item["pending"] else "仍需核实真实库存和车况"
-
-    return (
-        "🚗 <b>二手车雷达：发现候选车源</b>\n\n"
-        f"车型：{html.escape(item['vehicle'])}\n"
-        f"来源：{html.escape(item['platform'])}\n"
-        f"标题：{html.escape(item['title'])}\n"
-        f"价格：{price}\n"
-        f"生产日期：{html.escape(prod_date)}\n"
-        f"年款：{html.escape(year)}\n"
-        f"待核实：{html.escape(pending)}\n\n"
-        f'<a href="{html.escape(item["url"], quote=True)}">打开原始搜索结果</a>\n\n'
-        "提示：搜索结果不代表车辆仍在售。请打开链接核实售价、生产日期、配置及车况。"
-    )
+def safe_html(value):
+    return html.escape(str(value or ""), quote=False)
 
 
-def stable_id(url):
-    return hashlib.sha256(url.strip().encode("utf-8")).hexdigest()
+def format_listing(item, platform, vehicle, pending, details):
+    title = safe_html(item.get("title", "未命名车辆"))
+    url = html.escape(item.get("url", ""), quote=True)
+    model = safe_html(vehicle.get("model", "目标车型"))
+
+    lines = [
+        f"🚗 <b>{title}</b>",
+        f"平台：{safe_html(platform)}",
+        f"匹配车型：{model}",
+    ]
+
+    if details.get("price") is not None:
+        lines.append(f"搜索结果价格：约 ¥{details['price']:,}")
+    else:
+        lines.append("搜索结果价格：未识别，请打开原网页核实")
+
+    if details.get("production_date"):
+        lines.append(f"生产日期：{details['production_date'].isoformat()}")
+    else:
+        lines.append("生产日期：未识别，请打开原网页核实")
+
+    if details.get("model_year"):
+        lines.append(f"车型年款：{details['model_year']} 年款")
+    else:
+        lines.append("车型年款：未识别，请打开原网页核实")
+
+    if details.get("listing_date"):
+        lines.append(f"搜索到的发布时间：{details['listing_date'].isoformat()}")
+
+    if pending:
+        lines.append("⚠️ 待核实：" + "、".join(safe_html(x) for x in pending))
+
+    if item.get("description"):
+        summary = re.sub(r"<[^>]+>", " ", item["description"])
+        summary = re.sub(r"\s+", " ", summary).strip()
+        if len(summary) > 300:
+            summary = summary[:300] + "……"
+        if summary:
+            lines.append("摘要：" + safe_html(summary))
+
+    lines.append(f'🔗 <a href="{url}">打开原始搜索结果</a>')
+    return "\n".join(lines)
+
+
+def build_queries(vehicle, platform):
+    domains = PLATFORM_DOMAINS[platform]
+    model = vehicle.get("model", "")
+    brand = vehicle.get("brand", "")
+    queries = []
+
+    # 逐个域名搜索，之后仍会再次校验实际链接域名和车型
+    for domain in domains:
+        if model == "S60 T4/T5":
+            keywords = '"沃尔沃 S60" OR "Volvo S60"'
+        elif model == "V60":
+            keywords = '"沃尔沃 V60" OR "Volvo V60"'
+        elif model == "CX-50 智行版":
+            keywords = '"马自达 CX-50" OR "Mazda CX-50"'
+        elif model == "RAV4 荣放":
+            keywords = '"RAV4 荣放" OR "丰田 RAV4" OR "Toyota RAV4"'
+        elif model == "Model 3":
+            keywords = '"特斯拉 Model 3" OR "Tesla Model 3"'
+        elif model == "蒙迪欧双擎运动版":
+            keywords = '"蒙迪欧 双擎" OR "福特 蒙迪欧混动"'
+        else:
+            keywords = f'"{brand} {model}"'
+        queries.append(f"site:{domain} ({keywords}) 二手车")
+    return queries
 
 
 def main():
-    log("=" * 55)
-    log("二手车雷达启动：逐车型、逐平台搜索")
-    log("注意：搜索引擎结果不是平台完整库存。")
+    config = load_config()
+    init_db()
 
-    all_items = []
-    for vehicle, platform, query in build_queries():
-        log(f"搜索：{vehicle['name']} / {platform}")
-        entries = search_bing(query, platform)
-        for item in entries:
-            item["_query_vehicle"] = vehicle
-        all_items.extend(entries)
-        time.sleep(1)
+    selected_platforms = [
+        p for p in config.get("platforms", [])
+        if p in PLATFORM_DOMAINS
+    ]
+    vehicles = config.get("vehicles", [])
 
-    log(f"搜索结果合计：{len(all_items)} 条")
+    if not selected_platforms:
+        raise RuntimeError("配置文件中的 platforms 没有有效平台。")
+    if not vehicles:
+        raise RuntimeError("配置文件中的 vehicles 为空，请至少配置一个车型。")
 
-    # 展示样本标题，便于确认搜索引擎实际返回了什么。
-    for item in all_items[:12]:
-        log(f"样本：{item['title']} | {item['url']}")
+    log(f"开始搜索：车型 {len(vehicles)} 个，平台 {len(selected_platforms)} 个")
+    log(f"预算范围：{config.get('min_price')} - {config.get('max_price')} 元")
+    log(f"生产日期下限：{config.get('production_date_from')}；模式：{config.get('match_mode')}")
 
-    # 按链接去重，保留搜索到的第一次结果。
-    unique = {}
-    for item in all_items:
-        unique.setdefault(item["url"].strip(), item)
+    found = {}
+    errors = 0
+    rejected_domain = 0
+    rejected_vehicle = 0
 
-    log(f"链接去重后：{len(unique)} 条")
+    for vehicle in vehicles:
+        for platform in selected_platforms:
+            for query in build_queries(vehicle, platform):
+                try:
+                    log(f"搜索：{platform} / {vehicle.get('model')} / {query}")
+                    items = fetch_rss(query)
+                    log(f"搜索引擎返回 {len(items)} 条")
+                    for item in items:
+                        if not item.get("url"):
+                            continue
+                        if not url_matches_platform(item["url"], platform):
+                            rejected_domain += 1
+                            continue
 
-    stats = {
-        "no_platform": 0,
-        "no_vehicle": 0,
-        "over_price": 0,
-        "too_old": 0,
-        "wrong_year": 0,
-        "candidate": 0,
-        "already_seen": 0,
-    }
+                        ok, pending, details = evaluate(item, vehicle, config)
+                        if not ok:
+                            rejected_vehicle += 1
+                            continue
 
-    conn = sqlite3.connect(DB_FILE)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS seen_listings (
-            item_id TEXT PRIMARY KEY,
-            title TEXT,
-            url TEXT,
-            first_seen TEXT
+                        key = item["url"]
+                        if key not in found:
+                            found[key] = {
+                                "item": item,
+                                "platform": platform,
+                                "vehicle": vehicle,
+                                "pending": pending,
+                                "details": details,
+                            }
+                except Exception as exc:
+                    errors += 1
+                    log(f"搜索失败：{platform} / {vehicle.get('model')}：{exc}")
+                time.sleep(1)
+
+    new_count = 0
+    sent_count = 0
+    for url, result in found.items():
+        if already_sent(url):
+            continue
+        message = format_listing(
+            result["item"],
+            result["platform"],
+            result["vehicle"],
+            result["pending"],
+            result["details"],
         )
-    """)
-    conn.commit()
+        try:
+            telegram_send(message)
+            mark_sent(url)
+            sent_count += 1
+            new_count += 1
+            log(f"已推送：{result['item'].get('title', '')}")
+            time.sleep(1)
+        except Exception as exc:
+            log(f"Telegram 推送失败：{exc}")
 
-    pushed = 0
+    summary = (
+        "🚘 <b>二手车雷达每日汇总</b>\n"
+        f"搜索到的候选车辆：{len(found)} 条\n"
+        f"本次新推送：{new_count} 条\n"
+        f"因域名不符排除：{rejected_domain} 条\n"
+        f"因车型/筛选条件排除：{rejected_vehicle} 条\n"
+        f"搜索错误：{errors} 次\n\n"
+        "注意：这是公开网页搜索结果，不代表平台全部库存。价格、生产日期、车型年款及车辆状态请以卖家原始页面和车辆检测为准。"
+    )
     try:
-        for url, raw in unique.items():
-            vehicle = raw["_query_vehicle"]
-            item, reason = evaluate(raw, vehicle)
+        telegram_send(summary)
+    except Exception as exc:
+        log(f"汇总消息发送失败：{exc}")
 
-            if item is None:
-                if reason == "链接不是四个平台之一":
-                    stats["no_platform"] += 1
-                elif reason == "标题和摘要没有识别到车型关键词":
-                    stats["no_vehicle"] += 1
-                elif reason == "明确超过15万元":
-                    stats["over_price"] += 1
-                elif reason == "明确早于2019年生产":
-                    stats["too_old"] += 1
-                else:
-                    stats["wrong_year"] += 1
-                continue
-
-            stats["candidate"] += 1
-            key = stable_id(item["url"])
-
-            if conn.execute(
-                "SELECT 1 FROM seen_listings WHERE item_id = ?", (key,)
-            ).fetchone():
-                stats["already_seen"] += 1
-                continue
-
-            if pushed >= MAX_PUSH:
-                log(f"达到本次推送上限 {MAX_PUSH} 条")
-                break
-
-            if send_telegram(make_message(item)):
-                conn.execute(
-                    "INSERT OR IGNORE INTO seen_listings "
-                    "(item_id, title, url, first_seen) VALUES (?, ?, ?, ?)",
-                    (
-                        key,
-                        item["title"],
-                        item["url"],
-                        datetime.now(TZ).isoformat(),
-                    ),
-                )
-                conn.commit()
-                pushed += 1
-            else:
-                log("推送失败；本条不记入去重数据库，后续可重试")
-
-        log("========== 筛选统计 ==========")
-        log(f"非目标平台链接：{stats['no_platform']}")
-        log(f"车型关键词未匹配：{stats['no_vehicle']}")
-        log(f"明确超过预算：{stats['over_price']}")
-        log(f"明确早于生产日期下限：{stats['too_old']}")
-        log(f"明确年款不符或其他排除：{stats['wrong_year']}")
-        log(f"候选车源：{stats['candidate']}")
-        log(f"之前已通知：{stats['already_seen']}")
-        log(f"本次推送成功：{pushed}")
-        log("运行结束")
-    finally:
-        conn.close()
+    log(
+        f"运行结束：候选 {len(found)}，新推送 {sent_count}，"
+        f"域名排除 {rejected_domain}，条件排除 {rejected_vehicle}，错误 {errors}"
+    )
 
 
 if __name__ == "__main__":
