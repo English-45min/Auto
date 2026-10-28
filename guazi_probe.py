@@ -1,5 +1,5 @@
 
-import os
+import re
 import urllib.request
 import urllib.error
 from html.parser import HTMLParser
@@ -9,29 +9,27 @@ URL = "https://m.guazi.com/list?input=%E7%89%B9%E6%96%AF%E6%8B%89%20Model%203%20
 class PageParser(HTMLParser):
     def __init__(self):
         super().__init__()
-        self.title = False
-        self.titles = []
-        self.text_parts = []
+        self.scripts = []
+        self.in_script = False
+        self.script_text = []
 
     def handle_starttag(self, tag, attrs):
-        if tag.lower() == "title":
-            self.title = True
+        if tag.lower() == "script":
+            self.in_script = True
+            attrs = dict(attrs)
+            src = attrs.get("src")
+            if src:
+                self.scripts.append(src)
 
     def handle_endtag(self, tag):
-        if tag.lower() == "title":
-            self.title = False
+        if tag.lower() == "script":
+            self.in_script = False
 
     def handle_data(self, data):
-        data = data.strip()
-        if not data:
-            return
-        if self.title:
-            self.titles.append(data)
-        self.text_parts.append(data)
+        if self.in_script and data.strip():
+            self.script_text.append(data.strip())
 
 def main():
-    print("开始测试瓜子网页读取能力……")
-
     request = urllib.request.Request(
         URL,
         headers={
@@ -45,40 +43,46 @@ def main():
 
     try:
         with urllib.request.urlopen(request, timeout=25) as response:
-            status = response.status
-            content_type = response.headers.get(
-                "Content-Type", ""
+            page = response.read(2_000_000).decode(
+                response.headers.get_content_charset() or "utf-8",
+                errors="replace",
             )
-            raw = response.read(2_000_000)
-            encoding = response.headers.get_content_charset() or "utf-8"
+            print("HTTP 状态：", response.status)
+            print("页面长度：", len(page))
 
-        page = raw.decode(encoding, errors="replace")
         parser = PageParser()
         parser.feed(page)
 
-        print(f"HTTP 状态：{status}")
-        print(f"页面类型：{content_type}")
-        print(f"返回字节数：{len(raw)}")
-        print(f"页面标题：{' '.join(parser.titles) or '未识别'}")
+        print("\n--- 网页加载的脚本文件（最多 15 个）---")
+        for src in parser.scripts[:15]:
+            print(src)
 
-        text = " ".join(parser.text_parts)
-        print(f"提取文本长度：{len(text)}")
+        print("\n--- 页面中疑似数据接口或安全验证的线索 ---")
+        patterns = [
+            r"https?://[^\"'\s<>]+",
+            r"[/][\w./-]*(?:api|search|list|detail|graphql)[\w?&=./%-]*",
+            r"captcha|verify|challenge|security|登录|验证",
+            r"__NEXT_DATA__|__INITIAL_STATE__|window\.__",
+        ]
 
-        keywords = ["Model 3", "特斯拉", "万", "上牌", "车辆详情"]
-        for keyword in keywords:
-            print(f"包含“{keyword}”：{'是' if keyword in text else '否'}")
+        found = set()
+        for pattern in patterns:
+            for match in re.findall(pattern, page, re.I):
+                value = match if isinstance(match, str) else str(match)
+                if value not in found:
+                    found.add(value)
+                    print(value[:300])
+                if len(found) >= 40:
+                    break
+            if len(found) >= 40:
+                break
 
-        if len(text) < 200:
-            print("初步结果：页面内容较少，可能需要 JavaScript 才能加载车源。")
-        elif not any(word in text for word in ["Model 3", "特斯拉"]):
-            print("初步结果：已读取网页，但未找到目标车型文本。")
-        else:
-            print("初步结果：找到了目标车型相关文本，仍需验证价格和日期字段。")
+        print("\n测试完成：以上仅为页面线索，不代表接口已经验证可用。")
 
     except urllib.error.HTTPError as exc:
-        print(f"网页拒绝或限制了请求：HTTP {exc.code}")
+        print("HTTP 错误：", exc.code)
     except Exception as exc:
-        print(f"网页读取失败：{type(exc).__name__}: {exc}")
+        print("读取失败：", type(exc).__name__, str(exc))
 
 if __name__ == "__main__":
     main()
