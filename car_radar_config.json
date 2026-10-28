@@ -1,59 +1,61 @@
-
 {
-  "budget_max_cny": 150000,
+  "min_price": null,
+  "max_price": 150000,
   "production_date_from": "2019-01-01",
-  "sources": [
-    {
-      "name": "瓜子二手车",
-      "enabled": false,
-      "feed_url": ""
-    },
-    {
-      "name": "懂车帝",
-      "enabled": false,
-      "feed_url": ""
-    },
-    {
-      "name": "58同城",
-      "enabled": false,
-      "feed_url": ""
-    },
-    {
-      "name": "闲鱼",
-      "enabled": false,
-      "feed_url": ""
-    }
+  "production_date_to": null,
+  "listing_age_days": null,
+  "listing_age_custom_days": null,
+  "match_mode": "relaxed",
+  "frequency": "daily",
+  "platforms": [
+    "瓜子二手车",
+    "懂车帝",
+    "58同城",
+    "闲鱼"
+  ],
+  "brands": [
+    "沃尔沃",
+    "马自达",
+    "丰田",
+    "特斯拉",
+    "福特"
   ],
   "vehicles": [
     {
-      "name": "沃尔沃 S60 T4/T5（2020年款）",
-      "keywords": ["沃尔沃 S60 T4", "沃尔沃 S60 T5", "S60 T4", "S60 T5"],
-      "model_year": 2020
+      "brand": "沃尔沃",
+      "model": "S60 T4/T5",
+      "year_from": 2020,
+      "year_to": 2020
     },
     {
-      "name": "马自达 CX-50 智行版",
-      "keywords": ["马自达 CX-50 智行版", "CX-50 智行"],
-      "model_year": null
+      "brand": "沃尔沃",
+      "model": "V60",
+      "year_from": 2019,
+      "year_to": null
     },
     {
-      "name": "丰田 RAV4 荣放",
-      "keywords": ["丰田 RAV4", "RAV4 荣放", "荣放"],
-      "model_year": null
+      "brand": "马自达",
+      "model": "CX-50 智行版",
+      "year_from": 2019,
+      "year_to": null
     },
     {
-      "name": "特斯拉 Model 3（2023年及以后）",
-      "keywords": ["特斯拉 Model 3", "Tesla Model 3", "Model 3"],
-      "model_year_from": 2023
+      "brand": "丰田",
+      "model": "RAV4 荣放",
+      "year_from": 2019,
+      "year_to": null
     },
     {
-      "name": "福特蒙迪欧双擎运动版",
-      "keywords": ["福特蒙迪欧双擎运动版", "蒙迪欧双擎运动"],
-      "model_year": null
+      "brand": "特斯拉",
+      "model": "Model 3",
+      "year_from": 2023,
+      "year_to": null
+    },
+    {
+      "brand": "福特",
+      "model": "蒙迪欧双擎运动版",
+      "year_from": 2019,
+      "year_to": null
     }
-  ],
-  "notification": {
-    "telegram_enabled": true,
-    "notify_new_listings": true,
-    "deduplicate": true
-  }
+  ]
 }
