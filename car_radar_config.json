@@ -1,0 +1,59 @@
+
+{
+  "budget_max_cny": 150000,
+  "production_date_from": "2019-01-01",
+  "sources": [
+    {
+      "name": "瓜子二手车",
+      "enabled": false,
+      "feed_url": ""
+    },
+    {
+      "name": "懂车帝",
+      "enabled": false,
+      "feed_url": ""
+    },
+    {
+      "name": "58同城",
+      "enabled": false,
+      "feed_url": ""
+    },
+    {
+      "name": "闲鱼",
+      "enabled": false,
+      "feed_url": ""
+    }
+  ],
+  "vehicles": [
+    {
+      "name": "沃尔沃 S60 T4/T5（2020年款）",
+      "keywords": ["沃尔沃 S60 T4", "沃尔沃 S60 T5", "S60 T4", "S60 T5"],
+      "model_year": 2020
+    },
+    {
+      "name": "马自达 CX-50 智行版",
+      "keywords": ["马自达 CX-50 智行版", "CX-50 智行"],
+      "model_year": null
+    },
+    {
+      "name": "丰田 RAV4 荣放",
+      "keywords": ["丰田 RAV4", "RAV4 荣放", "荣放"],
+      "model_year": null
+    },
+    {
+      "name": "特斯拉 Model 3（2023年及以后）",
+      "keywords": ["特斯拉 Model 3", "Tesla Model 3", "Model 3"],
+      "model_year_from": 2023
+    },
+    {
+      "name": "福特蒙迪欧双擎运动版",
+      "keywords": ["福特蒙迪欧双擎运动版", "蒙迪欧双擎运动"],
+      "model_year": null
+    }
+  ],
+  "notification": {
+    "telegram_enabled": true,
+    "notify_new_listings": true,
+    "deduplicate": true
+  }
+}
