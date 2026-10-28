@@ -1,0 +1,44 @@
+
+name: Car Radar
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: car-radar
+  cancel-in-progress: false
+
+jobs:
+  car-radar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run car radar
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CAR_RADAR_FEED_URLS: ${{ vars.CAR_RADAR_FEED_URLS }}
+        run: python car_radar.py
+
+      - name: Save car radar database
+        if: always()
+        run: |
+          if [ -f car_radar.sqlite3 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add car_radar.sqlite3
+            git diff --cached --quiet || git commit -m "Update car radar database"
+            git push
+          fi
