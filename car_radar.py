@@ -1,16 +1,18 @@
 
 # -*- coding: utf-8 -*-
 """
-二手车雷达升级版
-功能：Bing RSS 搜索、候选车源筛选、详情页补充核验、Telegram 推送、SQLite 去重。
+二手车雷达
+功能：Bing RSS 搜索、Bing 跳转链接解析、车源筛选、详情页核验、
+Telegram 推送、SQLite 去重。
 
 注意：
 1. Bing 搜索不是二手车平台官方库存 API，无法保证覆盖全部车源。
-2. 搜索摘要和详情页都可能不完整；未知字段明确标记为待核实。
-3. listing_age_days 依据搜索结果发布时间估算，不等于车辆真实上架时间。
+2. 搜索结果发布时间不等于车辆真实上架时间。
+3. 未识别的价格、生产日期或年款会标记为待核实。
 4. 不会自动删除旧的 SQLite 推送记录。
 """
 
+import base64
 import html
 import json
 import os
@@ -46,7 +48,7 @@ PLATFORM_DOMAINS = {
     "爱卡汽车": ["used.xcar.com.cn", "xcar.com.cn"],
 }
 
-# 每款车采用更短、更直接的关键词，减少复杂 OR 语句的干扰。
+# 已统一使用 CX-50，不再要求“智行版”。
 VEHICLE_SEARCH_TERMS = {
     "S60 T4/T5": [
         "沃尔沃 S60 二手车",
@@ -56,7 +58,7 @@ VEHICLE_SEARCH_TERMS = {
         "沃尔沃 V60 二手车",
         "Volvo V60 used",
     ],
-    "CX-50 智行版": [
+    "CX-50": [
         "马自达 CX-50 二手车",
         "Mazda CX-50 used",
     ],
@@ -98,6 +100,7 @@ def load_config():
         "platforms": list(PLATFORM_DOMAINS),
         "vehicles": [],
     }
+
     for key, value in defaults.items():
         config.setdefault(key, value)
 
@@ -133,17 +136,85 @@ def mark_sent(url):
         )
 
 
-def normalize_url(url):
-    """规范 URL 并去掉常见追踪参数。"""
+def decode_bing_url(url):
+    """
+    解析 Bing 搜索结果中的跳转链接。
+
+    Bing 部分链接会把真实地址放在 u= 参数中，
+    形式可能是 a1 + URL-safe Base64 编码。
+    也兼容直接使用 url= 参数的情况。
+    """
     url = html.unescape((url or "").strip())
+
+    # 最多解析两层，防止嵌套跳转。
+    for _ in range(2):
+        try:
+            parsed = urllib.parse.urlsplit(url)
+            host = (parsed.hostname or "").lower()
+
+            if not (
+                host == "bing.com"
+                or host.endswith(".bing.com")
+            ):
+                break
+
+            params = urllib.parse.parse_qs(parsed.query)
+            changed = False
+
+            for key in ("url", "u"):
+                values = params.get(key, [])
+                if not values:
+                    continue
+
+                value = html.unescape(values[0]).strip()
+
+                if value.startswith(("http://", "https://")):
+                    url = value
+                    changed = True
+                    break
+
+                if key == "u":
+                    token = value
+
+                    # Bing 常见格式为 a1 + Base64 字符串。
+                    if token.startswith("a1"):
+                        token = token[2:]
+
+                    try:
+                        token += "=" * (-len(token) % 4)
+                        decoded = base64.urlsafe_b64decode(
+                            token.encode("ascii")
+                        ).decode("utf-8", errors="ignore")
+
+                        if decoded.startswith(("http://", "https://")):
+                            url = decoded
+                            changed = True
+                            break
+                    except Exception:
+                        pass
+
+            if not changed:
+                break
+
+        except Exception:
+            break
+
+    return url
+
+
+def normalize_url(url):
+    """解开 Bing 跳转地址，并清除常见追踪参数。"""
+    url = decode_bing_url(url)
 
     try:
         p = urllib.parse.urlsplit(url)
+
         if p.scheme not in ("http", "https") or not p.hostname:
             return url
 
         host = p.hostname.lower().rstrip(".")
         port = p.port
+
         netloc = host
         if port and not (
             (p.scheme == "http" and port == 80)
@@ -155,6 +226,7 @@ def normalize_url(url):
             "utm_source", "utm_medium", "utm_campaign",
             "utm_content", "utm_term", "spm", "from", "ref",
         }
+
         query = [
             (k, v)
             for k, v in urllib.parse.parse_qsl(
@@ -170,19 +242,25 @@ def normalize_url(url):
             urllib.parse.urlencode(query),
             "",
         ))
+
     except Exception:
         return url
 
 
 def get_host(url):
     try:
-        return (urllib.parse.urlsplit(url).hostname or "").lower().rstrip(".")
+        url = decode_bing_url(url)
+        return (
+            urllib.parse.urlsplit(url).hostname or ""
+        ).lower().rstrip(".")
     except Exception:
         return ""
 
 
 def url_matches_platform(url, platform):
+    url = normalize_url(url)
     host = get_host(url)
+
     return any(
         host == domain or host.endswith("." + domain)
         for domain in PLATFORM_DOMAINS.get(platform, [])
@@ -197,6 +275,7 @@ def fetch_rss(query):
         "setlang": "zh-hans",
         "cc": "cn",
     })
+
     url = "https://www.bing.com/search?" + params
     request = urllib.request.Request(
         url,
@@ -220,14 +299,18 @@ def fetch_rss(query):
         ).strip()
         pub_date = node.findtext("pubDate", "").strip()
 
-        # 部分 RSS 链接会返回 Bing 跳转地址；尽量跟随一次跳转。
         link = normalize_url(link)
+
+        # 若仍是 Bing 跳转地址，尝试跟随 HTTP 跳转。
         if "bing.com" in get_host(link):
             try:
                 request = urllib.request.Request(
-                    link, headers={"User-Agent": USER_AGENT}
+                    link,
+                    headers={"User-Agent": USER_AGENT},
                 )
-                with urllib.request.urlopen(request, timeout=8) as response:
+                with urllib.request.urlopen(
+                    request, timeout=8
+                ) as response:
                     link = normalize_url(response.geturl())
             except Exception:
                 pass
@@ -252,10 +335,10 @@ def strip_html(value):
 
 def fetch_page_text(url):
     """
-    尝试读取公开车源页面的文本。
-    部分网站需要登录、使用 JavaScript 或阻止自动访问，失败时返回空文本。
+    尝试读取公开车源页面。
+    若网站要求登录、使用 JavaScript 或阻止自动访问，则返回空文本。
     """
-    if not url or get_host(url) in ("bing.com", "www.bing.com"):
+    if not url or "bing.com" in get_host(url):
         return ""
 
     try:
@@ -266,18 +349,19 @@ def fetch_page_text(url):
                 "Accept": "text/html,application/xhtml+xml,*/*",
             },
         )
+
         with urllib.request.urlopen(request, timeout=8) as response:
             content_type = response.headers.get("Content-Type", "")
             if "html" not in content_type.lower():
                 return ""
             raw = response.read(900_000)
 
-        # 尽量兼容常见网页编码。
         page = raw.decode("utf-8", errors="ignore")
         if len(page.strip()) < 100:
             page = raw.decode("gb18030", errors="ignore")
 
         return strip_html(page)[:30000]
+
     except Exception:
         return ""
 
@@ -302,13 +386,13 @@ def vehicle_matches(text, vehicle):
         "特斯拉": ["特斯拉", "tesla"],
         "福特": ["福特", "ford"],
     }
-    aliases = brand_aliases.get(brand, [brand.lower()])
 
-    # 标题摘要可能省略品牌，但车型名称仍可能足以作为待核实候选。
+    aliases = brand_aliases.get(brand, [brand.lower()])
     brand_found = any(a.lower() in t for a in aliases if a)
+
+    # 某些英文车源标题会省略中文品牌，允许用车型关键词继续核验。
     if brand and not brand_found:
-        # 允许使用英文车型名的候选进入后续判断，但不无限放宽。
-        if model not in ("V60", "S60 T4/T5"):
+        if model not in ("V60", "S60 T4/T5", "CX-50", "Model 3"):
             return False
 
     if model == "S60 T4/T5":
@@ -317,8 +401,8 @@ def vehicle_matches(text, vehicle):
     if model == "V60":
         return "v60" in t or "v 60" in t
 
-    if model == "CX-50 智行版":
-        return "cx-50" in t or "cx50" in t
+    if model == "CX-50":
+        return any(x in t for x in ("cx-50", "cx50", "cx 50"))
 
     if model == "RAV4 荣放":
         return any(x in t for x in ("rav4", "荣放", "荣枫"))
@@ -346,18 +430,19 @@ def looks_like_listing(item):
         "可议价", "在售", "二手", "卖车",
     )
 
-    # 资讯词本身不能直接判死刑：若同一结果有明显售车信号则继续检查。
-    if any(x in text for x in negative) and not any(x in text for x in positive):
+    if any(x in text for x in negative) and not any(
+        x in text for x in positive
+    ):
         return False
 
     if any(x in text for x in positive):
         return True
 
-    # 没有明显售车词时，只接受疑似详情页路径，仍需在消息中提示核实。
     listing_paths = (
         "/used", "/ershou", "/car/", "/vehicle/",
         "/detail", "/dealer", "/listing", "/item", "/sale",
     )
+
     return any(x in url for x in listing_paths)
 
 
@@ -381,6 +466,7 @@ def parse_price(text):
         match = re.search(pattern, text or "", re.I)
         if not match:
             continue
+
         try:
             value = float(match.group(1).replace(",", ""))
             if wan:
@@ -405,6 +491,7 @@ def parse_production_date(text):
         match = re.search(pattern, text or "")
         if not match:
             continue
+
         try:
             year = int(match.group(1))
             month = int(match.group(2))
@@ -421,17 +508,20 @@ def parse_model_year(text):
         r"(20\d{2})\s*年款",
         r"(20\d{2})\s*款",
     )
+
     for pattern in patterns:
         match = re.search(pattern, text or "")
         if match:
             year = int(match.group(1))
             if 2010 <= year <= date.today().year + 1:
                 return year
+
     return None
 
 
 def parse_listing_date(item):
     pub_date = item.get("pub_date", "")
+
     if pub_date:
         try:
             dt = parsedate_to_datetime(pub_date)
@@ -513,7 +603,9 @@ def evaluate(item, vehicle, config):
             age_limit = int(age_limit)
             if listing_date is None:
                 pending.append("搜索结果日期待核实")
-            elif (date.today() - listing_date).days > age_limit:
+            elif (
+                datetime.now(BEIJING_TZ).date() - listing_date
+            ).days > age_limit:
                 return False, [], {}, "超过搜索结果日期限制"
         except (ValueError, TypeError):
             pass
@@ -528,12 +620,19 @@ def evaluate(item, vehicle, config):
         "model_year": model_year,
         "listing_date": listing_date,
     }
+
     return True, pending, details, ""
 
 
 def telegram_send(message):
-    token = os.environ.get("TG_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN")
-    chat_id = os.environ.get("TG_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID")
+    token = (
+        os.environ.get("TG_BOT_TOKEN")
+        or os.environ.get("TELEGRAM_BOT_TOKEN")
+    )
+    chat_id = (
+        os.environ.get("TG_CHAT_ID")
+        or os.environ.get("TELEGRAM_CHAT_ID")
+    )
 
     if not token or not chat_id:
         raise RuntimeError(
@@ -541,6 +640,7 @@ def telegram_send(message):
         )
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+
     payload = urllib.parse.urlencode({
         "chat_id": chat_id,
         "text": message,
@@ -580,12 +680,14 @@ def format_listing(item, platform, vehicle, pending, details):
     ]
 
     if details["price"] is not None:
-        lines.append(f"搜索内容识别价格：约 ¥{details['price']:,}")
+        lines.append(f"识别价格：约 ¥{details['price']:,}")
     else:
         lines.append("价格：未识别，请打开原网页核实")
 
     if details["production_date"]:
-        lines.append(f"生产日期：{details['production_date'].isoformat()}")
+        lines.append(
+            f"生产日期：{details['production_date'].isoformat()}"
+        )
     else:
         lines.append("生产日期：未识别，请打开原网页核实")
 
@@ -601,14 +703,20 @@ def format_listing(item, platform, vehicle, pending, details):
         )
 
     if pending:
-        lines.append("⚠️ 待核实：" + "、".join(safe_html(x) for x in pending))
+        lines.append(
+            "⚠️ 待核实：" + "、".join(
+                safe_html(x) for x in pending
+            )
+        )
 
     summary = strip_html(item.get("description", ""))
     if summary:
         lines.append("搜索摘要：" + safe_html(summary[:300]))
 
     if item.get("page_checked"):
-        lines.append("详情页：已尝试读取公开页面，仍需人工确认车辆在售状态")
+        lines.append(
+            "详情页：已尝试读取公开页面，仍需人工确认在售状态"
+        )
     else:
         lines.append("详情页：未能读取或尚未读取，请手动打开核实")
 
@@ -618,17 +726,21 @@ def format_listing(item, platform, vehicle, pending, details):
 
 def build_queries(vehicle, platform):
     """
-    每个域名最多两条简短查询。
-    先按平台域名约束搜索，再在代码中核验最终链接域名。
+    按平台域名搜索。
+    Bing 返回的 URL 仍会在后续步骤中再次检查真实域名。
     """
     model = str(vehicle.get("model", "")).strip()
     brand = str(vehicle.get("brand", "")).strip()
-    terms = VEHICLE_SEARCH_TERMS.get(model, [f"{brand} {model} 二手车"])
+    terms = VEHICLE_SEARCH_TERMS.get(
+        model, [f"{brand} {model} 二手车"]
+    )
 
     queries = []
+
     for domain in PLATFORM_DOMAINS.get(platform, []):
         for term in terms:
             queries.append(f"site:{domain} {term}")
+
     return queries
 
 
@@ -660,11 +772,11 @@ def main():
             "urls": set(),
             "candidates": 0,
             "reasons": Counter(),
+            "samples": [],
         }
         for p in platforms
     }
 
-    # URL -> 候选车源；同一链接只保留一条，避免重复推送。
     found = {}
     errors = 0
     search_seen = set()
@@ -673,34 +785,46 @@ def main():
         for platform in platforms:
             for query in build_queries(vehicle, platform):
                 try:
-                    log(f"搜索：{platform} / {vehicle.get('model')} / {query}")
+                    log(
+                        f"搜索：{platform} / "
+                        f"{vehicle.get('model')} / {query}"
+                    )
+
                     items = fetch_rss(query)
                     stats[platform]["search"] += len(items)
                     log(f"返回 {len(items)} 条")
 
                     for item in items:
                         url = normalize_url(item.get("url", ""))
+
                         if not url:
                             stats[platform]["reasons"]["链接为空"] += 1
                             continue
 
+                        # 先解码 Bing 跳转，再核验平台域名。
                         if not url_matches_platform(url, platform):
                             stats[platform]["reasons"]["域名不匹配"] += 1
+
+                            if len(stats[platform]["samples"]) < 3:
+                                stats[platform]["samples"].append(url)
+
                             continue
 
                         stats[platform]["urls"].add(url)
+
                         key = (platform, url)
                         if key in search_seen:
                             continue
                         search_seen.add(key)
 
-                        # 搜索结果先做一次宽松筛选，详情页只对可能候选读取。
                         if not vehicle_matches(combined_text(item), vehicle):
                             stats[platform]["reasons"]["车型不匹配"] += 1
                             continue
 
                         if not looks_like_listing(item):
-                            stats[platform]["reasons"]["疑似资讯或非车源页面"] += 1
+                            stats[platform]["reasons"][
+                                "疑似资讯或非车源页面"
+                            ] += 1
                             continue
 
                         item["url"] = url
@@ -710,6 +834,7 @@ def main():
                         ok, pending, details, reason = evaluate(
                             item, vehicle, config
                         )
+
                         if not ok:
                             stats[platform]["reasons"][reason] += 1
                             continue
@@ -727,9 +852,11 @@ def main():
 
                 except Exception as exc:
                     errors += 1
-                    log(f"搜索失败：{platform} / {vehicle.get('model')}：{exc}")
+                    log(
+                        f"搜索失败：{platform} / "
+                        f"{vehicle.get('model')}：{exc}"
+                    )
 
-                # 避免连续请求过快。
                 time.sleep(0.8)
 
     sent_count = 0
@@ -755,21 +882,27 @@ def main():
             sent_count += 1
             log("已推送：" + result["item"].get("title", "未命名车源"))
             time.sleep(1)
+
         except Exception as exc:
             failed_sends += 1
             log(f"推送失败：{exc}")
 
     log("各平台统计：搜索结果 / 域名通过 / 候选车源")
+
     for platform, item in stats.items():
         log(
             f"{platform}：{item['search']} / "
             f"{len(item['urls'])} / {item['candidates']}"
         )
+
         for reason, count in item["reasons"].most_common(5):
             log(f"  排除原因 - {reason}：{count}")
 
+        for sample in item["samples"]:
+            log(f"  域名排查样例：{sample}")
+
     summary = [
-        "🚘 <b>二手车雷达运行汇总（升级版）</b>",
+        "🚘 <b>二手车雷达运行汇总</b>",
         f"候选车源：{len(found)} 条",
         f"本次新推送：{sent_count} 条",
         f"已推送过而跳过：{skipped_count} 条",
@@ -785,10 +918,11 @@ def main():
             f"域名通过 {len(item['urls'])} 条，"
             f"候选 {item['candidates']} 条"
         )
+
         reasons = item["reasons"].most_common(3)
         if reasons:
             summary.append(
-                "  排除原因：" + "；".join(
+                "排除原因：" + "；".join(
                     f"{safe_html(reason)} {count} 条"
                     for reason, count in reasons
                 )
@@ -797,8 +931,8 @@ def main():
     summary.extend([
         "",
         "注意：公开搜索不能保证覆盖平台全部库存。",
-        "价格、生产日期、年款、车况及是否仍在售，均应以原始车源页面和卖家确认结果为准。",
-        "生产日期与车型年款是不同概念；搜索结果日期也不等于车辆真实上架日期。",
+        "价格、生产日期、年款、车况及是否仍在售，均应以原始页面和卖家确认结果为准。",
+        "生产日期与车型年款是不同概念；搜索结果日期不等于车辆真实上架日期。",
     ])
 
     try:
