@@ -7,15 +7,16 @@ JS_URL = (
     "guazi-mall-vue3/static/index.1189010c.js"
 )
 
-def main():
-    print("开始检查瓜子前端脚本中的公开接口线索……")
+TARGETS = [
+    "/api/uniformRecommend/v3/feedsIndex",
+    "/api/uniformRecommend/v2/feedsIndex",
+    "/api/home/pageIndex",
+]
 
+def main():
     request = urllib.request.Request(
         JS_URL,
-        headers={
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "*/*",
-        },
+        headers={"User-Agent": "Mozilla/5.0"},
     )
 
     try:
@@ -23,45 +24,28 @@ def main():
             code = response.read(8_000_000).decode(
                 "utf-8", errors="replace"
             )
-            print("HTTP 状态：", response.status)
-            print("脚本字符数：", len(code))
 
-        patterns = [
-            r"""["']([^"' ]{1,180})["']"""
-        ]
+        for target in TARGETS:
+            print(f"\n--- {target} ---")
+            positions = [
+                match.start()
+                for match in re.finditer(re.escape(target), code)
+            ]
 
-        keywords = (
-            "api", "car", "list", "search", "detail",
-            "vehicle", "used", "clue", "recommend"
-        )
+            if not positions:
+                print("未找到完整路径，可能由代码拼接生成。")
+                continue
 
-        found = set()
-        for pattern in patterns:
-            for match in re.findall(pattern, code, re.I):
-                value = match.strip()
-                lower = value.lower()
+            print("出现次数：", len(positions))
 
-                if not value.startswith("/"):
-                    continue
-                if not any(word in lower for word in keywords):
-                    continue
-                if value.startswith("//"):
-                    continue
+            for pos in positions[:3]:
+                start = max(0, pos - 350)
+                end = min(len(code), pos + len(target) + 500)
+                snippet = code[start:end]
+                print(snippet)
+                print("\n[片段结束]\n")
 
-                # 只输出看起来像路径的字符串，不输出整段脚本。
-                if len(value) > 180:
-                    continue
-                found.add(value)
-
-        print("\n--- 疑似车源或查询路径（最多 40 条）---")
-        for path in sorted(found)[:40]:
-            print(path)
-
-        if not found:
-            print("没有发现明显的接口路径。")
-            print("接口也可能由多个字符串拼接生成。")
-
-        print("\n注意：这些只是字符串线索，尚未验证为可用车源接口。")
+        print("检查结束：代码片段只是线索，不代表接口已可调用。")
 
     except Exception as exc:
         print("测试失败：", type(exc).__name__, str(exc))
