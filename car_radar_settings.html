@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>二手车雷达设置</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#eef3ff;font:16px/1.5 system-ui,sans-serif}main{max-width:800px;margin:auto;padding:18px 12px 40px}h1{font-size:25px}h2{font-size:18px;margin-top:0}.panel{background:#131b2e;border:1px solid #293650;border-radius:14px;padding:16px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:5px}label{font-size:14px;color:#d6deee}input,select,textarea{width:100%;background:#0b1222;color:#eef3ff;border:1px solid #34435e;border-radius:8px;padding:10px;font:inherit}textarea{min-height:140px}.checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.check{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid #293650;border-radius:8px}.check input{width:18px;height:18px;accent-color:#f5a623}.hint{color:#a8b4ca;font-size:13px}.actions{display:flex;gap:9px;flex-wrap:wrap}button{padding:11px 13px;border:0;border-radius:9px;font-weight:700;cursor:pointer}.primary{background:#f5a623;color:#201607}.secondary{background:#26344d;color:white}.summary{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1222;padding:10px;border-radius:8px;font-size:13px}#status{color:#bfe9c9;min-height:24px;margin:10px 0}@media(max-width:520px){.grid,.checks{grid-template-columns:1fr}h1{font-size:22px}}
+</style></head><body><main>
+<div style="color:#f5a623;font-size:12px;font-weight:bold;letter-spacing:.12em">AUTO RADAR / SETTINGS</div><h1>二手车雷达｜筛选设置</h1>
+<p class="hint">可在手机上编辑条件、保存在当前浏览器或导出 JSON。此页面目前尚未连接 GitHub Actions 或 Telegram。</p>
+<section class="panel"><h2>1. 预算与生产日期</h2><div class="grid">
+<div class="field"><label for="minPrice">最低预算（元，可空）</label><input id="minPrice" type="number" min="0" placeholder="不限"></div>
+<div class="field"><label for="maxPrice">最高预算（元）</label><input id="maxPrice" type="number" value="150000" min="0"></div>
+<div class="field"><label for="dateFrom">最早生产日期</label><input id="dateFrom" type="date" value="2019-01-01"></div>
+<div class="field"><label for="dateTo">最晚生产日期（可空）</label><input id="dateTo" type="date"></div>
+<div class="field"><label for="age">上架时间范围</label><select id="age"><option value="any">不限时间（推荐）</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option><option value="custom">自定义天数</option></select></div>
+<div class="field"><label for="customAge">自定义天数</label><input id="customAge" type="number" min="1" placeholder="仅自定义时填写"></div>
+</div><p class="hint">上架时间不等于生产日期。默认不限上架时间，避免漏掉较早发布但仍可能在售的车源。</p></section>
+<section class="panel"><h2>2. 品牌</h2><div class="checks" id="brands">
+<label class="check"><input type="checkbox" value="沃尔沃" checked>沃尔沃</label><label class="check"><input type="checkbox" value="马自达" checked>马自达</label><label class="check"><input type="checkbox" value="丰田" checked>丰田</label><label class="check"><input type="checkbox" value="特斯拉" checked>特斯拉</label><label class="check"><input type="checkbox" value="福特" checked>福特</label><label class="check"><input type="checkbox" value="宝马">宝马</label><label class="check"><input type="checkbox" value="奔驰">奔驰</label><label class="check"><input type="checkbox" value="奥迪">奥迪</label><label class="check"><input type="checkbox" value="本田">本田</label><label class="check"><input type="checkbox" value="大众">大众</label><label class="check"><input type="checkbox" value="其他">其他</label></div></section>
+<section class="panel"><h2>3. 车型、配置与年款</h2><div class="field"><label for="vehicles">每行一条规则：品牌 | 车型/配置 | 最低年款 | 最高年款（年款可留空）</label>
+<textarea id="vehicles">沃尔沃 | S60 T4/T5 | 2020 | 2020
+沃尔沃 | V60 | 2019 |
+马自达 | CX-50 智行版 | 2019 |
+丰田 | RAV4 荣放 | 2019 |
+特斯拉 | Model 3 | 2023 |
+福特 | 蒙迪欧双擎运动版 | 2019 |</textarea></div><p class="hint">年款和实际生产日期是不同条件，会分别检查。</p></section>
+<section class="panel"><h2>4. 搜索平台与匹配模式</h2><div class="checks" id="platforms">
+<label class="check"><input type="checkbox" value="瓜子二手车" checked>瓜子二手车</label><label class="check"><input type="checkbox" value="懂车帝" checked>懂车帝</label><label class="check"><input type="checkbox" value="58同城" checked>58同城</label><label class="check"><input type="checkbox" value="闲鱼" checked>闲鱼</label></div>
+<div class="grid" style="margin-top:12px"><div class="field"><label for="mode">匹配模式</label><select id="mode"><option value="relaxed">宽松：缺价格/日期时标为待核实</option><option value="strict">严格：缺少关键条件时不推送</option></select></div><div class="field"><label>推送频率</label><input value="每天汇总一次" disabled></div></div></section>
+<section class="panel"><h2>5. 保存与导出</h2><p class="hint">保存到本机只影响当前浏览器。自动任务要使用新条件，还需要将导出的配置接入仓库脚本。</p>
+<div class="actions"><button class="primary" id="save">保存到本机</button><button class="secondary" id="export">导出 JSON</button><button class="secondary" id="import">导入 JSON</button><button class="secondary" id="reset">恢复默认</button><input id="file" type="file" accept=".json,application/json" hidden></div>
+<div id="status" role="status" aria-live="polite"></div><h2>配置预览</h2><div id="preview" class="summary"></div></section>
+<p class="hint">不要在页面填写 Telegram Token 等机密信息。搜索结果不代表平台完整库存，车源仍需打开原始链接核实。</p></main>
+<script>
+const KEY="autoRadarSettingsV1";
+const defaults={min_price:null,max_price:150000,production_date_from:"2019-01-01",production_date_to:null,listing_age_days:null,listing_age_custom_days:null,brands:["沃尔沃","马自达","丰田","特斯拉","福特"],vehicles:[{brand:"沃尔沃",model:"S60 T4/T5",year_from:2020,year_to:2020},{brand:"沃尔沃",model:"V60",year_from:2019,year_to:null},{brand:"马自达",model:"CX-50 智行版",year_from:2019,year_to:null},{brand:"丰田",model:"RAV4 荣放",year_from:2019,year_to:null},{brand:"特斯拉",model:"Model 3",year_from:2023,year_to:null},{brand:"福特",model:"蒙迪欧双擎运动版",year_from:2019,year_to:null}],platforms:["瓜子二手车","懂车帝","58同城","闲鱼"],frequency:"daily",match_mode:"relaxed"};
+const $=id=>document.getElementById(id);
+function checked(id){return [...$(id).querySelectorAll("input:checked")].map(x=>x.value)}
+function setChecked(id,values){$(id).querySelectorAll("input").forEach(x=>x.checked=values.includes(x.value))}
+function read(){let a=$("age").value;let vehicles=$("vehicles").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(line=>{let p=line.split("|").map(x=>x.trim());return{brand:p[0]||"",model:p[1]||"",year_from:p[2]?Number(p[2]):null,year_to:p[3]?Number(p[3]):null}});
+return{min_price:$("minPrice").value===""?null:Number($("minPrice").value),max_price:$("maxPrice").value===""?null:Number($("maxPrice").value),production_date_from:$("dateFrom").value||null,production_date_to:$("dateTo").value||null,listing_age_days:a==="any"||a==="custom"?null:Number(a),listing_age_custom_days:a==="custom"&&$("customAge").value?Number($("customAge").value):null,brands:checked("brands"),vehicles,platforms:checked("platforms"),frequency:"daily",match_mode:$("mode").value}}
+function preview(){$("preview").textContent=JSON.stringify(read(),null,2)}
+function fill(c){$("minPrice").value=c.min_price??"";$("maxPrice").value=c.max_price??"";$("dateFrom").value=c.production_date_from??"";$("dateTo").value=c.production_date_to??"";$("age").value=c.listing_age_custom_days?"custom":c.listing_age_days==null?"any":String(c.listing_age_days);$("customAge").value=c.listing_age_custom_days??"";setChecked("brands",c.brands||[]);setChecked("platforms",c.platforms||[]);$("vehicles").value=(c.vehicles||[]).map(v=>[v.brand,v.model,v.year_from??"",v.year_to??""].join(" | ")).join("\n");$("mode").value=c.match_mode||"relaxed";preview()}
+function save(){let c=read();if(c.min_price!==null&&c.max_price!==null&&c.min_price>c.max_price){$("status").textContent="保存失败：最低预算不能高于最高预算。";return}if(c.production_date_from&&c.production_date_to&&c.production_date_from>c.production_date_to){$("status").textContent="保存失败：最早生产日期不能晚于最晚生产日期。";return}localStorage.setItem(KEY,JSON.stringify(c));preview();$("status").textContent="已保存到当前浏览器；GitHub 自动任务尚未读取这份本地设置。"}
+$("save").onclick=save;
+$("export").onclick=()=>{let blob=new Blob([JSON.stringify(read(),null,2)],{type:"application/json"});let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="car_radar_config.json";a.click();URL.revokeObjectURL(a.href);$("status").textContent="配置文件已导出。"};
+$("import").onclick=()=>$("file").click();
+$("file").onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let c=JSON.parse(await f.text());if(!Array.isArray(c.vehicles)||!Array.isArray(c.brands)||!Array.isArray(c.platforms))throw Error("配置结构不完整");fill({...defaults,...c});$("status").textContent="已导入；点击保存可保存到当前浏览器。"}catch(err){$("status").textContent="导入失败："+err.message}e.target.value=""};
+$("reset").onclick=()=>{fill(defaults);$("status").textContent="已恢复页面默认值；如需保存请点击保存到本机。"};
+document.addEventListener("input",e=>{if(e.target.matches("input,select,textarea"))preview()});document.addEventListener("change",e=>{if(e.target.matches("input,select,textarea"))preview()});
+try{fill({...defaults,...JSON.parse(localStorage.getItem(KEY)||"{}")})}catch{fill(defaults)}
+</script></body></html>
