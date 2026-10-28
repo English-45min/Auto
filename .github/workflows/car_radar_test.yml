@@ -7,13 +7,12 @@ on:
 jobs:
   telegram-test:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Send Telegram test message
-      
+      - name: Send TG test message
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-
         run: |
           python - <<'PY'
           import os
@@ -21,31 +20,51 @@ jobs:
           import urllib.request
           import urllib.error
 
-          token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-          chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+          token = os.environ.get("TG_BOT_TOKEN", "").strip()
+          chat_id = os.environ.get("TG_CHAT_ID", "").strip()
 
           if not token or not chat_id:
-              raise SystemExit("缺少 Telegram Secrets，请检查名称。")
+              raise SystemExit(
+                  "缺少 TG Secrets，请检查 TG_BOT_TOKEN 和 TG_CHAT_ID 名称及保存位置。"
+              )
 
           url = f"https://api.telegram.org/bot{token}/sendMessage"
+
           data = json.dumps({
               "chat_id": chat_id,
-              "text": "✅ 二手车雷达测试成功！Telegram 消息推送正常。"
+              "text": "✅ 二手车雷达测试成功！TG 消息推送正常。"
           }).encode("utf-8")
 
           request = urllib.request.Request(
               url,
               data=data,
-              headers={"Content-Type": "application/json"}
+              headers={"Content-Type": "application/json"},
+              method="POST"
           )
 
           try:
               with urllib.request.urlopen(request, timeout=20) as response:
                   result = json.loads(response.read().decode("utf-8"))
-                  if not result.get("ok"):
-                      raise SystemExit("Telegram 返回失败，请查看运行日志。")
-                  print("Telegram 测试消息发送成功。")
+
+              if not result.get("ok"):
+                  raise SystemExit(
+                      "TG API 返回失败：" +
+                      str(result.get("description", "未知原因"))
+                  )
+
+              print("TG 测试消息发送成功。")
+
           except urllib.error.HTTPError as exc:
-              print("Telegram 请求失败，HTTP 状态码：", exc.code)
+              print("TG API HTTP 错误：", exc.code)
+              try:
+                  print(
+                      exc.read().decode("utf-8")[:1000]
+                  )
+              except Exception:
+                  pass
+              raise SystemExit(1)
+
+          except urllib.error.URLError as exc:
+              print("无法连接 TG API：", str(exc.reason))
               raise SystemExit(1)
           PY
