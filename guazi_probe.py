@@ -1,88 +1,70 @@
 
 import re
 import urllib.request
-import urllib.error
-from html.parser import HTMLParser
 
-URL = "https://m.guazi.com/list?input=%E7%89%B9%E6%96%AF%E6%8B%89%20Model%203%202020&cityId=45"
-
-class PageParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.scripts = []
-        self.in_script = False
-        self.script_text = []
-
-    def handle_starttag(self, tag, attrs):
-        if tag.lower() == "script":
-            self.in_script = True
-            attrs = dict(attrs)
-            src = attrs.get("src")
-            if src:
-                self.scripts.append(src)
-
-    def handle_endtag(self, tag):
-        if tag.lower() == "script":
-            self.in_script = False
-
-    def handle_data(self, data):
-        if self.in_script and data.strip():
-            self.script_text.append(data.strip())
+JS_URL = (
+    "https://sta.guazistatic.com/"
+    "guazi-mall-vue3/static/index.1189010c.js"
+)
 
 def main():
+    print("开始检查瓜子前端脚本中的公开接口线索……")
+
     request = urllib.request.Request(
-        URL,
+        JS_URL,
         headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Linux; Android 14) "
-                "AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36"
-            ),
-            "Accept-Language": "zh-CN,zh;q=0.9",
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "*/*",
         },
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=25) as response:
-            page = response.read(2_000_000).decode(
-                response.headers.get_content_charset() or "utf-8",
-                errors="replace",
+        with urllib.request.urlopen(request, timeout=30) as response:
+            code = response.read(8_000_000).decode(
+                "utf-8", errors="replace"
             )
             print("HTTP 状态：", response.status)
-            print("页面长度：", len(page))
+            print("脚本字符数：", len(code))
 
-        parser = PageParser()
-        parser.feed(page)
-
-        print("\n--- 网页加载的脚本文件（最多 15 个）---")
-        for src in parser.scripts[:15]:
-            print(src)
-
-        print("\n--- 页面中疑似数据接口或安全验证的线索 ---")
         patterns = [
-            r"https?://[^\"'\s<>]+",
-            r"[/][\w./-]*(?:api|search|list|detail|graphql)[\w?&=./%-]*",
-            r"captcha|verify|challenge|security|登录|验证",
-            r"__NEXT_DATA__|__INITIAL_STATE__|window\.__",
+            r"""["']([^"' ]{1,180})["']"""
         ]
+
+        keywords = (
+            "api", "car", "list", "search", "detail",
+            "vehicle", "used", "clue", "recommend"
+        )
 
         found = set()
         for pattern in patterns:
-            for match in re.findall(pattern, page, re.I):
-                value = match if isinstance(match, str) else str(match)
-                if value not in found:
-                    found.add(value)
-                    print(value[:300])
-                if len(found) >= 40:
-                    break
-            if len(found) >= 40:
-                break
+            for match in re.findall(pattern, code, re.I):
+                value = match.strip()
+                lower = value.lower()
 
-        print("\n测试完成：以上仅为页面线索，不代表接口已经验证可用。")
+                if not value.startswith("/"):
+                    continue
+                if not any(word in lower for word in keywords):
+                    continue
+                if value.startswith("//"):
+                    continue
 
-    except urllib.error.HTTPError as exc:
-        print("HTTP 错误：", exc.code)
+                # 只输出看起来像路径的字符串，不输出整段脚本。
+                if len(value) > 180:
+                    continue
+                found.add(value)
+
+        print("\n--- 疑似车源或查询路径（最多 40 条）---")
+        for path in sorted(found)[:40]:
+            print(path)
+
+        if not found:
+            print("没有发现明显的接口路径。")
+            print("接口也可能由多个字符串拼接生成。")
+
+        print("\n注意：这些只是字符串线索，尚未验证为可用车源接口。")
+
     except Exception as exc:
-        print("读取失败：", type(exc).__name__, str(exc))
+        print("测试失败：", type(exc).__name__, str(exc))
 
 if __name__ == "__main__":
     main()
