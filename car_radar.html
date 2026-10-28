@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>二手车雷达</title>
+<style>
+:root {
+  --bg: #0b1020;
+  --panel: #141d30;
+  --line: #2a3850;
+  --text: #e8edf7;
+  --muted: #9eacc2;
+  --accent: #ffb02e;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+header {
+  padding: 25px 18px;
+  background: linear-gradient(120deg, #182944, #101626);
+  border-bottom: 1px solid var(--line);
+}
+.header-inner, main {
+  width: min(1180px, 100%);
+  margin: auto;
+}
+h1 { margin: 0; font-size: clamp(25px, 4vw, 36px); }
+.subtitle { color: var(--muted); margin-top: 5px; }
+main { padding: 20px 16px 40px; }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.stat, .filters, .car {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+.stat { padding: 14px; }
+.stat strong {
+  display: block;
+  color: var(--accent);
+  font-size: 24px;
+  overflow-wrap: anywhere;
+}
+.stat span { color: var(--muted); font-size: 12px; }
+.filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+select, input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px;
+  border-radius: 8px;
+  border: 1px solid #35445d;
+  background: #0b1322;
+  color: var(--text);
+  font-size: 14px;
+}
+#cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.car { padding: 15px; min-width: 0; }
+.car h2 {
+  margin: 9px 0;
+  font-size: 17px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  border: 1px solid #35445d;
+  border-radius: 99px;
+  padding: 3px 8px;
+  color: #c9d6e9;
+  font-size: 12px;
+}
+.price {
+  margin: 8px 0;
+  color: var(--accent);
+  font-size: 23px;
+  font-weight: 750;
+}
+.meta, .snippet { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.car a {
+  display: inline-block;
+  margin-top: 12px;
+  color: #91c9ff;
+  text-decoration: none;
+}
+.car a:hover { text-decoration: underline; }
+.empty {
+  grid-column: 1 / -1;
+  padding: 30px 15px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+footer {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 680px) {
+  .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #cards { grid-template-columns: 1fr; }
+  .stat { padding: 10px; }
+  .stat strong { font-size: 19px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <h1>🚗 二手车雷达</h1>
+    <div class="subtitle">自动搜索 · 历史车源 · Telegram 新车源提醒</div>
+  </div>
+</header>
+
+<main>
+  <section class="stats">
+    <div class="stat">
+      <strong id="total">—</strong>
+      <span>历史收录车源</span>
+    </div>
+    <div class="stat">
+      <strong>¥150,000</strong>
+      <span>预算上限</span>
+    </div>
+    <div class="stat">
+      <strong id="updated">—</strong>
+      <span>数据更新时间</span>
+    </div>
+  </section>
+
+  <section class="filters">
+    <select id="model">
+      <option value="">全部车型</option>
+    </select>
+    <select id="platform">
+      <option value="">全部平台</option>
+    </select>
+    <select id="sort">
+      <option value="price">价格从低到高</option>
+      <option value="new">最近收录优先</option>
+      <option value="year">年份从新到旧</option>
+    </select>
+    <input id="search" type="search" placeholder="搜索车型、标题或关键词">
+  </section>
+
+  <section id="cards">
+    <div class="empty">正在读取车源数据……</div>
+  </section>
+</main>
+
+<footer>
+  数据来自公开网页搜索结果，仅供筛选线索参考。
+  请打开原始页面核实售价、年份、车况、所在地和车辆手续。
+</footer>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+let listings = [];
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[ch]);
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function populate(id, values) {
+  const select = $(id);
+  [...new Set(values.filter(Boolean))].sort().forEach(value => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  });
+}
+
+function render() {
+  const model = $("model").value;
+  const platform = $("platform").value;
+  const keyword = $("search").value.trim().toLowerCase();
+
+  let rows = listings.filter(item =>
+    (!model || item.model === model) &&
+    (!platform || item.platform === platform) &&
+    (!keyword || [
+      item.title, item.model, item.platform, item.snippet
+    ].join(" ").toLowerCase().includes(keyword))
+  );
+
+  const sort = $("sort").value;
+
+  rows.sort((a, b) => {
+    if (sort === "new") {
+      return String(b.last_seen || "").localeCompare(
+        String(a.last_seen || "")
+      );
+    }
+    if (sort === "year") {
+      return (b.year || 0) - (a.year || 0);
+    }
+    return (a.price_rmb || Infinity) - (b.price_rmb || Infinity);
+  });
+
+  $("total").textContent = listings.length;
+
+  if (!rows.length) {
+    $("cards").innerHTML =
+      '<div class="empty">没有符合条件的车源。可以更换筛选条件，或等待下次自动更新。</div>';
+    return;
+  }
+
+  $("cards").innerHTML = rows.map(item => {
+    const price = Number(item.price_rmb);
+    const priceText = item.price_rmb && Number.isFinite(price)
+      ? "¥" + price.toLocaleString("zh-CN")
+      : "价格待核实";
+
+    const yearText = item.year
+      ? escapeHTML(item.year) + " 年"
+      : "待核实";
+
+    const checkTag = item.needs_check
+      ? '<span class="tag">信息待核实</span>'
+      : "";
+
+    return `
+      <article class="car">
+        <div class="tags">
+          <span class="tag">${escapeHTML(item.model || "车型待核实")}</span>
+          <span class="tag">${escapeHTML(item.platform || "平台待核实")}</span>
+          ${checkTag}
+        </div>
+        <h2>${escapeHTML(item.title)}</h2>
+        <div class="price">${priceText}</div>
+        <div class="meta">年份：${yearText}</div>
+        <div class="meta">首次收录：${escapeHTML(formatDate(item.first_seen))}</div>
+        ${item.snippet
+          ? `<p class="snippet">${escapeHTML(item.snippet)}</p>`
+          : ""}
+        <a href="${escapeHTML(item.url)}"
+           target="_blank"
+           rel="noopener noreferrer">打开原始车源 ↗</a>
+      </article>`;
+  }).join("");
+}
+
+["model", "platform", "sort", "search"].forEach(id => {
+  $(id).addEventListener("input", render);
+});
+
+fetch("./car_radar_data.json?time=" + Date.now())
+  .then(response => {
+    if (!response.ok) throw new Error("数据文件暂不可用");
+    return response.json();
+  })
+  .then(data => {
+    listings = Array.isArray(data.listings) ? data.listings : [];
+    populate("model", listings.map(item => item.model));
+    populate("platform", listings.map(item => item.platform));
+    $("updated").textContent = formatDate(data.updatedAt);
+    render();
+  })
+  .catch(() => {
+    $("cards").innerHTML =
+      '<div class="empty">尚未读取到数据。请先运行 GitHub Actions 中的 Car Radar 工作流。</div>';
+  });
+</script>
+</body>
+</html>
