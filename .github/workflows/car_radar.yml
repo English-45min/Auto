@@ -1,10 +1,10 @@
-
 name: Car Radar
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/15 * * * *"
+    # 每天北京时间 09:00 运行（GitHub Actions 可能延迟启动）
+    - cron: "0 1 * * *"
 
 permissions:
   contents: write
@@ -16,6 +16,7 @@ concurrency:
 jobs:
   car-radar:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,9 +28,8 @@ jobs:
 
       - name: Run car radar
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          CAR_RADAR_FEED_URLS: ${{ vars.CAR_RADAR_FEED_URLS }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python car_radar.py
 
       - name: Save car radar database
