@@ -1,10 +1,14 @@
 
 # -*- coding: utf-8 -*-
-"""二手车雷达升级版
+"""
+二手车雷达诊断增强版
 公开网页搜索 + 车型筛选 + Telegram 推送 + SQLite 去重
 
-注意：使用 Bing RSS，不是各平台官方库存 API。
-搜索摘要可能不完整，价格、生产日期和车源状态须打开原网页核实。
+说明：
+1. 使用 Bing RSS，不是平台官方库存 API。
+2. 搜索结果不等于平台全部库存。
+3. 未能从摘要确认的价格、生产日期和年款会标记为待核实。
+4. 统计区分搜索结果条数和去重后的结果。
 """
 
 import base64
@@ -18,6 +22,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -80,63 +85,112 @@ def init_db():
         """)
 
 
-def normalize_url(url):
-    """尝试解码 Bing 跳转链接，并规范化网址。"""
-    if not url:
-        return ""
+def extract_bing_destination(url):
+    """从 Bing 跳转链接中尽可能提取原始目标 URL。"""
+    current = html.unescape((url or "").strip())
 
-    current = html.unescape(url.strip())
-
-    for _ in range(4):
+    for _ in range(5):
         try:
             parsed = urllib.parse.urlsplit(current)
             host = (parsed.hostname or "").lower()
-            params = urllib.parse.parse_qs(parsed.query)
 
-            if host == "bing.com" or host.endswith(".bing.com"):
-                direct = params.get("url", [None])[0]
-                if direct and direct.startswith(("http://", "https://")):
+            if not (host == "bing.com" or host.endswith(".bing.com")):
+                break
+
+            params = urllib.parse.parse_qs(
+                parsed.query, keep_blank_values=True
+            )
+
+            direct = params.get("url", [None])[0]
+            if direct:
+                direct = urllib.parse.unquote(direct.strip())
+                if direct.startswith(("http://", "https://")):
                     current = direct
                     continue
 
-                encoded = params.get("u", [None])[0]
-                if encoded:
-                    try:
-                        if encoded.startswith("a1"):
-                            encoded = encoded[2:]
+            encoded = params.get("u", [None])[0]
+            if not encoded:
+                break
 
-                        encoded += "=" * (-len(encoded) % 4)
-                        decoded = base64.urlsafe_b64decode(
-                            encoded.encode("ascii")
-                        ).decode("utf-8", errors="ignore")
+            # parse_qs 会将查询参数中的 + 转为空格；
+            # Base64 解码前恢复，避免部分链接解码失败。
+            encoded = encoded.strip().replace(" ", "+")
+            encoded = urllib.parse.unquote(encoded)
 
-                        match = re.search(
-                            r"https?://[^\s\"<>]+", decoded
-                        )
-                        if match:
-                            current = match.group(0).rstrip(").,;")
-                            continue
-                    except Exception:
-                        pass
+            if encoded.startswith("a1"):
+                encoded = encoded[2:]
 
-            if parsed.scheme in ("http", "https") and parsed.netloc:
-                return urllib.parse.urlunsplit((
-                    parsed.scheme,
-                    parsed.netloc.lower(),
-                    parsed.path.rstrip("/"),
-                    "",
-                    ""
-                ))
+            encoded += "=" * (-len(encoded) % 4)
+
+            try:
+                decoded = base64.urlsafe_b64decode(
+                    encoded.encode("ascii")
+                ).decode("utf-8", errors="ignore")
+            except Exception:
+                decoded = ""
+
+            match = re.search(r"https?://[^\s\"<>]+", decoded)
+            if match:
+                current = html.unescape(
+                    match.group(0).rstrip(").,;")
+                )
+                continue
 
             break
+
         except Exception:
             break
 
     return current
 
 
+def normalize_url(url):
+    """解码常见 Bing 跳转链接并清理追踪参数。"""
+    current = extract_bing_destination(url)
+
+    try:
+        parsed = urllib.parse.urlsplit(current)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return current
+
+        host = parsed.hostname.lower()
+        port = parsed.port
+
+        # 保留非默认端口；删除常见追踪参数。
+        netloc = host
+        if port and not (
+            (parsed.scheme == "http" and port == 80)
+            or (parsed.scheme == "https" and port == 443)
+        ):
+            netloc = f"{host}:{port}"
+
+        tracking = {
+            "from", "spm", "utm_source", "utm_medium",
+            "utm_campaign", "utm_term", "utm_content",
+            "ref", "source"
+        }
+
+        query_items = urllib.parse.parse_qsl(
+            parsed.query, keep_blank_values=True
+        )
+        kept = [
+            (k, v) for k, v in query_items
+            if k.lower() not in tracking
+        ]
+
+        return urllib.parse.urlunsplit((
+            parsed.scheme.lower(),
+            netloc,
+            parsed.path or "/",
+            urllib.parse.urlencode(kept),
+            ""
+        ))
+    except Exception:
+        return current
+
+
 def resolve_redirect(url):
-    """如果仍是 Bing 链接，尝试跟随 HTTP 跳转。"""
+    """只对仍指向 Bing 的链接尝试跟随 HTTP 跳转。"""
     url = normalize_url(url)
 
     try:
@@ -155,7 +209,7 @@ def resolve_redirect(url):
 
 def url_matches_platform(url, platform):
     try:
-        host = (urllib.parse.urlsplit(url).hostname or "").lower()
+        host = (urllib.parse.urlsplit(url).hostname or "").lower().rstrip(".")
     except Exception:
         return False
 
@@ -163,6 +217,13 @@ def url_matches_platform(url, platform):
         host == domain or host.endswith("." + domain)
         for domain in PLATFORM_DOMAINS.get(platform, [])
     )
+
+
+def get_host(url):
+    try:
+        return (urllib.parse.urlsplit(url).hostname or "").lower()
+    except Exception:
+        return ""
 
 
 def fetch_rss(query):
@@ -194,7 +255,9 @@ def fetch_rss(query):
             item.findtext("title", default="")
         ).strip()
 
-        raw_link = item.findtext("link", default="").strip()
+        raw_link = html.unescape(
+            item.findtext("link", default="")
+        ).strip()
 
         description = html.unescape(
             item.findtext("description", default="")
@@ -202,9 +265,12 @@ def fetch_rss(query):
 
         pub_date = item.findtext("pubDate", default="").strip()
 
+        normalized = normalize_url(raw_link)
+        resolved = resolve_redirect(normalized)
+
         items.append({
             "title": title,
-            "url": resolve_redirect(raw_link),
+            "url": resolved,
             "description": description,
             "pub_date": pub_date,
             "raw_url": raw_link
@@ -235,15 +301,14 @@ def vehicle_matches(text, vehicle):
 
     aliases = brand_aliases.get(brand, [brand.lower()])
 
-    if brand and not any(
-        alias.lower() in t for alias in aliases if alias
-    ):
+    if brand and not any(alias.lower() in t for alias in aliases if alias):
         return False
 
     if model == "S60 T4/T5":
+        # 不能只因出现“沃尔沃”就认为 T4/T5 匹配。
         return (
             ("s60" in t or "s 60" in t)
-            and any(x in t for x in ("t4", "t5", "沃尔沃", "volvo"))
+            and any(x in t for x in ("t4", "t5"))
         )
 
     if model == "V60":
@@ -274,7 +339,6 @@ def vehicle_matches(text, vehicle):
 
 
 def looks_like_listing(item):
-    """排除明显的资讯页面；并不代表通过后就一定是真实车源。"""
     text = combined_text(item).lower()
     url = item.get("url", "").lower()
 
@@ -307,7 +371,6 @@ def looks_like_listing(item):
 
 
 def parse_price(text):
-    """从搜索结果文字提取人民币价格，无法确认时返回 None。"""
     patterns = [
         r"([0-9]+(?:\.[0-9]+)?)\s*万元",
         r"(?:售价|价格|报价|仅售|卖价|车价)\s*[:：]?\s*"
@@ -324,7 +387,6 @@ def parse_price(text):
 
         try:
             value = float(match.group(1).replace(",", ""))
-
             if "万" in match.group(0):
                 value *= 10000
 
@@ -337,35 +399,23 @@ def parse_price(text):
 
 
 def parse_production_date(text):
-    """只识别明确的生产日期、出厂日期或生产时间。"""
+    """只有日期精度足够时才返回日期，避免把年份擅自当作 1 月 1 日。"""
     patterns = [
         r"(?:生产日期|出厂日期|生产时间)\s*[:：]?\s*"
-        r"(20\d{2})[年./-](\d{1,2})(?:[月./-](\d{1,2})日?)?",
-        r"(?:生产日期|出厂日期|生产时间)\s*[:：]?\s*"
-        r"(20\d{2})年"
+        r"(20\d{2})[年./-](\d{1,2})[月./-](\d{1,2})日?"
     ]
 
     for pattern in patterns:
         match = re.search(pattern, text)
-
         if not match:
             continue
 
         try:
-            year = int(match.group(1))
-            month = (
-                int(match.group(2))
-                if match.lastindex and match.lastindex >= 2
-                else 1
-            )
-            day = (
+            return date(
+                int(match.group(1)),
+                int(match.group(2)),
                 int(match.group(3))
-                if match.lastindex and match.lastindex >= 3
-                and match.group(3)
-                else 1
             )
-
-            return date(year, month, day)
         except (ValueError, TypeError):
             pass
 
@@ -373,29 +423,24 @@ def parse_production_date(text):
 
 
 def parse_model_year(text):
-    """只从明确的年款表述提取车型年款。"""
     for pattern in (r"(20\d{2})\s*年款", r"(20\d{2})\s*款"):
         match = re.search(pattern, text)
-
         if match:
             year = int(match.group(1))
             if 2010 <= year <= date.today().year + 1:
                 return year
-
     return None
 
 
 def parse_listing_date(item):
-    """获取搜索结果日期；它不一定是真实的车辆上架日期。"""
+    """这是搜索结果日期，不保证是真实车辆上架日期。"""
     pub_date = item.get("pub_date", "")
 
     if pub_date:
         try:
             dt = parsedate_to_datetime(pub_date)
-
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
-
             return dt.astimezone(BEIJING_TZ).date()
         except Exception:
             pass
@@ -405,7 +450,6 @@ def parse_listing_date(item):
 
     if "今天" in text or "刚刚" in text:
         return today
-
     if "昨天" in text:
         return today - timedelta(days=1)
 
@@ -413,26 +457,10 @@ def parse_listing_date(item):
     if match:
         return today - timedelta(days=int(match.group(1)))
 
-    match = re.search(
-        r"(20\d{2})[年./-](\d{1,2})[月./-](\d{1,2})日?",
-        text
-    )
-
-    if match:
-        try:
-            return date(
-                int(match.group(1)),
-                int(match.group(2)),
-                int(match.group(3))
-            )
-        except ValueError:
-            pass
-
     return None
 
 
 def evaluate(item, vehicle, config):
-    """返回：是否保留、待核实字段、解析信息、排除原因。"""
     text = combined_text(item)
 
     if not vehicle_matches(text, vehicle):
@@ -455,7 +483,6 @@ def evaluate(item, vehicle, config):
     else:
         if min_price is not None and price < int(min_price):
             return False, [], {}, "低于价格下限"
-
         if max_price is not None and price > int(max_price):
             return False, [], {}, "高于价格上限"
 
@@ -467,7 +494,6 @@ def evaluate(item, vehicle, config):
 
         if start and production_date < date.fromisoformat(start):
             return False, [], {}, "生产日期早于下限"
-
         if end and production_date > date.fromisoformat(end):
             return False, [], {}, "生产日期晚于上限"
 
@@ -479,34 +505,25 @@ def evaluate(item, vehicle, config):
     else:
         if year_from is not None and model_year < int(year_from):
             return False, [], {}, "车型年款早于下限"
-
         if year_to is not None and model_year > int(year_to):
             return False, [], {}, "车型年款晚于上限"
 
     age_limit = config.get("listing_age_days")
-
     if age_limit == "custom":
         age_limit = config.get("listing_age_custom_days")
 
     if age_limit not in (None, "", "unlimited"):
         try:
             age_limit = int(age_limit)
-
             if listing_date is None:
                 pending.append("搜索结果日期待核实")
-            elif (
-                datetime.now(BEIJING_TZ).date() - listing_date
-            ).days > age_limit:
+            elif (datetime.now(BEIJING_TZ).date() - listing_date).days > age_limit:
                 return False, [], {}, "超过搜索结果日期限制"
         except (ValueError, TypeError):
             pass
 
     if config.get("match_mode", "relaxed") == "strict":
-        if (
-            price is None
-            or production_date is None
-            or model_year is None
-        ):
+        if price is None or production_date is None or model_year is None:
             return False, [], {}, "严格模式下关键字段缺失"
 
     details = {
@@ -552,7 +569,6 @@ def telegram_send(message):
         )
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-
     payload = urllib.parse.urlencode({
         "chat_id": chat_id,
         "text": message,
@@ -614,20 +630,14 @@ def format_listing(item, platform, vehicle, pending, details):
         )
 
     if pending:
-        lines.append(
-            "⚠️ 待核实：" + "、".join(safe_html(x) for x in pending)
-        )
+        lines.append("⚠️ 待核实：" + "、".join(safe_html(x) for x in pending))
 
-    summary = re.sub(
-        r"<[^>]+>", " ", item.get("description", "")
-    )
+    summary = re.sub(r"<[^>]+>", " ", item.get("description", ""))
     summary = re.sub(r"\s+", " ", summary).strip()
-
     if summary:
         lines.append("搜索摘要：" + safe_html(summary[:350]))
 
     lines.append(f'🔗 <a href="{url}">打开原始网页</a>')
-
     return "\n".join(lines)
 
 
@@ -636,18 +646,12 @@ def build_queries(vehicle, platform):
     brand = vehicle.get("brand", "")
 
     aliases = {
-        "S60 T4/T5":
-            '"沃尔沃 S60" OR "Volvo S60" OR "S60 T5"',
-        "V60":
-            '"沃尔沃 V60" OR "Volvo V60"',
-        "CX-50 智行版":
-            '"马自达 CX-50" OR "Mazda CX-50" OR "CX50"',
-        "RAV4 荣放":
-            '"RAV4 荣放" OR "丰田 RAV4" OR "Toyota RAV4"',
-        "Model 3":
-            '"特斯拉 Model 3" OR "Tesla Model 3" OR "Model3"',
-        "蒙迪欧双擎运动版":
-            '"蒙迪欧 双擎" OR "福特 蒙迪欧混动" OR "Mondeo Hybrid"'
+        "S60 T4/T5": '"沃尔沃 S60" OR "Volvo S60" OR "S60 T5"',
+        "V60": '"沃尔沃 V60" OR "Volvo V60"',
+        "CX-50 智行版": '"马自达 CX-50" OR "Mazda CX-50" OR "CX50"',
+        "RAV4 荣放": '"RAV4 荣放" OR "丰田 RAV4" OR "Toyota RAV4"',
+        "Model 3": '"特斯拉 Model 3" OR "Tesla Model 3" OR "Model3"',
+        "蒙迪欧双擎运动版": '"蒙迪欧 双擎" OR "福特 蒙迪欧混动" OR "Mondeo Hybrid"'
     }
 
     keywords = aliases.get(model, f'"{brand} {model}"')
@@ -675,7 +679,6 @@ def main():
 
     if not platforms:
         raise RuntimeError("配置文件 platforms 没有有效平台。")
-
     if not vehicles:
         raise RuntimeError("配置文件 vehicles 为空。")
 
@@ -684,72 +687,82 @@ def main():
     log(f"预算：{config.get('min_price')} - {config.get('max_price')} 元")
     log(f"生产日期下限：{config.get('production_date_from')}")
     log(f"筛选模式：{config.get('match_mode')}")
-    log("公开网页搜索无法保证覆盖平台全部库存，摘要字段可能不完整。")
+    log("提醒：Bing 搜索摘要不能证明车源仍在售。")
 
-    found = {}
-    errors = 0
-    rejected_domain = 0
-    rejected_vehicle = 0
-    rejected_other = 0
-    unresolved_urls = 0
-    domain_samples = []
-
+    # 按平台记录原始结果、去重结果和不同排除原因。
     platform_stats = {
-        p: {"rss": 0, "valid_domain": 0, "candidates": 0}
+        p: {
+            "rss": 0,
+            "unique_urls": set(),
+            "valid_domain": 0,
+            "candidates": 0,
+            "reasons": Counter()
+        }
         for p in platforms
     }
 
+    # 全局 URL 去重，避免同一链接被重复计算成多辆车。
+    seen_results = set()
+    found = {}
+    errors = 0
+    unresolved_urls = 0
+    domain_samples = []
+    unresolved_samples = []
+
     for vehicle in vehicles:
         for platform in platforms:
+            stats = platform_stats[platform]
+
             for query in build_queries(vehicle, platform):
                 try:
-                    log(
-                        f"搜索：{platform} / "
-                        f"{vehicle.get('model')} / {query}"
-                    )
-
+                    log(f"搜索：{platform} / {vehicle.get('model')} / {query}")
                     items = fetch_rss(query)
-                    platform_stats[platform]["rss"] += len(items)
+                    stats["rss"] += len(items)
                     log(f"搜索引擎返回 {len(items)} 条")
 
                     for item in items:
                         url = item.get("url", "")
-
                         if not url:
-                            rejected_domain += 1
+                            stats["reasons"]["链接为空"] += 1
                             continue
 
-                        host = (
-                            urllib.parse.urlsplit(url).hostname or ""
-                        ).lower()
+                        host = get_host(url)
+                        if host == "bing.com" or host.endswith(".bing.com"):
+                            unresolved_urls += 1
+                            if len(unresolved_samples) < 10:
+                                unresolved_samples.append(
+                                    f"{platform}: {item.get('title', '')[:70]} | "
+                                    f"{item.get('raw_url', '')[:180]}"
+                                )
 
                         if not url_matches_platform(url, platform):
-                            rejected_domain += 1
-
-                            if host == "bing.com" or host.endswith(".bing.com"):
-                                unresolved_urls += 1
-
-                            if len(domain_samples) < 15:
+                            stats["reasons"]["域名不匹配"] += 1
+                            if len(domain_samples) < 20:
                                 domain_samples.append(
                                     f"{platform}: {host or '(无域名)'} | "
-                                    f"{item.get('title', '')[:65]}"
+                                    f"{item.get('title', '')[:70]} | {url[:160]}"
                                 )
                             continue
 
-                        platform_stats[platform]["valid_domain"] += 1
+                        stats["unique_urls"].add(url)
+
+                        # 只对同一平台的同一 URL 做一次车型筛选。
+                        unique_key = (platform, url)
+                        if unique_key in seen_results:
+                            continue
+                        seen_results.add(unique_key)
+
+                        stats["valid_domain"] += 1
 
                         ok, pending, details, reason = evaluate(
                             item, vehicle, config
                         )
 
                         if not ok:
-                            if reason == "车型不匹配":
-                                rejected_vehicle += 1
-                            else:
-                                rejected_other += 1
+                            stats["reasons"][reason or "未知原因"] += 1
                             continue
 
-                        platform_stats[platform]["candidates"] += 1
+                        stats["candidates"] += 1
 
                         if url not in found:
                             found[url] = {
@@ -762,18 +775,17 @@ def main():
 
                 except Exception as exc:
                     errors += 1
-                    log(
-                        f"搜索失败：{platform} / "
-                        f"{vehicle.get('model')}：{exc}"
-                    )
+                    log(f"搜索失败：{platform} / {vehicle.get('model')}：{exc}")
 
                 time.sleep(1)
 
     sent_count = 0
     failed_sends = 0
+    already_sent_count = 0
 
     for url, result in found.items():
         if already_sent(url):
+            already_sent_count += 1
             continue
 
         message = format_listing(
@@ -790,48 +802,62 @@ def main():
             sent_count += 1
             log(f"已推送：{result['item'].get('title', '')}")
             time.sleep(1)
-
         except Exception as exc:
             failed_sends += 1
             log(f"Telegram 推送失败：{exc}")
 
-    log("各平台诊断：搜索结果 / 域名通过 / 候选")
+    log("各平台诊断：原始搜索条数 / 去重后域名通过 / 候选")
     for platform, stats in platform_stats.items():
         log(
             f"  {platform}：{stats['rss']} / "
-            f"{stats['valid_domain']} / {stats['candidates']}"
+            f"{len(stats['unique_urls'])} / {stats['candidates']}"
         )
+        for reason, count in stats["reasons"].most_common():
+            log(f"    排除原因 - {reason}：{count}")
 
     log("域名校验失败样例：")
-    if domain_samples:
-        for sample in domain_samples:
-            log("  " + sample)
-    else:
+    for sample in domain_samples:
+        log("  " + sample)
+    if not domain_samples:
         log("  无")
 
+    if unresolved_samples:
+        log("仍指向 Bing 的链接样例：")
+        for sample in unresolved_samples:
+            log("  " + sample)
+
     summary_lines = [
-        "🚘 <b>二手车雷达运行汇总</b>",
-        f"符合初步条件的候选：{len(found)} 条",
+        "🚘 <b>二手车雷达运行汇总（诊断增强版）</b>",
+        f"候选车源：{len(found)} 条",
         f"本次新推送：{sent_count} 条",
-        f"域名校验排除：{rejected_domain} 条",
-        f"车型不匹配：{rejected_vehicle} 条",
-        f"其他条件排除：{rejected_other} 条",
+        f"已推送过而跳过：{already_sent_count} 条",
         f"仍指向 Bing 的链接：{unresolved_urls} 条",
         f"搜索错误：{errors} 次",
         f"推送失败：{failed_sends} 次",
-        ""
+        "",
+        "<b>各平台统计</b>"
     ]
 
     for platform, stats in platform_stats.items():
         summary_lines.append(
-            f"{platform}：搜索 {stats['rss']}，"
-            f"域名通过 {stats['valid_domain']}，"
+            f"{safe_html(platform)}：搜索 {stats['rss']}，"
+            f"域名通过（去重）{len(stats['unique_urls'])}，"
             f"候选 {stats['candidates']}"
         )
 
+        reasons = stats["reasons"].most_common(3)
+        if reasons:
+            summary_lines.append(
+                "  排除原因：" + "；".join(
+                    f"{safe_html(reason)} {count} 条"
+                    for reason, count in reasons
+                )
+            )
+
     summary_lines.extend([
         "",
-        "注意：公开搜索不等于平台全部库存；价格、生产日期、"
+        "注意：公开搜索不等于平台全部库存。"
+        "搜索摘要无法可靠确认车辆仍在售；价格、生产日期、"
         "年款及车辆状态请以原始页面为准。"
     ])
 
@@ -842,8 +868,7 @@ def main():
 
     log(
         f"运行结束：候选 {len(found)}，新推送 {sent_count}，"
-        f"域名排除 {rejected_domain}，车型排除 {rejected_vehicle}，"
-        f"其他条件排除 {rejected_other}，"
+        f"已推送跳过 {already_sent_count}，"
         f"未解码链接 {unresolved_urls}，搜索错误 {errors}，"
         f"推送失败 {failed_sends}"
     )
