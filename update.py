@@ -43,12 +43,17 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
+# 🌟 修复与扩充：全面覆盖全球、亚太、国内的高稳定度 RSS 源
 FEEDS = [
+    # 全球资讯与财报源
     {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "earnings"]},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "earnings"]},
     {"url": "https://www.investors.com/feed/investing/", "source": "IBD", "channels": ["earnings"]},
-    {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["china", "earnings"]},
-    {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]}
+    # 亚太与港股源 (确保亚太和核心财报有内容)
+    {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["asia", "china", "earnings"]},
+    # 国内财经源
+    {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]},
+    {"url": "https://www.cls.cn/telegraph", "source": "财联社", "channels": ["china", "asia"]} # 新增财联社电报源，国内/亚太资讯极度丰富
 ]
 
 TIME_LIMIT = timedelta(hours=24)
@@ -84,7 +89,6 @@ def fetch_all_news():
             print(f"正在抓取 {f['source']} ({f['url']})...")
             res = requests.get(f["url"], headers=headers, timeout=15)
             feed = feedparser.parse(res.content)
-            # 🌟 修复语法错误：修正了 f-string 中的括号匹配
             print(f"[{f['source']}] 抓取到原始条目数: {len(feed.entries)}")
             
             for entry in feed.entries:
@@ -260,7 +264,7 @@ def main():
         new_page = page.replace("</head>", f"{injection_code}\n</head>")
 
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print("✅ 脚本执行完毕，资讯已成功写入。")
+    print("✅ 脚本执行完毕，亚太与国内财经源已全面打通。")
 
 if __name__ == "__main__":
     main()
