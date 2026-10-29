@@ -3,71 +3,71 @@ import requests
 import feedparser
 from urllib.parse import quote
 
-# 从环境变量中读取基础配置
-RSSHUB_URL = os.getenv('RSSHUB_URL', 'http://104.207.154.160:1200')
+# 优先读取 GitHub Secrets 中的 RSSHUB_URL，如果失效或未设置，自动兜底使用公共 RSS 节点
+RSSHUB_URL = os.getenv('RSSHUB_URL', 'https://rsshub.rssforever.com').rstrip('/')
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 
-def fetch_twitter_tech_ai_posts():
-    print("🐦 正在从自建服务器拉取 X (Twitter) 科技 AI 中文圈爆文...")
+def fetch_tech_ai_posts():
+    print("🚀 正在抓取中文科技 AI 圈精选爆文...")
     
-    # 放宽检索条件，确保数据源稳定拉取
-    raw_keywords = "AI OR Claude OR GPT OR 独立开发者 lang:zh"
-    encoded_keywords = quote(raw_keywords)
-    
-    url = f"{RSSHUB_URL}/twitter/keyword/{encoded_keywords}"
-    print(f"请求路由: {url}")
+    # 组合多节点策略，防止单一节点失效
+    nodes = [
+        RSSHUB_URL,
+        "https://rsshub.rssforever.com",
+        "https://rsshub.app"
+    ]
     
     posts = []
-    try:
-        resp = requests.get(url, timeout=15)
-        if resp.status_code != 200:
-            print(f"⚠️ RSSHub 状态异常: HTTP {resp.status_code}")
-            return posts
-
-        feed = feedparser.parse(resp.content)
-        if not feed.entries:
-            print("⚠️ 提示: 暂时未抓取到推文。")
-            return posts
-
-        # 抓取前 10 条推文
-        for entry in feed.entries[:10]:
-            title = entry.title
-            link = entry.link
-            
-            # 清理标题过长的换行，保持看板整洁
-            clean_title = title.replace('\n', ' ').strip()
-            if len(clean_title) > 100:
-                clean_title = clean_title[:100] + "..."
-
-            posts.append({
-                "title": clean_title,
-                "link": link
-            })
-            
-        print(f"✅ 成功解析出 {len(posts)} 条科技 AI 中文圈推文！")
-    except Exception as e:
-        print(f"❌ 抓取推文时发生异常: {e}")
+    
+    for base_url in nodes:
+        print(f"尝试从节点抓取: {base_url}")
+        target_url = f"{base_url}/36kr/newsflashes"
+        try:
+            resp = requests.get(target_url, timeout=10)
+            if resp.status_code == 200:
+                feed = feedparser.parse(resp.content)
+                keywords = ["AI", "Claude", "GPT", "大模型", "智能体", "Prompt", "独立开发", "开源", "科技", "英伟达"]
+                
+                for entry in feed.entries:
+                    title = entry.title.strip().replace('\n', ' ')
+                    link = entry.link
+                    
+                    # 优先筛选科技/AI相关主题
+                    if any(kw.lower() in title.lower() for kw in keywords) or len(posts) < 3:
+                        if not any(p['link'] == link for p in posts):
+                            posts.append({
+                                "title": title[:90] + "..." if len(title) > 90 else title,
+                                "link": link
+                            })
+                    if len(posts) >= 8:
+                        break
+                        
+            if posts:
+                print(f"✅ 成功从 {base_url} 解析出 {len(posts)} 条爆文！")
+                break # 抓取成功直接退出循环
+        except Exception as e:
+            print(f"⚠️ 节点 {base_url} 连接失败/超时: {e}")
 
     return posts
 
-def format_pure_tech_board(posts):
-    board = "🔥 <b>【X 科技 & AI 中文圈精选爆文看板】</b>\n"
+def format_tech_board(posts):
+    board = "🔥 <b>【中文科技 & AI 圈每日爆文看板】</b>\n"
     board += "───────────────────────────\n\n"
     
     if not posts:
-        board += "<i>当前时间窗口内暂无新推文</i>\n"
+        board += "<i>当前时间窗口内暂无新推送（网络节点连接异常）</i>\n"
     else:
         for i, post in enumerate(posts, 1):
             board += f"🔹 <b>#{i}</b> <a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>Vultr 节点自建 RSSHub | 科技 AI 垂直推送</i>"
+    board += "🤖 <i>全网科技 AI 高品质干货推送 | 多节点自动容灾</i>"
     return board
 
 def send_telegram(text):
     if not TG_BOT_TOKEN or not TG_CHAT_ID:
-        print("❌ 错误: 未检测到 Telegram 密钥。")
+        print("❌ 错误: 未检测到 Telegram 密钥 (TG_BOT_TOKEN 或 TG_CHAT_ID)。")
         return
         
     url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
@@ -87,6 +87,6 @@ def send_telegram(text):
         print(f"❌ 发送 Telegram 消息失败: {e}")
 
 if __name__ == "__main__":
-    posts = fetch_twitter_tech_ai_posts()
-    board_content = format_pure_tech_board(posts)
+    posts = fetch_tech_ai_posts()
+    board_content = format_tech_board(posts)
     send_telegram(board_content)
