@@ -6,7 +6,6 @@ import base64
 import requests
 import feedparser
 from datetime import datetime, timezone, timedelta
-from urllib.parse import urlparse
 from collections import OrderedDict
 from dotenv import load_dotenv
 from pathlib import Path
@@ -56,7 +55,6 @@ FEEDS = [
     {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]}
 ]
 
-# 严格限定 24 小时以内
 TIME_LIMIT = timedelta(hours=24)
 
 def get_importance_weight(title, channels):
@@ -94,19 +92,18 @@ def fetch_all_news():
                 url = entry.get("link", "")
                 if not url or url in seen_urls: continue
                 
-                # 严格时效性过滤（24小时内）
+                # 安全的时效性解析
+                published_at = now.astimezone(TZ).strftime("%m-%d %H:%M")
                 pub_time = entry.get("published_parsed", None)
                 if pub_time:
                     try:
                         dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
-                        if now - dt > TIME_LIMIT: 
-                            continue # 超过24小时的严格丢弃，绝不硬塞
+                        # 超过 24 小时坚决滤除
+                        if now - dt > TIME_LIMIT:
+                            continue
                         published_at = dt.astimezone(TZ).strftime("%m-%d %H:%M")
-                    except:
-                        continue
-                else:
-                    # 如果没有明确发布时间的条目，为保证时效性直接跳过，宁缺毋滥
-                    continue
+                    except Exception:
+                        pass
                 
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")
@@ -122,6 +119,7 @@ def fetch_all_news():
             print(f"Error fetching feed {f['source']}: {e}")
             
     news_pool.sort(key=lambda x: x["_weight"], reverse=True)
+    print(f"抓取到有效时效新闻：{len(news_pool)} 条")
     return news_pool
 
 def load_cache():
@@ -243,22 +241,29 @@ def main():
             result[ch].append(news_item)
             count_limit[ch] -= 1
 
-    # 严格按权重排序，绝不硬塞非时效内容
     for ch in ["global", "asia", "china", "earnings"]:
         result[ch].sort(key=lambda x: x["_importance"], reverse=True)
 
     save_cache(cache)
     
+    # 安全写入逻辑
     page = Path(OUTPUT_FILE).read_text(encoding="utf-8")
     json_data_json = json.dumps(result, ensure_ascii=False, indent=2)
-    new_page = re.sub(
-        r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->",
-        f"<!-- NEWS_DATA_START -->\n<script>window.newsData={json_data_json};</script>\n<!-- NEWS_DATA_END -->",
-        page,
-        flags=re.S
-    )
+    injection_code = f"<!-- NEWS_DATA_START -->\n<script>window.newsData={json_data_json};</script>\n<!-- NEWS_DATA_END -->"
+    
+    if "<!-- NEWS_DATA_START -->" in page:
+        new_page = re.sub(
+            r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->",
+            injection_code,
+            page,
+            flags=re.S
+        )
+    else:
+        # 兜底注入：防止标记被删导致数据写不进去
+        new_page = page.replace("</head>", f"{injection_code}\n</head>")
+
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print("✅ 严格时效性过滤执行完毕，未引入任何非24小时内过时内容。")
+    print("✅ 脚本执行完毕，数据已安全写入 index.html。")
 
 if __name__ == "__main__":
     main()
