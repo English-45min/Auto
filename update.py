@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from collections import OrderedDict
 from dotenv import load_dotenv
+from pathlib import Path
 
 # ================= Configuration =================
 load_dotenv()
@@ -21,27 +22,21 @@ TZ = timezone(timedelta(hours=8))
 OUTPUT_FILE = "index.html"
 CACHE_FILE = "ai_cache.json"
 
-# ************************************************
-# [Important] 全球万亿巨头与美联储（沃什时代）重磅宏观词库
-# ************************************************
+# 1. 万亿巨头词库
 MEGA_CAP_KEYWORDS = {
-    # 科技与 AI 巨头
     "microsoft": "Microsoft (微软)", "msft": "Microsoft (微软)",
     "apple": "Apple (苹果)", "aapl": "Apple (苹果)",
     "google": "Alphabet (谷歌)", "alphabet": "Alphabet (谷歌)", "googl": "Alphabet (谷歌)",
     "amazon": "Amazon (亚马逊)", "amzn": "Amazon (亚马逊)",
     "nvidia": "Nvidia (英伟达)", "nvda": "Nvidia (英伟达)",
     "meta": "Meta Platforms", "facebook": "Meta Platforms",
-    # 半导体与新能源
     "tsmc": "台积电", "broadcom": "博通", "tesla": "Tesla (特斯拉)", "tsla": "Tesla (特斯拉)",
-    # 中概股
     "tencent": "腾讯", "alibaba": "阿里巴巴",
-    # 中文映射
     "微软": "微软", "苹果": "苹果", "谷歌": "谷歌", "亚马逊": "亚马逊", "英伟达": "英伟达",
     "台积电": "台积电", "博通": "博通", "特斯拉": "特斯拉", "腾讯": "腾讯", "阿里巴巴": "阿里巴巴"
 }
 
-# 沃什时代美联储及顶级宏观政策事件关键词
+# 2. 沃什时代美联储及宏观重磅词库
 MACRO_EVENT_KEYWORDS = {
     "federal reserve": "美联储", "fomc": "美联储FOMC", "warsh": "美联储主席沃什",
     "interest rate": "利率决议", "rate cut": "降息", "rate hike": "加息",
@@ -66,13 +61,9 @@ TIME_LIMIT = timedelta(hours=24)
 def get_importance_weight(title, channels):
     title_lower = title.lower()
     weight = 50 
-
-    if "earnings" in channels:
-        weight += 15
-
-    if any(k in title_lower for k in EARNINGS_CHANNEL_KEYWORDS):
-        weight += 10
-        
+    if "earnings" in channels: weight += 15
+    if any(k in title_lower for k in EARNINGS_CHANNEL_KEYWORDS): weight += 10
+    
     is_mega = any(kw in title_lower for kw in MEGA_CAP_KEYWORDS)
     is_macro = any(kw in title_lower for kw in MACRO_EVENT_KEYWORDS)
 
@@ -88,12 +79,10 @@ def fetch_all_news():
     seen_urls = set()
     news_pool = []
     
-    print(f"[Fetch] Fetching news from {len(FEEDS)} feeds...")
     for f in FEEDS:
         try:
             feed = feedparser.parse(f["url"])
             if feed.bozo: continue
-            
             for entry in feed.entries:
                 url = entry.get("link", "")
                 if not url or url in seen_urls: continue
@@ -108,22 +97,17 @@ def fetch_all_news():
                 
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")
-                
                 weight = get_importance_weight(title, f["channels"])
                 
                 news_pool.append({
-                    "title": title,
-                    "summary": summary,
-                    "url": url,
-                    "source": f["source"],
-                    "publishedAt": published_at,
-                    "channels": f["channels"],
-                    "_weight": weight
+                    "title": title, "summary": summary, "url": url,
+                    "source": f["source"], "publishedAt": published_at,
+                    "channels": f["channels"], "_weight": weight
                 })
                 seen_urls.add(url)
         except Exception as e:
             print(f"Error fetching feed {f['source']}: {e}")
-    
+            
     news_pool.sort(key=lambda x: x["_weight"], reverse=True)
     return news_pool
 
@@ -141,7 +125,7 @@ def save_cache(cache_data):
 
 def call_deepseek_ai(entry):
     if not API_KEY:
-        return None, "🟠 DeepSeek API 密钥未检测到，AI 宏观拆解不可用。"
+        return None, "🟠 DeepSeek API 密钥未检测到"
 
     text_en = f"Title: {entry['title']}\nSummary: {entry['summary']}\nSource: {entry['source']}"
     prompt = f"""
@@ -175,13 +159,13 @@ JSON Structure:
         clean_content = re.sub(r"^```json\n|\n```$", "", content.strip(), flags=re.MULTILINE)
         ai_data = json.loads(clean_content)
         
-        title_zh_lower = ai_data["zh_title"].lower()
+        title_zh_lower = ai_data.get("zh_title", "").lower()
         is_mega = any(kw in title_zh_lower for kw in MEGA_CAP_KEYWORDS)
         is_macro = any(kw in title_zh_lower for kw in MACRO_EVENT_KEYWORDS)
         is_earnings = any(k in title_zh_lower for k in EARNINGS_CHANNEL_KEYWORDS)
 
         if is_mega or is_macro:
-            ai_data["importance"] = max(ai_data["importance"], 95) 
+            ai_data["importance"] = max(ai_data.get("importance", 70), 95) 
             if is_earnings or is_macro:
                 ai_data["importance"] = 100 
             ai_data["zh_title"] = f"🔥 {ai_data['zh_title']}"
@@ -231,13 +215,13 @@ def main():
                 cache[cache_key] = {"ai_msg": ai_msg, "importance": 40}
 
         if ai_data and "ai_msg" not in ai_data:
-            news_item["title"] = ai_data["zh_title"]
-            news_item["summary"] = ai_data["zh_summary"]
-            news_item["analysis"] = ai_data["analysis"]
-            news_item["impact"] = ai_data["marketImpact"]
-            news_item["coreLogic"] = ai_data["coreLogic"]
-            news_item["risk"] = ai_data["risk"]
-            news_item["_importance"] = ai_data["importance"]
+            news_item["title"] = ai_data.get("zh_title", entry["title"])
+            news_item["summary"] = ai_data.get("zh_summary", entry["summary"])
+            news_item["analysis"] = ai_data.get("analysis", "")
+            news_item["impact"] = ai_data.get("marketImpact", "")
+            news_item["coreLogic"] = ai_data.get("coreLogic", "")
+            news_item["risk"] = ai_data.get("risk", "")
+            news_item["_importance"] = ai_data.get("importance", 50)
         else:
             news_item["ai_msg"] = ai_msg or "AI分析不可用"
             news_item["_importance"] = entry["_weight"]
@@ -260,8 +244,7 @@ def main():
         flags=re.S
     )
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print("✅ 沃什时代美联储宏观词库与强制置顶升级完成。")
+    print("✅ 脚本执行成功，四个看板数据已安全更新。")
 
-from pathlib import Path
 if __name__ == "__main__":
     main()
