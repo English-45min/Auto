@@ -21,6 +21,9 @@ TZ = timezone(timedelta(hours=8))
 OUTPUT_FILE = "index.html"
 CACHE_FILE = "ai_cache.json"
 
+# 每天最大 AI 分析指令数（严格限制在 12 条以内）
+MAX_AI_DAILY_CALLS = 12
+
 MEGA_CAP_KEYWORDS = {
     "microsoft": "Microsoft (微软)", "msft": "Microsoft (微软)",
     "apple": "Apple (苹果)", "aapl": "Apple (苹果)",
@@ -43,17 +46,17 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
-# 🌟 修复与扩充：全面覆盖全球、亚太、国内的高稳定度 RSS 源
+# 🌟 修复：使用标准、高可用的全球、亚太、国内财经 RSS 订阅源
 FEEDS = [
-    # 全球资讯与财报源
+    # 国际与财报源
     {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "earnings"]},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "earnings"]},
     {"url": "https://www.investors.com/feed/investing/", "source": "IBD", "channels": ["earnings"]},
-    # 亚太与港股源 (确保亚太和核心财报有内容)
+    # 亚太与港股源
     {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["asia", "china", "earnings"]},
-    # 国内财经源
-    {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]},
-    {"url": "https://www.cls.cn/telegraph", "source": "财联社", "channels": ["china", "asia"]} # 新增财联社电报源，国内/亚太资讯极度丰富
+    # 国内财经源 (使用标准 XML/RSS 接口)
+    {"url": "https://finance.sina.com.cn/rollnews/rss.xml", "source": "新浪财经", "channels": ["china", "asia"]},
+    {"url": "https://money.163.com/special/00254VB5/rss_news.xml", "source": "网易财经", "channels": ["china", "asia"]}
 ]
 
 TIME_LIMIT = timedelta(hours=24)
@@ -204,6 +207,8 @@ def main():
     limit = {"global": 20, "asia": 10, "china": 10, "earnings": 10}
     count_limit = OrderedDict(limit)
 
+    ai_call_count = 0
+
     for entry in all_news:
         if all(c <= 0 for c in count_limit.values()): break
         item_channels = entry["channels"]
@@ -220,13 +225,18 @@ def main():
         
         ai_msg = None
         if not ai_data:
-            result["aiStats"]["attempts"] += 1
-            ai_data, ai_msg = call_deepseek_ai(entry)
-            if ai_data:
-                result["aiStats"]["successes"] += 1
-                cache[cache_key] = ai_data
-            elif ai_msg:
-                cache[cache_key] = {"ai_msg": ai_msg, "importance": 40}
+            if ai_call_count < MAX_AI_DAILY_CALLS:
+                result["aiStats"]["attempts"] += 1
+                ai_call_count += 1
+                ai_data, ai_msg = call_deepseek_ai(entry)
+                if ai_data:
+                    result["aiStats"]["successes"] += 1
+                    cache[cache_key] = ai_data
+                elif ai_msg:
+                    cache[cache_key] = {"ai_msg": ai_msg, "importance": 40}
+            else:
+                ai_msg = "已达今日AI分析配额上限"
+                cache[cache_key] = {"ai_msg": ai_msg, "importance": entry["_weight"]}
 
         if ai_data and "ai_msg" not in ai_data:
             news_item["title"] = ai_data.get("zh_title", entry["title"])
@@ -237,7 +247,7 @@ def main():
             news_item["risk"] = ai_data.get("risk", "")
             news_item["_importance"] = ai_data.get("importance", 50)
         else:
-            news_item["ai_msg"] = ai_msg or "AI分析不可用"
+            news_item["ai_msg"] = ai_msg or "AI分析未执行"
             news_item["_importance"] = entry["_weight"]
 
         for ch in can_add_to:
@@ -264,7 +274,7 @@ def main():
         new_page = page.replace("</head>", f"{injection_code}\n</head>")
 
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print("✅ 脚本执行完毕，亚太与国内财经源已全面打通。")
+    print(f"✅ 脚本执行完毕，本次共消耗 AI 指令: {ai_call_count} 条（已严格限制在 12 条以内）。")
 
 if __name__ == "__main__":
     main()
