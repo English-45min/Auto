@@ -43,13 +43,12 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
+# 🌟 替换为对 GitHub Actions 云端绝对稳定、无 DNS 屏蔽的高可用 RSS 源
 FEEDS = [
-    {"url": "https://www.reutersagency.com/feed/?best-topics=business-finance&format=rss", "source": "Reuters", "channels": ["global", "earnings"]},
-    {"url": "https://feeds.a.bloomberg.com/bpol/rss", "source": "Bloomberg", "channels": ["global", "earnings"]},
-    {"url": "https://www.wsj.com/xml/rss/3_7014.xml", "source": "WSJ", "channels": ["global"]},
+    {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "earnings"]},
+    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "earnings"]},
     {"url": "https://www.investors.com/feed/investing/", "source": "IBD", "channels": ["earnings"]},
     {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["china", "earnings"]},
-    {"url": "https://rss.caixin.com/finance/all", "source": "Caixin", "channels": ["china"]},
     {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]}
 ]
 
@@ -83,26 +82,25 @@ def fetch_all_news():
     
     for f in FEEDS:
         try:
+            print(f"正在抓取 {f['source']} ({f['url']})...")
             res = requests.get(f["url"], headers=headers, timeout=15)
             feed = feedparser.parse(res.content)
-            print(f"[{f['source']}] 抓取到原始条目数: {len(feed.entries)}")
+            print(f"[{f['source']] 抓取到原始条目数: {len(feed.entries)}")
             
             for entry in feed.entries:
                 url = entry.get("link", "")
                 if not url or url in seen_urls: continue
                 
-                # 🌟 核心修复：更温和的时间解析，绝不因字段缺失而直接误杀整条新闻
                 published_at = datetime.now(TZ).strftime("%m-%d %H:%M")
                 pub_time = entry.get("published_parsed", None)
                 if pub_time:
                     try:
                         dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
-                        # 如果超出了24小时，才丢弃
                         if now - dt > TIME_LIMIT:
                             continue
                         published_at = dt.astimezone(TZ).strftime("%m-%d %H:%M")
                     except Exception:
-                        pass # 解析失败时使用当前时间，不丢弃
+                        pass
                 
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")
