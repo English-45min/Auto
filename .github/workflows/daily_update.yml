@@ -28,8 +28,11 @@ jobs:
           python-version: "3.11"
 
       - name: 安装 Python 依赖库
-        # 安装脚本所需的第三方库 requests 和 feedparser
-        run: pip install requests feedparser
+        # ************************************************
+        # 🌟 [Key Change] 修正报错的关键
+        # 加上 python-dotenv，同时确保 requests 和 feedparser 也安装了
+        # ************************************************
+        run: pip install requests feedparser python-dotenv
 
       - name: 检查必要文件
         run: |
@@ -64,6 +67,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "没有新的网页变化，无需提交。"
           else
-            git commit -m "auto: update finance news (mega-cap priority fix)"
+            git commit -m "auto: update finance news (dotenv fix)"
             git push
           fi
