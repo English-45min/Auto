@@ -11,9 +11,8 @@ TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 def fetch_twitter_tech_ai_posts():
     print("🐦 正在从自建服务器拉取 X (Twitter) 科技 AI 中文圈爆文...")
     
-    # 关键词定义
-    raw_keywords = "AI OR 智能体 OR Claude OR GPT OR 独立开发者 min_faves:50 lang:zh"
-    # 💡 核心修复：对关键词中的空格及特殊字符进行标准 URL 编码
+    # 放宽检索条件，确保数据源稳定拉取
+    raw_keywords = "AI OR Claude OR GPT OR 独立开发者 lang:zh"
     encoded_keywords = quote(raw_keywords)
     
     url = f"{RSSHUB_URL}/twitter/keyword/{encoded_keywords}"
@@ -21,7 +20,6 @@ def fetch_twitter_tech_ai_posts():
     
     posts = []
     try:
-        # 使用 requests 先获取 XML 文本，设置 15 秒超时防止卡死
         resp = requests.get(url, timeout=15)
         if resp.status_code != 200:
             print(f"⚠️ RSSHub 状态异常: HTTP {resp.status_code}")
@@ -29,19 +27,25 @@ def fetch_twitter_tech_ai_posts():
 
         feed = feedparser.parse(resp.content)
         if not feed.entries:
-            print("⚠️ 提示: 暂时未抓取到符合条件的推文。")
+            print("⚠️ 提示: 暂时未抓取到推文。")
             return posts
 
-        for entry in feed.entries[:8]: # 取前 8 条精选
+        # 抓取前 10 条推文
+        for entry in feed.entries[:10]:
             title = entry.title
             link = entry.link
             
+            # 清理标题过长的换行，保持看板整洁
+            clean_title = title.replace('\n', ' ').strip()
+            if len(clean_title) > 100:
+                clean_title = clean_title[:100] + "..."
+
             posts.append({
-                "title": title,
+                "title": clean_title,
                 "link": link
             })
             
-        print(f"✅ 成功解析出 {len(posts)} 条科技 AI 中文圈爆文！")
+        print(f"✅ 成功解析出 {len(posts)} 条科技 AI 中文圈推文！")
     except Exception as e:
         print(f"❌ 抓取推文时发生异常: {e}")
 
@@ -52,13 +56,13 @@ def format_pure_tech_board(posts):
     board += "───────────────────────────\n\n"
     
     if not posts:
-        board += "<i>当前时间窗口内暂无新爆文</i>\n"
+        board += "<i>当前时间窗口内暂无新推文</i>\n"
     else:
         for i, post in enumerate(posts, 1):
             board += f"🔹 <b>#{i}</b> <a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>Vultr 节点自建 RSSHub | 纯粹科技 AI 垂直高赞推送</i>"
+    board += "🤖 <i>Vultr 节点自建 RSSHub | 科技 AI 垂直推送</i>"
     return board
 
 def send_telegram(text):
