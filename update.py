@@ -1,391 +1,367 @@
-# -*- coding: utf-8 -*-
-"""
-财经与时政新闻助手 6.0 - DeepSeek AI 深度分析版
-"""
-
 import os
 import re
 import json
 import time
-import html
-import hashlib
-import xml.etree.ElementTree as ET
-from pathlib import Path
+import base64
+import requests
+import feedparser
 from datetime import datetime, timezone, timedelta
-from email.utils import parsedate_to_datetime
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlparse, parse_qs
+from urllib.parse import urlparse
+from collections import OrderedDict
+from dotenv import load_dotenv
 
-BASE = Path(__file__).resolve().parent
-PAGE = BASE / "index.html"
-CACHE = BASE / "ai_cache.json"
+# ================= Configuration =================
+load_dotenv()
+
+# DeepSeek API
+API_BASE_URL = "https://api.deepseek.com"
+API_KEY = os.getenv("DEEPSEEK_API_KEY")
+AI_MODEL = "deepseek-chat"
+
+# Timezone (UTC+8 for China)
 TZ = timezone(timedelta(hours=8))
 
-MAX_AI_CALLS = 10  # 控制单次最大调用数，确保稳妥
-RETRIES = 1
-AI_TIMEOUT = 25
-MAX_NEWS_AGE_HOURS = 72
+# Output file
+OUTPUT_FILE = "index.html"
+CACHE_FILE = "ai_cache.json"
 
-LIMITS = {
-    "global": 20,
-    "asia": 10,
-    "china": 10,
-    "earnings": 10,
+# ************************************************
+# [Important] 超万亿公司财报特殊播报关键词
+# 这些关键词出现，重要性自动提升到最高级，并强制置顶
+# ************************************************
+MEGA_CAP_KEYWORDS = {
+    # 英文源
+    "google": "Alphabet (Google)",
+    "alphabet": "Alphabet (Google)",
+    "microsoft": "Microsoft (微软)",
+    "msft": "Microsoft (微软)",
+    "apple": "Apple (苹果)",
+    "amazon": "Amazon (亚马逊)",
+    "amzn": "Amazon (亚马逊)",
+    "nvidia": "Nvidia (英伟达)",
+    "nvda": "Nvidia (英伟达)",
+    # 中文源
+    "谷歌": "谷歌",
+    "微软": "微软",
+    "苹果公司": "苹果",
+    "亚马逊": "亚马逊",
+    "英伟达": "英伟达"
 }
 
-def rss(query, region="US", language="zh-Hans"):
-    ceid = f"{region}:{language}"
-    return "https://news.google.com/rss/search?" + urlencode({
-        "q": query, "hl": "zh-CN", "gl": region, "ceid": ceid,
-    })
+# 财报栏目专属关键词
+EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
-FEEDS = {
-    "global": [
-        ("Reuters", rss("site:reuters.com finance economy markets central bank")),
-        ("CNBC Finance", "https://www.cnbc.com/id/10000664/device/rss/rss.html"),
-        ("Associated Press", rss("site:apnews.com business economy news")),
-        ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
-        ("Yahoo Finance", rss("site:finance.yahoo.com markets economy")),
-    ],
-    "asia": [
-        ("Nikkei Asia", "https://asia.nikkei.com/rss/feed/nar"),
-        ("The Japan Times", "https://www.japantimes.co.jp/feed/"),
-        ("Focus Taiwan", rss("site:focustaiwan.tw economy semiconductor")),
-        ("中央社 CNA (台湾)", "https://feeds.feedburner.com/rsscna/finance"),
-    ],
-    "china": [
-        ("Reuters (China)", rss("site:reuters.com China economy PBOC yuan property A-shares")),
-        ("CNBC (China)", rss("site:cnbc.com China economy markets")),
-        ("AP News (China)", rss("site:apnews.com China economy trade")),
-        ("BBC (China)", rss("site:bbc.com/news/world/asia/china economy")),
-    ],
-    "earnings": [
-        ("CNBC Earnings", "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
-        ("MarketWatch", "https://feeds.marketwatch.com/marketwatch/marketpulse/"),
-        ("Yahoo Finance Earnings", rss("site:finance.yahoo.com earnings revenue forecast")),
-    ],
-}
-
-def clean(value):
-    value = html.unescape(str(value or ""))
-    value = re.sub(r"<[^>]+>", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
-
-def chinese(text):
-    return bool(re.search(r"[\u4e00-\u9fff]", text or ""))
-
-def is_http_url(url):
-    try:
-        parsed = urlparse(str(url or ""))
-        return parsed.scheme in ("http", "https") and bool(parsed.hostname)
-    except Exception:
-        return False
-
-def is_google_news_url(url):
-    try:
-        host = (urlparse(url).hostname or "").lower()
-        return host.endswith("news.google.com")
-    except Exception:
-        return False
-
-def get(url, timeout=18):
-    request = Request(url, headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml,application/rss+xml;q=0.9,*/*;q=0.8",
-    })
-    with urlopen(request, timeout=timeout) as response:
-        return response.read()
-
-def extract_article_url(url):
-    if not url or not is_http_url(url): return ""
-    if not is_google_news_url(url): return url
-    try:
-        query = parse_qs(urlparse(url).query)
-        for key in ("url", "u", "target", "article_url"):
-            for value in query.get(key, []):
-                candidate = html.unescape(value.strip())
-                if is_http_url(candidate) and not is_google_news_url(candidate):
-                    return candidate
-    except Exception:
-        pass
-    return url
-
-def parse_feed(source, url):
-    try:
-        root = ET.fromstring(get(url, timeout=18))
-    except Exception:
-        return []
+# RSS Feeds configuration
+FEEDS = [
+    # Global / AP / Earnings
+    {"url": "https://www.reutersagency.com/feed/?best-topics=business-finance&format=rss", "source": "Reuters", "channels": ["global", "earnings"]},
+    {"url": "https://feeds.a.bloomberg.com/bpol/rss", "source": "Bloomberg", "channels": ["global", "earnings"]},
+    {"url": "https://www.wsj.com/xml/rss/3_7014.xml", "source": "WSJ", "channels": ["global"]},
+    {"url": "https://hnrss.org/frontpage", "source": "HackerNews", "channels": ["asia"]},
+    {"url": "https://www.investors.com/feed/investing/", "source": "IBD", "channels": ["earnings"]},
     
-    output = []
-    for entry in root.findall(".//item"):
-        title = clean(entry.findtext("title"))
-        link = clean(entry.findtext("link"))
-        if not title or not link: continue
-        output.append({
-            "title": title, "url": link,
-            "summary": clean(entry.findtext("description")),
-            "source": source,
-            "published": clean(entry.findtext("pubDate")),
-        })
-    return output
-
-def parse_date(value):
-    if not value: return None
-    try:
-        result = parsedate_to_datetime(value)
-        if result.tzinfo is None: result = result.replace(tzinfo=timezone.utc)
-        return result.astimezone(timezone.utc)
-    except Exception:
-        pass
-    return None
-
-def translate(text):
-    text = clean(text)
-    if not text or chinese(text): return text
-    url = "https://translate.googleapis.com/translate_a/single?" + urlencode({"client": "gtx", "sl": "auto", "tl": "zh-CN", "dt": "t", "q": text[:1600]})
-    try:
-        result = json.loads(get(url, timeout=10).decode("utf-8"))
-        return "".join(part[0] for part in result[0] if part and part[0]) or text
-    except Exception:
-        return text
-
-def load_cache():
-    try:
-        data = json.loads(CACHE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-def deduplicate(items):
-    output = []
-    for item in items:
-        raw_title = clean(item.get("title", ""))
-        clean_title = re.sub(r"\s*-\s*[^-]+$", "", raw_title).strip().lower()
-        tokens = set(re.findall(r"[\w\u4e00-\u9fff]", clean_title))
-        if len(tokens) < 3:
-            output.append(item)
-            continue
-        is_duplicate = False
-        for accepted in output:
-            acc_title = clean(accepted.get("title", ""))
-            acc_clean = re.sub(r"\s*-\s*[^-]+$", "", acc_title).strip().lower()
-            acc_tokens = set(re.findall(r"[\w\u4e00-\u9fff]", acc_clean))
-            if not acc_tokens: continue
-            intersection = tokens.intersection(acc_tokens)
-            union = tokens.union(acc_tokens)
-            similarity = len(intersection) / len(union) if union else 0
-            if similarity > 0.85:
-                is_duplicate = True
-                break
-        if not is_duplicate:
-            output.append(item)
-    return output
-
-def classify(items, channel):
-    patterns = {
-        "asia": r"asia|asian|japan|korea|taiwan|hong kong|singapore|india|australia|亚太|中国|日本|韩国|台湾|香港",
-        "china": r"china|chinese|beijing|shanghai|pboc|yuan|cny|a-shares|hong kong|hkex|property|developer|中国|人民币|A股|港股|央行|地产",
-        "earnings": r"earnings|revenue|profit|quarter|forecast|guidance|results|财报|业绩|营收|利润|季度"
-    }
-    if channel not in patterns: return items
-    filtered = [x for x in items if re.search(patterns[channel], x["title"] + " " + x.get("summary", ""), re.I)]
-    return filtered if filtered else items
-
-# ============================================================
-# DeepSeek API 调用核心函数（完全兼容 OpenAI 标准格式）
-# ============================================================
-def call_deepseek(prompt):
-    api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
-    if not api_key: return None
-    
-    url = "https://api.deepseek.com/chat/completions"
-    body = json.dumps({
-        "model": "deepseek-chat",  # 使用 DeepSeek 主力对话模型
-        "messages": [
-            {"role": "system", "content": "你是由 DeepSeek 驱动的资深国际财经时政研究专家。请严格按照要求输出合法的 JSON 格式。"},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"}  # 强制输出 JSON，彻底杜绝解析失败
-    }).encode("utf-8")
-    
-    for attempt in range(RETRIES + 1):
-        request = Request(url, data=body, headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-            "User-Agent": "FinanceAssistant/6.0"
-        }, method="POST")
-        try:
-            with urlopen(request, timeout=AI_TIMEOUT) as response:
-                data = json.loads(response.read().decode("utf-8"))
-                choices = data.get("choices", [])
-                if choices:
-                    content = choices[0].get("message", {}).get("content", "").strip()
-                    if content: return content
-        except Exception:
-            pass
-        if attempt < RETRIES: time.sleep(2)
-    return None
-
-def parse_ai(raw):
-    if not raw: return None
-    try:
-        data = json.loads(raw)
-    except Exception:
-        start, end = raw.find("{"), raw.rfind("}")
-        if start < 0 or end <= start: return None
-        try: data = json.loads(raw[start:end + 1])
-        except Exception: return None
-    if not isinstance(data, dict): return None
-    
-    def value(key, limit=600): return clean(data.get(key, ""))[:limit]
-    def array(key, limit=3):
-        items = data.get(key, [])
-        return [clean(item)[:250] for item in items if clean(item)][:limit] if isinstance(items, list) else []
-    
-    assets = data.get("assets", [])
-    if not isinstance(assets, list): assets = []
-    
-    return {
-        "analysis": value("analysis", 1600),
-        "coreLogic": value("core_logic"),
-        "marketImpact": value("market_impact"),
-        "transmission": value("transmission"),
-        "impact": value("impact", 180),
-        "asset": [clean(item)[:80] for item in assets if clean(item)][:4],
-        "timeHorizon": value("time_horizon", 150),
-        "scenarios": array("scenarios"),
-        "evidence": array("evidence"),
-        "risk": value("risk"),
-        "confidence": value("confidence", 100),
-        "provider": "DeepSeek",
-    }
-
-IMPORTANCE_RULES = [
-    (r"war|invasion|missile|military escalation|ceasefire|战争|入侵|导弹|军事冲突|停火", 30),
-    (r"sanction|tariff|trade war|export controls|制裁|关税|贸易战|出口管制", 24),
-    (r"central bank|interest rate|rate cut|rate hike|Federal Reserve|央行|利率|降息|加息|美联储", 20),
-    (r"GDP|inflation|CPI|unemployment|recession|通胀|CPI|失业|衰退", 12),
+    # China
+    {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["china", "earnings"]},
+    {"url": "https://p.wrd.waseda.jp/feed/all", "source": "WasedaAP", "channels": ["asia"]},
+    {"url": "https://rss.caixin.com/finance/all", "source": "Caixin", "channels": ["china"]},
+    {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]}
 ]
 
-def importance_score(item):
-    text = (item.get("title", "") + " " + item.get("summary", "")).lower()
-    score = 10
-    for pattern, points in IMPORTANCE_RULES:
-        if re.search(pattern, text, re.I): score += points
-    return min(score, 100)
+# Time limit: 24 hours
+TIME_LIMIT = timedelta(hours=24)
 
-def insight(item, cache, budget):
-    ck = hashlib.sha256((item["title"]+"|"+item["url"]).encode()).hexdigest()
-    old = cache.get(ck)
-    if isinstance(old, dict) and old.get("analysis") and old.get("coreLogic"): return old
-    if budget["attempts"] >= MAX_AI_CALLS: return None
-    
-    prompt = f"""请分析以下国际财经新闻，并严格以 JSON 格式输出（不要包含任何 markdown 代码块符号如 ```json）：
-字段要求：
-- "analysis": 100-180字，事件含义和宏观重要性。
-- "core_logic": 事件/政策到变量变化再到影响对象的逻辑链。
-- "market_impact": 潜在受益或承压方向。
-- "transmission": 传导机制（供需、利率、汇率或风险偏好）。
-- "impact": 一句话概括潜在市场影响。
-- "assets": 最多4个相关资产、指数、行业或ETF类别数组。
-- "time_horizon": 短中长期及其依据。
-- "scenarios": 最多3条情景及触发条件数组。
-- "evidence": 最多3条证据线索数组。
-- "risk": 反证与风险。
-- "confidence": 评估置信度（低/中/高）。
+# ************************************************
+# [Important] 修改重要性评分逻辑
+# 加入针对超万亿公司的专属权重提升
+# ************************************************
+def get_importance_weight(title, channels):
+    title_lower = title.lower()
+    weight = 50 # Base weight
 
-新闻标题：{item['title']}
-新闻来源：{item['source']}
-新闻摘要：{item.get('summary','')[:1200]}"""
-    
-    budget["attempts"] += 1
-    time.sleep(1.5)
-    ai = parse_ai(call_deepseek(prompt))
-    if ai and ai["analysis"] and ai["coreLogic"]:
-        cache[ck] = ai
-        budget["successes"] += 1
-        return ai
-    budget["failures"] += 1
-    return None
+    # 1. 栏目影响 (财报栏目基础分较高)
+    if "earnings" in channels:
+        weight += 15
 
-def build(channel, cache, budget):
-    gathered = []
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=MAX_NEWS_AGE_HOURS)
-    
-    for src, url in FEEDS[channel]:
-        for x in parse_feed(src, url):
-            dt = parse_date(x.get("published")) or now
-            if not (cutoff <= dt <= now + timedelta(hours=12)): continue
-            x["_date"] = dt
-            gathered.append(x)
+    # 2. 财报相关关键词 (在标题中检测到财报字眼)
+    if any(k in title_lower for k in EARNINGS_CHANNEL_KEYWORDS):
+        weight += 10
+        
+    # ==========================================================
+    # 🌟 [Key Change] 特殊公司播报核心逻辑
+    # 如果是超万亿公司（MEGA-CAP），自动获得最高额外权重
+    # ==========================================================
+    mega_cap_match = None
+    for kw, name in MEGA_CAP_KEYWORDS.items():
+        if kw in title_lower:
+            mega_cap_match = name
+            # 检测到万亿俱乐部公司名称
+            weight += 40  # 自动获得极大权重提升
             
-    gathered = classify(gathered, channel)
-    gathered = deduplicate(gathered)
+            # 如果同时也在检测到财报关键词，则是“双重重磅”
+            if any(k in title_lower for k in EARNINGS_CHANNEL_KEYWORDS):
+                weight += 15  # 财报发布，额外再加！
+            
+            break # 匹配一个即可
+
+    # 限制评分区间在 0 - 100 之间
+    return min(100, weight)
+
+# Fetch news and filter by date
+def fetch_all_news():
+    now = datetime.now(timezone.utc)
+    seen_urls = set()
+    news_pool = []
     
-    for item in gathered:
-        item["_importance"] = importance_score(item)
-        
-    gathered.sort(key=lambda x: (x.get("_importance", 0), x["_date"].timestamp()), reverse=True)
-    
-    output = []
-    for i, item in enumerate(gathered):
-        if len(output) >= LIMITS[channel]: break
-        orig_t, orig_s = item.get("title", ""), item.get("summary", "")
-        resolved = extract_article_url(item.get("url", ""))
-        
-        news_item = {
-            "title": translate(orig_t) or orig_t,
-            "originalTitle": orig_t,
-            "summary": (translate(orig_s) or orig_s)[:900],
-            "source": item.get("source", "国际权威媒体"),
-            "url": resolved if is_http_url(resolved) else item.get("url", ""),
-            "publishedAt": item["_date"].astimezone(TZ).strftime("%Y-%m-%d %H:%M"),
-            "timestamp": int(item["_date"].timestamp()),
-            "impact": "待分析", "asset": [], "analysis": "", "risk": "",
-            "coreLogic": "", "marketImpact": "", "transmission": "", "timeHorizon": "",
-            "scenarios": [], "evidence": [], "confidence": "", "aiStatus": "未分析",
-            "_importance": item["_importance"]
-        }
-        
-        # 仅对每栏目前 2 条重磅新闻调用 DeepSeek 进行深度分析
-        if i < 2:
-            ai = insight(news_item, cache, budget)
-            if ai:
-                news_item.update(ai)
-                news_item["impact"] = ai.get("impact") or ai.get("marketImpact") or "见分层分析"
-                news_item["aiStatus"] = "DeepSeek AI"
+    print(f"[Fetch] Fetching news from {len(FEEDS)} feeds...")
+    for f in FEEDS:
+        try:
+            feed = feedparser.parse(f["url"])
+            if feed.bozo: continue
+            
+            for entry in feed.entries:
+                url = entry.get("link", "")
+                if not url or url in seen_urls: continue
                 
-        output.append(news_item)
+                # Filter by date (last 24h)
+                pub_time = entry.get("published_parsed", None)
+                if pub_time:
+                    dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
+                    if now - dt > TIME_LIMIT: continue
+                    published_at = dt.astimezone(TZ).strftime("%m-%d %H:%M")
+                else:
+                    # Fallback to current time if pubDate missing
+                    published_at = now.astimezone(TZ).strftime("%m-%d %H:%M")
+                
+                title = entry.get("title", "")
+                summary = entry.get("summary", "")
+                
+                weight = get_importance_weight(title, f["channels"])
+                
+                news_pool.append({
+                    "title": title,
+                    "summary": summary,
+                    "url": url,
+                    "source": f["source"],
+                    "publishedAt": published_at,
+                    "channels": f["channels"],
+                    "_weight": weight # Sorting only, not shown on webpage
+                })
+                seen_urls.add(url)
+                
+        except Exception as e:
+            print(f"Error fetching feed {f['source']}: {e}")
+    
+    # Sort news by importance (highest weight first)
+    news_pool.sort(key=lambda x: x["_weight"], reverse=True)
+    return news_pool
+
+# AI Cache
+def load_cache():
+    if Path(CACHE_FILE).exists():
+        try:
+            return json.loads(Path(CACHE_FILE).read_text(encoding="utf-8"), object_pairs_hook=OrderedDict)
+        except:
+            return OrderedDict()
+    return OrderedDict()
+
+def save_cache(cache_data):
+    # Keep only 200 items to save space
+    items = list(cache_data.items())[-200:]
+    Path(CACHE_FILE).write_text(json.dumps(OrderedDict(items), ensure_ascii=False, indent=2), encoding="utf-8")
+
+# DeepSeek API Translation and Analysis
+def call_deepseek_ai(entry):
+    if not API_KEY:
+        return None, "🟠 DeepSeek API 密钥未检测到，AI 宏观拆解不可用。"
+
+    text_en = f"Title: {entry['title']}\nSummary: {entry['summary']}\nSource: {entry['source']}"
+    
+    prompt = f"""
+Input text:
+'''
+{text_en}
+'''
+
+Task:
+Perform financial/geopolitical macro analysis on this input text and generate a structured JSON object in simplified Chinese (zh-CN).
+
+Constraints:
+1. Do not use Markdown formatting in the JSON keys or values.
+2. Provide precise financial and logic translations.
+
+JSON Structure:
+{{
+  "zh_title": "精准的中文标题",
+  "zh_summary": "精准简练的中文摘要",
+  "importance": 70, // 评分 (0-100)，基于宏观影响、突发性、证据可信度
+  "analysis": "100字以内的宏观时政深度拆解与逻辑链条。指出最关键的影响因素。",
+  "coreLogic": "核心逻辑/传导链条 (2句话内)",
+  "marketImpact": "潜在市场影响 (资产/板块/宏观指标)",
+  "risk": "风险提示/信息不确定性"
+}}
+"""
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    payload = {
+        "model": AI_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "response_format": {"type": "json_object"} # Force JSON output
+    }
+
+    print(f"[{entry['source']}] AI Processing (NVIDIA/MEGA detector enabled)...")
+    try:
+        response = requests.post(f"{API_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=40)
+        response.raise_for_status()
+        data = response.json()
         
-    for i, item in enumerate(output):
-        item["id"] = f"NO.{len(output) - i:02d}"
-    return output
+        # DeepSeek often embeds JSON inside Markdown like ```json...``` in 'content'
+        content = data["choices"][0]["message"]["content"]
+        
+        # Strip markdown if present
+        clean_content = re.sub(r"^```json\n|\n```$", "", content.strip(), flags=re.MULTILINE)
+        
+        ai_data = json.loads(clean_content)
+        
+        print(f"AI: Importance {ai_data['importance']} - {ai_data['zh_title']}")
+        
+        # ==========================================================
+        # 🌟 [Key Change] AI 层面再次确保万亿巨头财报置顶
+        # 如果公司名称在 AI 拆解的标题中出现，则在原评分上强制再加分
+        # ==========================================================
+        title_zh_lower = ai_data["zh_title"].lower()
+        mega_found_in_ai = False
+        for kw, name in MEGA_CAP_KEYWORDS.items():
+            if kw in title_zh_lower or name in title_zh_lower:
+                if any(k in title_zh_lower for k in EARNINGS_CHANNEL_KEYWORDS):
+                    ai_data["importance"] += 15 # 双重确认：万亿巨头+财报关键词
+                    mega_found_in_ai = True
+                    break # 匹配一个即可
+        
+        # 再次确保评分最高为 100
+        ai_data["importance"] = min(100, ai_data["importance"])
+        
+        # 如果检测到万亿俱乐部的财报，在中文标题前加上专属火种图标 🔥
+        if mega_found_in_ai:
+             ai_data["zh_title"] = f"🔥 {ai_data['zh_title']}"
+
+        return ai_data, None
+
+    except Exception as e:
+        print(f"Error calling DeepSeek API: {e}")
+        return None, f"🟠 AI 分析不可用: API 调用出错 ({str(e)})."
 
 def main():
-    if not PAGE.exists(): return
-    page = PAGE.read_text(encoding="utf-8")
-    sm, em = "<!-- NEWS_DATA_START -->", "<!-- NEWS_DATA_END -->"
-    if sm not in page or em not in page: return
+    if not API_KEY:
+        print("Warning: DEEPSEEK_API_KEY is not set.")
+
+    all_news = fetch_all_news()
+    cache = load_cache()
     
-    cache, budget = load_cache(), {"attempts": 0, "successes": 0, "failures": 0}
-    news = {ch: build(ch, cache, budget) for ch in ("global", "asia", "china", "earnings")}
-    news["updatedAt"] = datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
-    news["aiEnabled"] = bool(os.getenv("DEEPSEEK_API_KEY", "").strip())
-    news["aiModel"] = "deepseek-chat"
-    news["aiStats"] = {**budget, "maxPerRun": MAX_AI_CALLS}
+    # Output structure
+    result = OrderedDict()
+    result["updatedAt"] = datetime.now(TZ).strftime("%m-%d %H:%M:%S")
+    result["aiEnabled"] = bool(API_KEY)
+    result["aiModel"] = AI_MODEL
+    result["aiStats"] = {"attempts": 0, "successes": 0}
     
-    start = page.index(sm) + len(sm)
-    end = page.index(em, start)
-    data_block = "\n<script>window.newsData = " + json.dumps(news, ensure_ascii=False).replace("</", "<\\/") + ";</script>\n"
-    page = page[:start] + data_block + page[end:]
-    page = re.sub(r"""(<span[^>]*id=["']updateTime["'][^>]*>).*?(</span>)""", lambda m: m.group(1) + html.escape(news["updatedAt"])+m.group(2), page, flags=re.I|re.S)
+    for channel in ["global", "asia", "china", "earnings"]:
+        result[channel] = []
+
+    limit = {"global": 20, "asia": 10, "china": 10, "earnings": 10}
     
-    PAGE.write_text(page, encoding="utf-8")
-    CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"更新完成。DeepSeek 尝试/成功/失败：{budget['attempts']}/{budget['successes']}/{budget['failures']}")
+    count_limit = OrderedDict()
+    for ch in limit:
+        count_limit[ch] = limit[ch]
+
+    print("[Process] Processing AI analyses and sorting with mega-cap priority...")
+    for entry in all_news:
+        if all(c <= 0 for c in count_limit.values()):
+            break
+
+        item_channels = entry["channels"]
+        can_add_to = [ch for ch in item_channels if ch in count_limit and count_limit[ch] > 0]
+        
+        if not can_add_to: continue
+
+        # DeepSeek AI Analysis
+        cache_key = base64.b64encode(f"{entry['url']}_{entry['source']}".encode("utf-8")).decode("utf-8")
+        ai_data = cache.get(cache_key)
+        
+        news_item = {
+            "source": entry["source"],
+            "url": entry["url"],
+            "publishedAt": entry["publishedAt"],
+            "title": entry["title"],
+            "summary": entry["summary"]
+        }
+        
+        ai_msg = None
+        if not ai_data:
+            result["aiStats"]["attempts"] += 1
+            ai_data, ai_msg = call_deepseek_ai(entry)
+            if ai_data:
+                result["aiStats"]["successes"] += 1
+                cache[cache_key] = ai_data
+            elif ai_msg:
+                # Store message in cache as object with empty analysis
+                cache[cache_key] = {"ai_msg": ai_msg, "importance": 40}
+
+        if ai_data:
+            if "ai_msg" in ai_data:
+                # Handle cached API error
+                news_item["ai_msg"] = ai_data["ai_msg"]
+                news_item["_importance"] = ai_data["importance"]
+            else:
+                # Merge AI results into news_item
+                # Prepend special "MEGA CAP" indicator before title if prioritized
+                news_item["title"] = ai_data["zh_title"]
+                news_item["summary"] = ai_data["zh_summary"]
+                news_item["analysis"] = ai_data["analysis"]
+                news_item["impact"] = ai_data["marketImpact"]
+                news_item["coreLogic"] = ai_data["coreLogic"]
+                news_item["transmission"] = ai_data["transmission"]
+                news_item["evidence"] = ai_data["evidence"]
+                news_item["scenarios"] = ai_data["scenarios"]
+                news_item["risk"] = ai_data["risk"]
+                news_item["confidence"] = ai_data["confidence"]
+                
+                # Internal sorting weight, prioritize AI-calculated importance
+                news_item["_importance"] = ai_data["importance"]
+        else:
+            news_item["ai_msg"] = ai_msg or "AI分析不可用"
+            news_item["_importance"] = 40
+
+        # Add to matching channels and count down
+        for ch in can_add_to:
+            result[ch].append(news_item)
+            count_limit[ch] -= 1
+
+    # Sorting again after AI processing to ensure priorities within the top-10 are correct
+    print("[Final Sort] Final channel-based sorting with AI importance.")
+    for ch in ["global", "asia", "china", "earnings"]:
+        # Sorted by AI importance, mega-cap earnings get 90-100 score
+        result[ch].sort(key=lambda x: x["_importance"], reverse=True)
+
+    # Save data to index.html
+    print(f"[Save] Saving data to {OUTPUT_FILE} and updating cache...")
+    save_cache(cache)
+    
+    page = Path(OUTPUT_FILE).read_text(encoding="utf-8")
+    json_data_json = json.dumps(result, ensure_ascii=False, indent=2)
+    new_page = re.sub(
+        r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->",
+        f"<!-- NEWS_DATA_START -->\n<script>window.newsData={json_data_json};</script>\n<!-- NEWS_DATA_END -->",
+        page,
+        flags=re.S
+    )
+    Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
+    print("✅ 大功告成！万亿公司财报已设置最高播报权重。")
+
+from pathlib import Path
 
 if __name__ == "__main__":
     main()
