@@ -21,7 +21,6 @@ TZ = timezone(timedelta(hours=8))
 OUTPUT_FILE = "index.html"
 CACHE_FILE = "ai_cache.json"
 
-# 万亿巨头与超级大厂词库
 MEGA_CAP_KEYWORDS = {
     "microsoft": "Microsoft (微软)", "msft": "Microsoft (微软)",
     "apple": "Apple (苹果)", "aapl": "Apple (苹果)",
@@ -35,7 +34,6 @@ MEGA_CAP_KEYWORDS = {
     "台积电": "台积电", "博通": "博通", "特斯拉": "特斯拉", "腾讯": "腾讯", "阿里巴巴": "阿里巴巴"
 }
 
-# 沃什时代美联储及宏观重磅词库
 MACRO_EVENT_KEYWORDS = {
     "federal reserve": "美联储", "fomc": "美联储FOMC", "warsh": "美联储主席沃什",
     "interest rate": "利率决议", "rate cut": "降息", "rate hike": "加息",
@@ -87,26 +85,29 @@ def fetch_all_news():
         try:
             res = requests.get(f["url"], headers=headers, timeout=15)
             feed = feedparser.parse(res.content)
+            print(f"[{f['source']}] 抓取到原始条目数: {len(feed.entries)}")
             
             for entry in feed.entries:
                 url = entry.get("link", "")
                 if not url or url in seen_urls: continue
                 
-                # 安全的时效性解析
-                published_at = now.astimezone(TZ).strftime("%m-%d %H:%M")
+                # 🌟 核心修复：更温和的时间解析，绝不因字段缺失而直接误杀整条新闻
+                published_at = datetime.now(TZ).strftime("%m-%d %H:%M")
                 pub_time = entry.get("published_parsed", None)
                 if pub_time:
                     try:
                         dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
-                        # 超过 24 小时坚决滤除
+                        # 如果超出了24小时，才丢弃
                         if now - dt > TIME_LIMIT:
                             continue
                         published_at = dt.astimezone(TZ).strftime("%m-%d %H:%M")
                     except Exception:
-                        pass
+                        pass # 解析失败时使用当前时间，不丢弃
                 
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")
+                if not title: continue
+                
                 weight = get_importance_weight(title, f["channels"])
                 
                 news_pool.append({
@@ -119,7 +120,7 @@ def fetch_all_news():
             print(f"Error fetching feed {f['source']}: {e}")
             
     news_pool.sort(key=lambda x: x["_weight"], reverse=True)
-    print(f"抓取到有效时效新闻：{len(news_pool)} 条")
+    print(f"✅ 最终筛选出的有效时效新闻总数: {len(news_pool)}")
     return news_pool
 
 def load_cache():
@@ -246,7 +247,6 @@ def main():
 
     save_cache(cache)
     
-    # 安全写入逻辑
     page = Path(OUTPUT_FILE).read_text(encoding="utf-8")
     json_data_json = json.dumps(result, ensure_ascii=False, indent=2)
     injection_code = f"<!-- NEWS_DATA_START -->\n<script>window.newsData={json_data_json};</script>\n<!-- NEWS_DATA_END -->"
@@ -259,11 +259,10 @@ def main():
             flags=re.S
         )
     else:
-        # 兜底注入：防止标记被删导致数据写不进去
         new_page = page.replace("</head>", f"{injection_code}\n</head>")
 
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print("✅ 脚本执行完毕，数据已安全写入 index.html。")
+    print("✅ 脚本执行完毕，资讯已成功写入。")
 
 if __name__ == "__main__":
     main()
