@@ -22,7 +22,7 @@ TZ = timezone(timedelta(hours=8))
 OUTPUT_FILE = "index.html"
 CACHE_FILE = "ai_cache.json"
 
-# 1. 万亿巨头词库
+# 万亿巨头与超级大厂词库
 MEGA_CAP_KEYWORDS = {
     "microsoft": "Microsoft (微软)", "msft": "Microsoft (微软)",
     "apple": "Apple (苹果)", "aapl": "Apple (苹果)",
@@ -36,7 +36,7 @@ MEGA_CAP_KEYWORDS = {
     "台积电": "台积电", "博通": "博通", "特斯拉": "特斯拉", "腾讯": "腾讯", "阿里巴巴": "阿里巴巴"
 }
 
-# 2. 沃什时代美联储及宏观重磅词库
+# 沃什时代美联储及宏观重磅词库
 MACRO_EVENT_KEYWORDS = {
     "federal reserve": "美联储", "fomc": "美联储FOMC", "warsh": "美联储主席沃什",
     "interest rate": "利率决议", "rate cut": "降息", "rate hike": "加息",
@@ -46,6 +46,7 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
+# 🌟 完整恢复所有国际与国内财经 RSS 源
 FEEDS = [
     {"url": "https://www.reutersagency.com/feed/?best-topics=business-finance&format=rss", "source": "Reuters", "channels": ["global", "earnings"]},
     {"url": "https://feeds.a.bloomberg.com/bpol/rss", "source": "Bloomberg", "channels": ["global", "earnings"]},
@@ -79,19 +80,30 @@ def fetch_all_news():
     seen_urls = set()
     news_pool = []
     
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/xml, text/xml, */*"
+    }
+    
     for f in FEEDS:
         try:
-            feed = feedparser.parse(f["url"])
-            if feed.bozo: continue
+            print(f"Fetching from {f['source']} ({f['url']})...")
+            res = requests.get(f["url"], headers=headers, timeout=15)
+            feed = feedparser.parse(res.content)
+            
+            print(f"-> Parsed {len(feed.entries)} entries from {f['source']}")
             for entry in feed.entries:
                 url = entry.get("link", "")
                 if not url or url in seen_urls: continue
                 
                 pub_time = entry.get("published_parsed", None)
                 if pub_time:
-                    dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
-                    if now - dt > TIME_LIMIT: continue
-                    published_at = dt.astimezone(TZ).strftime("%m-%d %H:%M")
+                    try:
+                        dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
+                        if dt < now - TIME_LIMIT: continue
+                        published_at = dt.astimezone(TZ).strftime("%m-%d %H:%M")
+                    except:
+                        published_at = now.astimezone(TZ).strftime("%m-%d %H:%M")
                 else:
                     published_at = now.astimezone(TZ).strftime("%m-%d %H:%M")
                 
@@ -109,6 +121,7 @@ def fetch_all_news():
             print(f"Error fetching feed {f['source']}: {e}")
             
     news_pool.sort(key=lambda x: x["_weight"], reverse=True)
+    print(f"Total valid news fetched: {len(news_pool)}")
     return news_pool
 
 def load_cache():
@@ -244,7 +257,7 @@ def main():
         flags=re.S
     )
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print("✅ 脚本执行成功，四个看板数据已安全更新。")
+    print("✅ 脚本执行成功，所有看板源数据已完全恢复并写入。")
 
 if __name__ == "__main__":
     main()
