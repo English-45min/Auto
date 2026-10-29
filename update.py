@@ -43,7 +43,6 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
-# 🌟 替换为对 GitHub Actions 云端绝对稳定、无 DNS 屏蔽的高可用 RSS 源
 FEEDS = [
     {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "earnings"]},
     {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "earnings"]},
@@ -85,7 +84,8 @@ def fetch_all_news():
             print(f"正在抓取 {f['source']} ({f['url']})...")
             res = requests.get(f["url"], headers=headers, timeout=15)
             feed = feedparser.parse(res.content)
-            print(f"[{f['source']] 抓取到原始条目数: {len(feed.entries)}")
+            # 🌟 修复语法错误：修正了 f-string 中的括号匹配
+            print(f"[{f['source']}] 抓取到原始条目数: {len(feed.entries)}")
             
             for entry in feed.entries:
                 url = entry.get("link", "")
