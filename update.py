@@ -46,7 +46,6 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
-# 🌟 完整恢复所有国际与国内财经 RSS 源
 FEEDS = [
     {"url": "https://www.reutersagency.com/feed/?best-topics=business-finance&format=rss", "source": "Reuters", "channels": ["global", "earnings"]},
     {"url": "https://feeds.a.bloomberg.com/bpol/rss", "source": "Bloomberg", "channels": ["global", "earnings"]},
@@ -57,6 +56,7 @@ FEEDS = [
     {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]}
 ]
 
+# 严格限定 24 小时以内
 TIME_LIMIT = timedelta(hours=24)
 
 def get_importance_weight(title, channels):
@@ -87,25 +87,26 @@ def fetch_all_news():
     
     for f in FEEDS:
         try:
-            print(f"Fetching from {f['source']} ({f['url']})...")
             res = requests.get(f["url"], headers=headers, timeout=15)
             feed = feedparser.parse(res.content)
             
-            print(f"-> Parsed {len(feed.entries)} entries from {f['source']}")
             for entry in feed.entries:
                 url = entry.get("link", "")
                 if not url or url in seen_urls: continue
                 
+                # 严格时效性过滤（24小时内）
                 pub_time = entry.get("published_parsed", None)
                 if pub_time:
                     try:
                         dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
-                        if dt < now - TIME_LIMIT: continue
+                        if now - dt > TIME_LIMIT: 
+                            continue # 超过24小时的严格丢弃，绝不硬塞
                         published_at = dt.astimezone(TZ).strftime("%m-%d %H:%M")
                     except:
-                        published_at = now.astimezone(TZ).strftime("%m-%d %H:%M")
+                        continue
                 else:
-                    published_at = now.astimezone(TZ).strftime("%m-%d %H:%M")
+                    # 如果没有明确发布时间的条目，为保证时效性直接跳过，宁缺毋滥
+                    continue
                 
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")
@@ -121,7 +122,6 @@ def fetch_all_news():
             print(f"Error fetching feed {f['source']}: {e}")
             
     news_pool.sort(key=lambda x: x["_weight"], reverse=True)
-    print(f"Total valid news fetched: {len(news_pool)}")
     return news_pool
 
 def load_cache():
@@ -243,6 +243,7 @@ def main():
             result[ch].append(news_item)
             count_limit[ch] -= 1
 
+    # 严格按权重排序，绝不硬塞非时效内容
     for ch in ["global", "asia", "china", "earnings"]:
         result[ch].sort(key=lambda x: x["_importance"], reverse=True)
 
@@ -257,7 +258,7 @@ def main():
         flags=re.S
     )
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print("✅ 脚本执行成功，所有看板源数据已完全恢复并写入。")
+    print("✅ 严格时效性过滤执行完毕，未引入任何非24小时内过时内容。")
 
 if __name__ == "__main__":
     main()
