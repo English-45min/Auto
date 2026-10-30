@@ -5,6 +5,7 @@ import json
 import time
 import base64
 import html
+import hashlib
 import requests
 import feedparser
 
@@ -30,14 +31,14 @@ TZ = timezone(timedelta(hours=8))
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = BASE_DIR / "index.html"
 CACHE_FILE = BASE_DIR / "ai_cache.json"
+MARKET_CAP_CACHE = BASE_DIR / "market_cap_cache.json"
 
-# 每轮最多调用 AI 12 次
-MAX_AI_DAILY_CALLS = 12
+# 每轮最多调用 AI 3 次
+MAX_AI_CALLS_PER_RUN = 3
 
-# 新闻时效：最近 24 小时
+# 新闻时效：最近24小时
 TIME_LIMIT = timedelta(hours=24)
 
-# 每个板块展示数量
 CHANNEL_LIMITS = {
     "global": 20,
     "asia": 10,
@@ -45,41 +46,29 @@ CHANNEL_LIMITS = {
     "earnings": 10
 }
 
-
-# ============================================================
-# 动态市值识别
-# ============================================================
-
 MARKET_CAP_THRESHOLD = 1_000_000_000_000
 
-MARKET_CAP_CACHE = BASE_DIR / "market_cap_cache.json"
 
-# 初始备用名单。
-# 每次运行优先从公开市值榜单刷新，失败时使用此名单。
-# 这不是固定的最终名单。
+# ============================================================
+# 万亿美元科技公司动态名单
+# ============================================================
+
 FALLBACK_MEGA_CAP_COMPANIES = {
     "NVIDIA": ["nvidia", "英伟达", "nvda"],
     "Apple": ["apple", "苹果", "aapl"],
     "Microsoft": ["microsoft", "微软", "msft"],
     "Alphabet": ["alphabet", "google", "谷歌", "googl", "goog"],
     "Amazon": ["amazon", "亚马逊", "amzn"],
-    "Meta": ["meta platforms", "meta", "facebook", "脸书"],
+    "Meta": ["meta platforms", "facebook", "脸书", "meta"],
     "TSMC": ["tsmc", "taiwan semiconductor", "台积电"],
     "Broadcom": ["broadcom", "博通", "avgo"],
     "Tesla": ["tesla", "特斯拉", "tsla"],
     "Tencent": ["tencent", "腾讯", "0700"],
-    "Alibaba": ["alibaba", "阿里巴巴", "baba"],
+    "Alibaba": ["alibaba", "阿里巴巴", "baba"]
 }
 
 
 def refresh_mega_cap_companies():
-    """
-    从 CompaniesMarketCap 公开榜单获取公司市值。
-    仅保留市值超过 1 万亿美元的科技公司。
-    如果外部数据源不可用，则使用最近缓存；
-    如果没有缓存，则使用备用名单。
-    """
-
     companies = {}
 
     try:
@@ -87,64 +76,63 @@ def refresh_mega_cap_companies():
 
         response = requests.get(
             url,
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            },
+            headers={"User-Agent": "Mozilla/5.0"},
             timeout=15
         )
-
         response.raise_for_status()
 
-        page = response.text
-
         rows = re.findall(
-            r'<tr[^>]*>(.*?)</tr>',
-            page,
+            r"<tr[^>]*>(.*?)</tr>",
+            response.text,
             flags=re.S | re.I
         )
 
         for row in rows:
             name_match = re.search(
-                r'<div class="company-name">([^<]+)</div>',
+                r'<div class="company-name">\s*([^<]+)',
                 row,
                 flags=re.I
             )
 
             symbol_match = re.search(
-                r'<div class="company-code">([^<]+)</div>',
+                r'<div class="company-code">\s*([^<]+)',
                 row,
                 flags=re.I
             )
 
-            cap_match = re.search(
-                r'<td[^>]*class="[^"]*td-right[^"]*"[^>]*>\s*'
-                r'\$?([\d,.]+)\s*(T|B|M)?',
+            # 优先寻找带 T/B 单位的市值字段
+            cap_matches = re.findall(
+                r"\$?\s*([\d,.]+)\s*(T|B|M)\b",
                 row,
                 flags=re.I
             )
 
-            if not name_match or not cap_match:
+            if not name_match or not cap_matches:
                 continue
 
             name = html.unescape(name_match.group(1)).strip()
-            symbol = symbol_match.group(1).strip() if symbol_match else ""
+            symbol = (
+                symbol_match.group(1).strip()
+                if symbol_match else ""
+            )
 
-            value = float(cap_match.group(1).replace(",", ""))
-            unit = (cap_match.group(2) or "").upper()
+            # 榜单行中可能有其他金额，取第一个带单位的数值
+            value_text, unit = cap_matches[0]
+            value = float(value_text.replace(",", ""))
 
-            if unit == "T":
-                market_cap = value * 1_000_000_000_000
-            elif unit == "B":
-                market_cap = value * 1_000_000_000
-            elif unit == "M":
-                market_cap = value * 1_000_000
-            else:
-                market_cap = value
+            unit = unit.upper()
+
+            multiplier = {
+                "T": 1_000_000_000_000,
+                "B": 1_000_000_000,
+                "M": 1_000_000
+            }.get(unit, 1)
+
+            market_cap = value * multiplier
 
             if market_cap < MARKET_CAP_THRESHOLD:
                 continue
 
-            # 名称和代码同时建立匹配词
             aliases = [name.lower()]
 
             if symbol:
@@ -154,12 +142,16 @@ def refresh_mega_cap_companies():
 
         if companies:
             MARKET_CAP_CACHE.write_text(
-                json.dumps(companies, ensure_ascii=False, indent=2),
+                json.dumps(
+                    companies,
+                    ensure_ascii=False,
+                    indent=2
+                ),
                 encoding="utf-8"
             )
 
             print(
-                f"✅ 已刷新万亿美元科技公司名单：{len(companies)} 家"
+                f"✅ 动态市值名单刷新成功：{len(companies)} 家"
             )
 
             return companies
@@ -167,7 +159,6 @@ def refresh_mega_cap_companies():
     except Exception as e:
         print(f"⚠️ 市值榜单刷新失败：{e}")
 
-    # 使用最近一次成功缓存
     if MARKET_CAP_CACHE.exists():
         try:
             cached = json.loads(
@@ -182,6 +173,18 @@ def refresh_mega_cap_companies():
             pass
 
     print("⚠️ 使用备用科技公司名单")
+
+    # 即使动态抓取失败，也创建缓存文件，避免 GitHub Actions
+    # 因 market_cap_cache.json 不存在而报错。
+    MARKET_CAP_CACHE.write_text(
+        json.dumps(
+            FALLBACK_MEGA_CAP_COMPANIES,
+            ensure_ascii=False,
+            indent=2
+        ),
+        encoding="utf-8"
+    )
+
     return FALLBACK_MEGA_CAP_COMPANIES
 
 
@@ -193,7 +196,20 @@ def find_mega_cap_company(text):
 
     for company, aliases in MEGA_CAP_COMPANIES.items():
         for alias in aliases:
-            if alias and alias.lower() in text:
+            alias = alias.lower().strip()
+
+            if not alias:
+                continue
+
+            # 英文短代码使用单词边界，避免误匹配
+            if re.fullmatch(r"[a-z0-9.]+", alias):
+                if re.search(
+                    r"(?<![a-z0-9])" + re.escape(alias) +
+                    r"(?![a-z0-9])",
+                    text
+                ):
+                    return company
+            elif alias in text:
                 return company
 
     return None
@@ -277,115 +293,102 @@ def google_news_feed(query):
     return (
         "https://news.google.com/rss/search?q="
         + quote(query)
+        + "&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
+    )
+
+
+def google_news_feed_en(query):
+    return (
+        "https://news.google.com/rss/search?q="
+        + quote(query)
         + "&hl=en-US&gl=US&ceid=US:en"
     )
 
 
 FEEDS = [
 
-    # --------------------------------------------------------
     # 国际财经
-    # --------------------------------------------------------
-
     {
         "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
         "source": "CNBC",
         "channels": ["global"]
     },
-
     {
         "url": "https://feeds.bbci.co.uk/news/business/rss.xml",
         "source": "BBC Business",
         "channels": ["global"]
     },
-
     {
         "url": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
         "source": "WSJ Markets",
         "channels": ["global", "earnings"]
     },
-
     {
-        "url": google_news_feed("Reuters world business economy markets"),
+        "url": google_news_feed_en("Reuters world business economy markets"),
         "source": "Reuters",
         "channels": ["global"]
     },
-
     {
-        "url": google_news_feed("Bloomberg global finance economy markets"),
+        "url": google_news_feed_en("Bloomberg global finance economy markets"),
         "source": "Bloomberg",
         "channels": ["global"]
     },
-
     {
-        "url": google_news_feed(
+        "url": google_news_feed_en(
             "Federal Reserve FOMC meeting interest rate decision"
         ),
         "source": "美联储会议报道",
         "channels": ["global"]
     },
 
-
-    # --------------------------------------------------------
     # 亚太时政财经
-    # --------------------------------------------------------
-
     {
         "url": "https://feeds.bbci.co.uk/news/world/asia/rss.xml",
         "source": "BBC Asia",
         "channels": ["asia"]
     },
-
     {
         "url": "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511",
         "source": "CNA Asia",
         "channels": ["asia"]
     },
-
     {
         "url": "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936",
         "source": "CNA Business",
         "channels": ["asia"]
     },
-
     {
         "url": "https://feeds.feedburner.com/rsscna/politics",
         "source": "台湾中央社政治",
         "channels": ["asia"]
     },
-
     {
         "url": "https://feeds.feedburner.com/rsscna/intworld",
         "source": "台湾中央社国际",
         "channels": ["asia"]
     },
-
     {
         "url": "https://feeds.feedburner.com/rsscna/finance",
         "source": "台湾中央社财经",
         "channels": ["asia"]
     },
-
     {
         "url": "https://feeds.feedburner.com/rsscna/technology",
         "source": "台湾中央社科技",
         "channels": ["asia"]
     },
-
     {
         "url": "https://www3.nhk.or.jp/rj/podcast/rss/english.xml",
         "source": "NHK World",
         "channels": ["asia"]
     },
-
     {
         "url": "https://www.scmp.com/rss/91/feed",
         "source": "南华早报",
         "channels": ["asia"]
     },
-
     {
-        "url": google_news_feed(
+        "url": google_news_feed_en(
             '(site:asia.nikkei.com OR site:japantimes.co.jp '
             'OR site:english.kyodonews.net) '
             'Japan politics economy business'
@@ -393,27 +396,24 @@ FEEDS = [
         "source": "日本主流媒体",
         "channels": ["asia"]
     },
-
     {
-        "url": google_news_feed(
+        "url": google_news_feed_en(
             '(site:scmp.com OR site:hongkongfp.com) '
             'Hong Kong politics economy business'
         ),
         "source": "香港主流媒体",
         "channels": ["asia"]
     },
-
     {
-        "url": google_news_feed(
+        "url": google_news_feed_en(
             '(site:koreaherald.com OR site:koreatimes.co.kr) '
             'South Korea politics economy business'
         ),
         "source": "韩国主流媒体",
         "channels": ["asia"]
     },
-
     {
-        "url": google_news_feed(
+        "url": google_news_feed_en(
             '(site:channelnewsasia.com OR site:straitstimes.com) '
             'Southeast Asia politics economy'
         ),
@@ -421,55 +421,71 @@ FEEDS = [
         "channels": ["asia"]
     },
 
-
-    # --------------------------------------------------------
     # 国内财经
-    # --------------------------------------------------------
-
     {
-        "url": "https://www.nbd.com.cn/rss",
-        "source": "每日经济新闻",
+        "url": "https://rss.sina.com.cn/roll/finance/hot_roll.xml",
+        "source": "新浪财经",
         "channels": ["china"]
     },
-
+    {
+        "url": "https://dedicated.wallstreetcn.com/rss.xml",
+        "source": "华尔街见闻",
+        "channels": ["china"]
+    },
     {
         "url": google_news_feed(
-            '(site:caixin.com OR site:yicai.com '
-            'OR site:21jingji.com OR site:cs.com.cn) 中国财经'
+            "中国财经 A股 中国经济 央行 人民币 财政政策"
         ),
-        "source": "大陆财经媒体",
+        "source": "中国财经新闻",
+        "channels": ["china"]
+    },
+    {
+        "url": google_news_feed(
+            "site:caixin.com 中国 财经 经济"
+        ),
+        "source": "财新网",
+        "channels": ["china"]
+    },
+    {
+        "url": google_news_feed(
+            "site:yicai.com 中国 财经 市场"
+        ),
+        "source": "第一财经",
+        "channels": ["china"]
+    },
+    {
+        "url": google_news_feed(
+            "site:21jingji.com 财经 中国经济"
+        ),
+        "source": "21世纪经济报道",
         "channels": ["china"]
     },
 
-
-    # --------------------------------------------------------
     # 核心财报
-    # --------------------------------------------------------
-
     {
         "url": "https://www.investors.com/feed/investing/",
         "source": "Investor's Business Daily",
         "channels": ["earnings"]
     },
-
     {
-        "url": google_news_feed(
+        "url": google_news_feed_en(
             "company earnings quarterly results revenue guidance"
         ),
         "source": "全球企业财报",
         "channels": ["earnings"]
     },
-
     {
-        "url": "https://sc.hkexnews.hk/rss",
-        "source": "港交所公告",
-        "channels": ["asia", "china", "earnings"]
+        "url": google_news_feed(
+            "上市公司 财报 营收 净利润 季度业绩"
+        ),
+        "source": "上市公司财报",
+        "channels": ["earnings"]
     }
 ]
 
 
 # ============================================================
-# 新闻抓取与时效过滤
+# 新闻抓取
 # ============================================================
 
 def normalize_url(url):
@@ -488,7 +504,6 @@ def normalize_url(url):
 
 
 def fetch_all_news():
-
     now = datetime.now(timezone.utc)
 
     seen_urls = set()
@@ -503,9 +518,7 @@ def fetch_all_news():
     }
 
     for feed_config in FEEDS:
-
         try:
-
             response = requests.get(
                 feed_config["url"],
                 headers=headers,
@@ -525,7 +538,6 @@ def fetch_all_news():
             feed_count = 0
 
             for entry in feed.entries:
-
                 url = entry.get("link", "").strip()
 
                 if not url:
@@ -541,12 +553,10 @@ def fetch_all_news():
                     or entry.get("updated_parsed")
                 )
 
-                # 不可靠或缺少发布时间的新闻不进入列表
                 if not pub_time:
                     continue
 
                 try:
-
                     dt = datetime(
                         *pub_time[:6],
                         tzinfo=timezone.utc
@@ -554,7 +564,6 @@ def fetch_all_news():
 
                     age = now - dt
 
-                    # 只收最近24小时，允许最多30分钟时钟误差
                     if age > TIME_LIMIT:
                         continue
 
@@ -587,7 +596,6 @@ def fetch_all_news():
                 )
 
                 news_pool.append({
-
                     "title": title,
                     "summary": summary,
                     "url": url,
@@ -596,7 +604,6 @@ def fetch_all_news():
                     "publishedTimestamp": int(dt.timestamp()),
                     "channels": channels,
                     "_weight": weight
-
                 })
 
                 seen_urls.add(normalized)
@@ -607,14 +614,11 @@ def fetch_all_news():
             )
 
         except Exception as e:
-
             print(
                 f"⚠️ 新闻源失败 {feed_config['source']}：{e}"
             )
-
             continue
 
-    # 先按重要性，再按发布时间
     news_pool.sort(
         key=lambda x: (
             x["_weight"],
@@ -635,24 +639,24 @@ def fetch_all_news():
 # ============================================================
 
 def load_cache():
-
     if CACHE_FILE.exists():
-
         try:
-
-            return json.loads(
+            data = json.loads(
                 CACHE_FILE.read_text(encoding="utf-8"),
                 object_pairs_hook=OrderedDict
             )
 
-        except Exception:
-            return OrderedDict()
+            if isinstance(data, dict):
+                return data
+
+        except Exception as e:
+            print(f"⚠️ AI 缓存读取失败：{e}")
 
     return OrderedDict()
 
 
 def save_cache(cache_data):
-
+    # 最多保留最近500条
     items = list(cache_data.items())[-500:]
 
     CACHE_FILE.write_text(
@@ -665,12 +669,27 @@ def save_cache(cache_data):
     )
 
 
+def make_cache_key(entry):
+    # 不再加入 channel，同一篇新闻在不同板块只分析一次
+    raw = (
+        normalize_url(entry.get("url", ""))
+        or (
+            entry.get("source", "")
+            + "_"
+            + entry.get("title", "")
+        )
+    )
+
+    return hashlib.sha256(
+        raw.encode("utf-8")
+    ).hexdigest()
+
+
 # ============================================================
 # DeepSeek AI 分析
 # ============================================================
 
 def call_deepseek_ai(entry):
-
     if not API_KEY:
         return None, "🟠 DeepSeek API 密钥未检测到"
 
@@ -697,6 +716,7 @@ Requirements:
 4. Explain potential market impact.
 5. Include risk warnings.
 6. Do not invent facts.
+7. Keep the analysis concise.
 
 JSON:
 {{
@@ -716,26 +736,21 @@ JSON:
     }
 
     payload = {
-
         "model": AI_MODEL,
-
         "messages": [
             {
                 "role": "user",
                 "content": prompt
             }
         ],
-
         "temperature": 0.1,
-
+        "max_tokens": 700,
         "response_format": {
             "type": "json_object"
         }
-
     }
 
     try:
-
         response = requests.post(
             f"{API_BASE_URL}/chat/completions",
             headers=headers,
@@ -769,16 +784,14 @@ JSON:
         return ai_data, None
 
     except Exception as e:
-
         return None, f"🟠 AI 分析不可用：{str(e)}"
 
 
 # ============================================================
-# 新闻优先级判定
+# 新闻优先级
 # ============================================================
 
 def is_eligible_mega_cap_earnings(entry):
-
     text = (
         entry.get("title", "")
         + " "
@@ -797,7 +810,6 @@ def is_eligible_mega_cap_earnings(entry):
 
 
 def is_eligible_fed_meeting(entry):
-
     text = (
         entry.get("title", "")
         + " "
@@ -808,9 +820,7 @@ def is_eligible_fed_meeting(entry):
 
 
 def sort_channel_news(channel, entries):
-
     if channel == "global":
-
         fed_news = [
             item for item in entries
             if item.get("_fed_meeting")
@@ -822,7 +832,10 @@ def sort_channel_news(channel, entries):
         ]
 
         fed_news.sort(
-            key=lambda x: x.get("_importance", 0),
+            key=lambda x: (
+                x.get("_importance", 0),
+                x.get("_timestamp", 0)
+            ),
             reverse=True
         )
 
@@ -834,10 +847,10 @@ def sort_channel_news(channel, entries):
             reverse=True
         )
 
+        # 美联储会议报道优先置顶
         return fed_news + other_news
 
     if channel == "earnings":
-
         priority_news = [
             item for item in entries
             if item.get("_mega_cap_earnings")
@@ -864,7 +877,8 @@ def sort_channel_news(channel, entries):
             reverse=True
         )
 
-        return priority_news + other_news
+        # 符合条件的万亿美元科技公司财报最多优先占据前三
+        return priority_news[:3] + other_news + priority_news[3:]
 
     return sorted(
         entries,
@@ -881,7 +895,6 @@ def sort_channel_news(channel, entries):
 # ============================================================
 
 def main():
-
     print("=" * 60)
     print("财经与时政焦点看板：开始更新")
     print("=" * 60)
@@ -910,7 +923,6 @@ def main():
         "china",
         "earnings"
     ]:
-
         result[channel] = []
 
     channel_pools = {
@@ -921,17 +933,15 @@ def main():
     }
 
     for entry in all_news:
-
         for channel in entry["channels"]:
-
             if channel in channel_pools:
                 channel_pools[channel].append(entry)
 
-    ai_call_count = 0
+    # --------------------------------------------------------
+    # 先建立四个板块的新闻候选池
+    # --------------------------------------------------------
 
-    # --------------------------------------------------------
-    # 每个板块独立处理
-    # --------------------------------------------------------
+    processed_by_channel = {}
 
     for channel in [
         "global",
@@ -939,7 +949,6 @@ def main():
         "china",
         "earnings"
     ]:
-
         entries = channel_pools[channel]
 
         entries.sort(
@@ -953,64 +962,20 @@ def main():
         processed = []
 
         for entry in entries:
-
-            cache_key = base64.b64encode(
-                f"{entry['url']}_{entry['source']}_{channel}".encode(
-                    "utf-8"
-                )
-            ).decode("utf-8")
-
+            cache_key = make_cache_key(entry)
             ai_data = cache.get(cache_key)
 
-            ai_msg = None
-
-            # ------------------------------------------------
-            # AI 分析
-            # ------------------------------------------------
-
-            if not ai_data:
-
-                if ai_call_count < MAX_AI_DAILY_CALLS:
-
-                    result["aiStats"]["attempts"] += 1
-
-                    ai_call_count += 1
-
-                    ai_data, ai_msg = call_deepseek_ai(entry)
-
-                    if ai_data:
-
-                        result["aiStats"]["successes"] += 1
-
-                        cache[cache_key] = ai_data
-
-                    else:
-
-                        # 不缓存临时错误，下轮继续尝试
-                        pass
-
-                else:
-
-                    ai_msg = "已达到本轮 AI 分析调用上限"
-
-            # ------------------------------------------------
-            # 生成新闻卡片数据
-            # ------------------------------------------------
-
             news_item = {
-
                 "source": entry["source"],
                 "url": entry["url"],
                 "publishedAt": entry["publishedAt"],
                 "title": entry["title"],
                 "summary": entry["summary"],
-
-                "_timestamp": entry["publishedTimestamp"]
-
+                "_timestamp": entry["publishedTimestamp"],
+                "_cache_key": cache_key
             }
 
             if ai_data:
-
                 news_item["title"] = ai_data.get(
                     "zh_title",
                     entry["title"]
@@ -1047,25 +1012,16 @@ def main():
                 )
 
             else:
-
                 news_item["ai_msg"] = (
-                    ai_msg or "AI 分析暂不可用"
+                    "本条新闻暂未进行 AI 深度分析"
                 )
 
                 news_item["_importance"] = entry["_weight"]
-
-            # ------------------------------------------------
-            # 美联储会议置顶标记
-            # ------------------------------------------------
 
             news_item["_fed_meeting"] = (
                 channel == "global"
                 and is_eligible_fed_meeting(entry)
             )
-
-            # ------------------------------------------------
-            # 万亿美元科技公司财报标记
-            # ------------------------------------------------
 
             news_item["_mega_cap_earnings"] = (
                 channel == "earnings"
@@ -1074,39 +1030,179 @@ def main():
 
             processed.append(news_item)
 
-        # ----------------------------------------------------
-        # 排序并限制数量
-        # ----------------------------------------------------
+        processed_by_channel[channel] = sort_channel_news(
+            channel,
+            processed
+        )
+
+    # --------------------------------------------------------
+    # 只对最终展示范围内的新闻选择 AI 候选
+    # 每条新闻只会进入一次候选队列
+    # --------------------------------------------------------
+
+    candidate_map = {}
+
+    for channel in [
+        "global",
+        "asia",
+        "china",
+        "earnings"
+    ]:
+        limit = CHANNEL_LIMITS[channel]
+
+        for item in processed_by_channel[channel][:limit]:
+            key = item["_cache_key"]
+
+            if key in cache:
+                continue
+
+            if key not in candidate_map:
+                candidate_map[key] = item
+
+    candidates = list(candidate_map.values())
+
+    # 优先分析美联储会议、万亿美元科技公司财报
+    def ai_priority(item):
+        score = item.get("_importance", 0)
+
+        if item.get("_fed_meeting"):
+            score += 100
+
+        if item.get("_mega_cap_earnings"):
+            score += 80
+
+        return score
+
+    candidates.sort(
+        key=ai_priority,
+        reverse=True
+    )
+
+    candidates = candidates[:MAX_AI_CALLS_PER_RUN]
+
+    print(
+        f"🧠 本轮 AI 最多分析 {MAX_AI_CALLS_PER_RUN} 条，"
+        f"实际候选 {len(candidates)} 条"
+    )
+
+    # --------------------------------------------------------
+    # 调用 AI
+    # --------------------------------------------------------
+
+    for number, item in enumerate(candidates, 1):
+        key = item["_cache_key"]
+
+        print(
+            f"🧠 AI 分析 {number}/{len(candidates)}："
+            f"{item.get('title', '')[:70]}"
+        )
+
+        result["aiStats"]["attempts"] += 1
+
+        ai_data, ai_msg = call_deepseek_ai(item)
+
+        if ai_data:
+            cache[key] = ai_data
+            result["aiStats"]["successes"] += 1
+
+        else:
+            print(ai_msg or "AI 分析失败")
+
+        time.sleep(0.5)
+
+    # --------------------------------------------------------
+    # 将 AI 结果回填所有板块
+    # --------------------------------------------------------
+
+    for channel in [
+        "global",
+        "asia",
+        "china",
+        "earnings"
+    ]:
+        processed = processed_by_channel[channel]
+
+        # 按优先级重新排序
+        for item in processed:
+            key = item["_cache_key"]
+            ai_data = cache.get(key)
+
+            if ai_data:
+                item["title"] = ai_data.get(
+                    "zh_title",
+                    item["title"]
+                )
+
+                item["summary"] = ai_data.get(
+                    "zh_summary",
+                    item["summary"]
+                )
+
+                item["analysis"] = ai_data.get(
+                    "analysis",
+                    ""
+                )
+
+                item["impact"] = ai_data.get(
+                    "marketImpact",
+                    ""
+                )
+
+                item["coreLogic"] = ai_data.get(
+                    "coreLogic",
+                    ""
+                )
+
+                item["risk"] = ai_data.get(
+                    "risk",
+                    ""
+                )
+
+                item["_importance"] = ai_data.get(
+                    "importance",
+                    item["_importance"]
+                )
 
         processed = sort_channel_news(
             channel,
             processed
         )
 
-        # 财报板块：符合条件的万亿美元科技公司财报最多优先占据前三
-        result[channel] = processed[
-            :CHANNEL_LIMITS[channel]
-        ]
+        selected = processed[:CHANNEL_LIMITS[channel]]
 
-        # 前端不需要内部排序字段
-        for item in result[channel]:
-
+        for item in selected:
             item.pop("_timestamp", None)
             item.pop("_fed_meeting", None)
             item.pop("_mega_cap_earnings", None)
+            item.pop("_cache_key", None)
+
+            if item.get("analysis"):
+                item.pop("ai_msg", None)
+
+        result[channel] = selected
 
     # --------------------------------------------------------
-    # 保存缓存
+    # 保存缓存文件
     # --------------------------------------------------------
 
     save_cache(cache)
 
+    # 确保市值缓存文件存在
+    if not MARKET_CAP_CACHE.exists():
+        MARKET_CAP_CACHE.write_text(
+            json.dumps(
+                FALLBACK_MEGA_CAP_COMPANIES,
+                ensure_ascii=False,
+                indent=2
+            ),
+            encoding="utf-8"
+        )
+
     # --------------------------------------------------------
-    # 写入 index.html 新闻数据
+    # 写入 index.html
     # --------------------------------------------------------
 
     if not OUTPUT_FILE.exists():
-
         raise FileNotFoundError(
             f"找不到网页文件：{OUTPUT_FILE}"
         )
@@ -1127,20 +1223,20 @@ def main():
         "<!-- NEWS_DATA_END -->"
     )
 
-    if "<!-- NEWS_DATA_START -->" in page:
-
+    if (
+        "<!-- NEWS_DATA_START -->" in page
+        and "<!-- NEWS_DATA_END -->" in page
+    ):
         new_page = re.sub(
             r"<!-- NEWS_DATA_START -->.*?<!-- NEWS_DATA_END -->",
             lambda match: injection_code,
             page,
             flags=re.S
         )
-
     else:
-
-        new_page = page.replace(
-            "</head>",
-            injection_code + "\n</head>"
+        raise RuntimeError(
+            "index.html 缺少 NEWS_DATA_START / NEWS_DATA_END 标记，"
+            "为保护原页面，已停止写入。"
         )
 
     OUTPUT_FILE.write_text(
@@ -1155,7 +1251,11 @@ def main():
     print(f"国内财经：{len(result['china'])} 条")
     print(f"核心财报：{len(result['earnings'])} 条")
     print(
-        f"AI 调用：{ai_call_count}/{MAX_AI_DAILY_CALLS}"
+        f"AI 调用：{result['aiStats']['attempts']}/"
+        f"{MAX_AI_CALLS_PER_RUN}"
+    )
+    print(
+        f"AI 成功：{result['aiStats']['successes']} 次"
     )
     print("=" * 60)
 
