@@ -1,4 +1,3 @@
-
 import os, re, json, time, html, hashlib
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -6,9 +5,6 @@ from collections import OrderedDict
 from html.parser import HTMLParser
 from urllib.parse import quote, urlparse, parse_qsl, urlencode, urlunparse
 import requests, feedparser
-from dotenv import load_dotenv
-
-load_dotenv()
 
 API_BASE_URL = 'https://api.deepseek.com'
 API_KEY = os.getenv('DEEPSEEK_API_KEY', '').strip()
@@ -1194,7 +1190,7 @@ def main():
     )
 
     print(
-        f'DeepSeek批量翻译：{calls["translation']}次；'
+        f'DeepSeek批量翻译：{calls["translation"]}次；'
         f'待翻译字段{translated_count}个，'
         f'成功{translated_ok}个'
     )
