@@ -1,10 +1,18 @@
-import os, re, json, time, html, hashlib
+import os
+import re
+import json
+import time
+import html
+import hashlib
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from collections import OrderedDict
 from html.parser import HTMLParser
-from urllib.parse import quote, urlparse, parse_qsl, urlencode, urlunparse
-import requests, feedparser
+from urllib.parse import quote, urlparse, parse_qsl, urlencode, urlunparse, unquote
+
+import requests
+import feedparser
+
 
 API_BASE_URL = 'https://api.deepseek.com'
 API_KEY = os.getenv('DEEPSEEK_API_KEY', '').strip()
@@ -31,9 +39,12 @@ CHANNEL_LIMITS = {
 CHANNELS = list(CHANNEL_LIMITS)
 
 ANALYSIS_PER_CHANNEL = 3
-MAX_ANALYSIS_CALLS = len(CHANNELS) * ANALYSIS_PER_CHANNEL
+MAX_ANALYSIS_CALLS = 9
 MAX_TRANSLATION_CALLS = 1
-MAX_TOTAL_CALLS = MAX_ANALYSIS_CALLS + MAX_TRANSLATION_CALLS
+MAX_TOTAL_CALLS = 10
+
+# 本次运行实际发送的 DeepSeek HTTP 请求次数
+DEEPSEEK_HTTP_CALLS = 0
 
 MARKET_CAP_THRESHOLD = 1_000_000_000_000
 
@@ -102,6 +113,128 @@ def clean_text(value, limit=600):
 
 def has_chinese(s):
     return bool(re.search(r'[\u4e00-\u9fff]', s or ''))
+
+
+def valid_article_url(url):
+    if not isinstance(url, str):
+        return ''
+
+    url = html.unescape(url.strip())
+
+    if not url:
+        return ''
+
+    try:
+        p = urlparse(url)
+
+        if p.scheme.lower() not in ('http', 'https'):
+            return ''
+
+        if not p.hostname:
+            return ''
+
+        return url
+
+    except Exception:
+        return ''
+
+
+def resolve_article_url(url):
+    """
+    尝试将 Google News RSS 跳转链接解析为出版商原始报道链接。
+    其他来源保留原始 URL。
+    解析失败时保留有效的 Google News 链接，避免丢失新闻。
+    """
+    original = valid_article_url(url)
+
+    if not original:
+        return ''
+
+    try:
+        parsed = urlparse(original)
+        host = (parsed.hostname or '').lower()
+
+        if not (
+            host == 'news.google.com'
+            or host.endswith('.news.google.com')
+        ):
+            return original
+
+        # 部分 Google News URL 直接包含原文地址
+        params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+
+        for key in ('url', 'u'):
+            value = params.get(key)
+
+            if value:
+                candidate = valid_article_url(unquote(value))
+
+                if candidate:
+                    candidate_host = (
+                        urlparse(candidate).hostname or ''
+                    ).lower()
+
+                    if candidate_host != 'news.google.com':
+                        return candidate
+
+        # 跟随 Google News 跳转
+        response = requests.get(
+            original,
+            headers=HEADERS,
+            timeout=15,
+            allow_redirects=True
+        )
+
+        final_url = valid_article_url(response.url)
+
+        if final_url:
+            final_host = (
+                urlparse(final_url).hostname or ''
+            ).lower()
+
+            if final_host != 'news.google.com':
+                return final_url
+
+        # 从页面 canonical / og:url 中提取出版商地址
+        page = response.text or ''
+
+        patterns = [
+            r'<link[^>]+rel=["\']canonical["\'][^>]+href=["\']([^"\']+)',
+            r'<link[^>]+href=["\']([^"\']+)["\'][^>]+rel=["\']canonical["\']',
+            r'<meta[^>]+property=["\']og:url["\'][^>]+content=["\']([^"\']+)',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:url["\']'
+        ]
+
+        for pattern in patterns:
+            match = re.search(
+                pattern,
+                page,
+                re.I
+            )
+
+            if not match:
+                continue
+
+            candidate = html.unescape(match.group(1).strip())
+            candidate = valid_article_url(candidate)
+
+            if not candidate:
+                continue
+
+            candidate_host = (
+                urlparse(candidate).hostname or ''
+            ).lower()
+
+            if candidate_host != 'news.google.com':
+                return candidate
+
+    except Exception as e:
+        print(
+            'Google News原文链接解析失败：'
+            + str(e)[:120]
+        )
+
+    return original
 
 
 def norm_url(url):
@@ -559,9 +692,9 @@ def fetch_all_news():
             count = 0
 
             for e in feed.entries:
-                url = (e.get('link') or '').strip()
+                raw_url = (e.get('link') or '').strip()
 
-                if not url:
+                if not raw_url:
                     continue
 
                 if (
@@ -586,6 +719,13 @@ def fetch_all_news():
                 )
 
                 if not title:
+                    continue
+
+                # 解析 Google News 跳转链接。
+                # WSJ、CNBC、BBC 等原始来源不进行改写。
+                url = resolve_article_url(raw_url)
+
+                if not url:
                     continue
 
                 nu = norm_url(url)
@@ -622,7 +762,7 @@ def fetch_all_news():
                     if 'china' in cfg['channels']
                     else (
                         src
-                        if src and 'news.google.com' in urlparse(url).netloc
+                        if src and 'news.google.com' in urlparse(raw_url).netloc
                         else cfg['source']
                     )
                 )
@@ -720,10 +860,21 @@ def cache_key(item):
 
 
 def call_deepseek(messages, max_tokens=500, timeout=70):
+    global DEEPSEEK_HTTP_CALLS
+
     if not API_KEY:
         return None, '未配置 DEEPSEEK_API_KEY'
 
+    # 真正发出 HTTP 请求之前执行硬上限检查
+    if DEEPSEEK_HTTP_CALLS >= MAX_TOTAL_CALLS:
+        return None, (
+            f'DeepSeek本次运行已达到'
+            f'{MAX_TOTAL_CALLS}次HTTP请求硬上限'
+        )
+
     try:
+        DEEPSEEK_HTTP_CALLS += 1
+
         r = requests.post(
             API_BASE_URL + '/chat/completions',
             headers={
@@ -780,7 +931,9 @@ def translate_batch(items, tcache, call_counter):
 
     if (
         not pending
+        or call_counter['translation'] >= MAX_TRANSLATION_CALLS
         or call_counter['total'] >= MAX_TOTAL_CALLS
+        or DEEPSEEK_HTTP_CALLS >= MAX_TOTAL_CALLS
     ):
         return 0, 0
 
@@ -804,14 +957,16 @@ def translate_batch(items, tcache, call_counter):
         + json.dumps(payload, ensure_ascii=False)
     )
 
-    call_counter['total'] += 1
-    call_counter['translation'] += 1
-
     data, error = call_deepseek(
         [{'role': 'user', 'content': prompt}],
         max_tokens=6000,
         timeout=100
     )
+
+    if data is not None or error:
+        if DEEPSEEK_HTTP_CALLS > 0:
+            call_counter['total'] += 1
+            call_counter['translation'] += 1
 
     translated = {}
 
@@ -874,9 +1029,15 @@ def is_valid_chinese(s):
 
 
 def main():
+    global DEEPSEEK_HTTP_CALLS
+
+    # 每次运行从0开始统计真实HTTP请求次数
+    DEEPSEEK_HTTP_CALLS = 0
+
     print('=' * 68)
     print('财经与时政焦点看板升级版开始运行')
     print('每板块Top3深度评论；跨板块同新闻去重')
+    print('DeepSeek限制：最多9次深度评论 + 1次批量翻译')
     print('=' * 68)
 
     ensure_json(CACHE_FILE, {})
@@ -962,7 +1123,9 @@ def main():
         if (
             calls['analysis'] >= MAX_ANALYSIS_CALLS
             or calls['total'] >= MAX_TOTAL_CALLS
+            or DEEPSEEK_HTTP_CALLS >= MAX_TOTAL_CALLS
         ):
+            print('已达到DeepSeek调用上限，停止后续评论')
             break
 
         print(
@@ -970,10 +1133,12 @@ def main():
             f"{item['title'][:55]}"
         )
 
-        calls['total'] += 1
-        calls['analysis'] += 1
-
         data, error = analyze_one(item)
+
+        # 只统计实际发出的HTTP请求
+        if DEEPSEEK_HTTP_CALLS > calls['total']:
+            calls['total'] += 1
+            calls['analysis'] += 1
 
         if data:
             if is_valid_chinese(data.get('zh_title')):
@@ -1082,6 +1247,9 @@ def main():
                 item.get('summary', ''),
                 420
             )
+
+            # 输出前再次检查原始报道链接
+            item['url'] = valid_article_url(item.get('url', ''))
 
             for field, limit in (
                 ('analysis', 500),
@@ -1196,8 +1364,9 @@ def main():
     )
 
     print(
-        f'DeepSeek总调用：{calls["total"]}/{MAX_TOTAL_CALLS}'
-        '（最多12条评论+1次批量翻译）'
+        f'DeepSeek实际HTTP请求：'
+        f'{DEEPSEEK_HTTP_CALLS}/{MAX_TOTAL_CALLS}'
+        '（最多9次评论+1次批量翻译）'
     )
 
     print(
