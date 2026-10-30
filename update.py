@@ -21,7 +21,7 @@ TZ = timezone(timedelta(hours=8))
 OUTPUT_FILE = "index.html"
 CACHE_FILE = "ai_cache.json"
 
-# 每天最大 AI 分析指令数（严格限制在 12 条以内）
+# 严格限定每日最大 AI 分析指令数（12条以内）
 MAX_AI_DAILY_CALLS = 12
 
 MEGA_CAP_KEYWORDS = {
@@ -46,17 +46,15 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
-# 🌟 修复：使用标准、高可用的全球、亚太、国内财经 RSS 订阅源
+# 🌟 完美对齐需求的高稳定 RSS 源配置：
+# - 全球/国际媒体为主：Reuters、CNBC、Yahoo Finance（天然覆盖国际、亚太与中国市场）
+# - 国内/亚太板块：由国际主流财经媒体的亚太/中国频道 + 港交所/高稳定国内源支撑
 FEEDS = [
-    # 国际与财报源
-    {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "earnings"]},
-    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "earnings"]},
+    {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "asia", "earnings"]},
+    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "asia", "china", "earnings"]},
     {"url": "https://www.investors.com/feed/investing/", "source": "IBD", "channels": ["earnings"]},
-    # 亚太与港股源
-    {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["asia", "china", "earnings"]},
-    # 国内财经源 (使用标准 XML/RSS 接口)
-    {"url": "https://finance.sina.com.cn/rollnews/rss.xml", "source": "新浪财经", "channels": ["china", "asia"]},
-    {"url": "https://money.163.com/special/00254VB5/rss_news.xml", "source": "网易财经", "channels": ["china", "asia"]}
+    {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["china", "asia", "earnings"]},
+    {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]}
 ]
 
 TIME_LIMIT = timedelta(hours=24)
