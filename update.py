@@ -1,1486 +1,1220 @@
 
-import os
-import re
-import json
-import time
-import html
-import hashlib
-import requests
-import feedparser
-
+import os, re, json, time, html, hashlib
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from collections import OrderedDict
 from html.parser import HTMLParser
-from pathlib import Path
 from urllib.parse import quote, urlparse, parse_qsl, urlencode, urlunparse
+import requests, feedparser
 from dotenv import load_dotenv
-
-
-# ============================================================
-# 1. 基础配置：与现有 index.html 保持兼容
-# ============================================================
 
 load_dotenv()
 
-API_BASE_URL = "https://api.deepseek.com"
-API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
-AI_MODEL = "deepseek-chat"
+API_BASE_URL = 'https://api.deepseek.com'
+API_KEY = os.getenv('DEEPSEEK_API_KEY', '').strip()
+AI_MODEL = 'deepseek-chat'
 
 TZ = timezone(timedelta(hours=8))
 UTC = timezone.utc
-
 BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_FILE = BASE_DIR / "index.html"
-CACHE_FILE = BASE_DIR / "ai_cache.json"
-MARKET_CAP_CACHE = BASE_DIR / "market_cap_cache.json"
+
+OUTPUT_FILE = BASE_DIR / 'index.html'
+CACHE_FILE = BASE_DIR / 'ai_cache.json'
+TRANSLATION_CACHE_FILE = BASE_DIR / 'translation_cache.json'
+MARKET_CAP_CACHE = BASE_DIR / 'market_cap_cache.json'
 
 TIME_LIMIT = timedelta(hours=24)
-MAX_AI_CALLS_PER_RUN = 3
 
 CHANNEL_LIMITS = {
-    "global": 20,
-    "asia": 10,
-    "china": 10,
-    "earnings": 10
+    'global': 20,
+    'asia': 10,
+    'china': 10,
+    'earnings': 10
 }
+
+CHANNELS = list(CHANNEL_LIMITS)
+
+ANALYSIS_PER_CHANNEL = 3
+MAX_ANALYSIS_CALLS = len(CHANNELS) * ANALYSIS_PER_CHANNEL
+MAX_TRANSLATION_CALLS = 1
+MAX_TOTAL_CALLS = MAX_ANALYSIS_CALLS + MAX_TRANSLATION_CALLS
 
 MARKET_CAP_THRESHOLD = 1_000_000_000_000
 
 HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 Chrome/125.0 Safari/537.36"
-    ),
-    "Accept": "application/rss+xml, application/xml, text/xml, */*"
+    'User-Agent': 'Mozilla/5.0 (compatible; NewsDashboard/2.0)',
+    'Accept': 'application/rss+xml, application/xml, text/xml, */*'
 }
 
-CHANNELS = ["global", "asia", "china", "earnings"]
 
-
-# ============================================================
-# 2. RSS 内容清理
-# ============================================================
-
-class RSSTextParser(HTMLParser):
-    """提取 RSS HTML 中的可见文字，不保留标签和链接地址。"""
-
+class TextParser(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.parts = []
-        self.skip_depth = 0
+        self.skip = 0
 
     def handle_starttag(self, tag, attrs):
-        if tag in ("script", "style"):
-            self.skip_depth += 1
+        if tag in ('script', 'style'):
+            self.skip += 1
 
     def handle_endtag(self, tag):
-        if tag in ("script", "style") and self.skip_depth:
-            self.skip_depth -= 1
+        if tag in ('script', 'style') and self.skip:
+            self.skip -= 1
 
     def handle_data(self, data):
-        if not self.skip_depth:
+        if not self.skip:
             self.parts.append(data)
-
-    def get_text(self):
-        return " ".join(self.parts)
 
 
 def clean_text(value, limit=600):
     if value is None:
-        return ""
+        return ''
 
-    value = html.unescape(str(value))
-
-    parser = RSSTextParser()
-
-    try:
-        parser.feed(value)
-        value = parser.get_text()
-    except Exception:
-        value = re.sub(r"<[^>]*>", " ", value)
-
-    # 清除 URL、HTML 残留和常见 RSS 尾巴
-    value = re.sub(r"https?://\S+", " ", value, flags=re.I)
-    value = re.sub(r"www\.\S+", " ", value, flags=re.I)
-    value = re.sub(r"<[^>]*>", " ", value)
-    value = re.sub(r"\bRead more\b.*$", "", value, flags=re.I)
-    value = re.sub(r"\bClick here\b.*$", "", value, flags=re.I)
-    value = re.sub(r"\bSubscribe now\b.*$", "", value, flags=re.I)
-    value = re.sub(r"\bSign up for\b.*$", "", value, flags=re.I)
-    value = re.sub(r"\s+", " ", value).strip()
-
-    value = value.strip(" \t\r\n-–—|·•:：;；")
-
-    if len(value) > limit:
-        value = value[:limit].rstrip(" ，,。；;") + "…"
-
-    return value
-
-
-def has_chinese(text):
-    return bool(re.search(r"[\u4e00-\u9fff]", text or ""))
-
-
-def normalize_url(url):
-    """移除跟踪参数，保留文章路径。"""
-
-    if not url:
-        return ""
+    p = TextParser()
+    raw = html.unescape(str(value))
 
     try:
-        parsed = urlparse(url.strip())
-
-        tracking_prefixes = (
-            "utm_", "fbclid", "gclid", "ocid",
-            "cmpid", "guccounter", "guce_referrer"
-        )
-
-        query = [
-            (key, value)
-            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
-            if not key.lower().startswith(tracking_prefixes)
-            and key.lower() not in ("oc", "ved", "usg")
-        ]
-
-        return urlunparse((
-            parsed.scheme.lower(),
-            parsed.netloc.lower(),
-            parsed.path.rstrip("/"),
-            "",
-            urlencode(query),
-            ""
-        ))
-
+        p.feed(raw)
+        raw = ' '.join(p.parts)
     except Exception:
-        return url.strip()
+        raw = re.sub(r'<[^>]*>', ' ', raw)
 
+    raw = re.sub(
+        r'https?://\S+|www\.\S+',
+        ' ',
+        raw,
+        flags=re.I
+    )
 
-def article_fingerprint(title):
-    title = clean_text(title, 300).lower()
-    title = re.sub(r"[^\w\u4e00-\u9fff]+", "", title)
-    return hashlib.sha256(title.encode("utf-8")).hexdigest()
+    for pat in (
+        r'\bRead more\b.*$',
+        r'\bClick here\b.*$',
+        r'\bSubscribe now\b.*$',
+        r'\bSign up for\b.*$'
+    ):
+        raw = re.sub(pat, '', raw, flags=re.I)
 
-
-def google_news_feed(query, language="en"):
-    if language == "zh":
-        return (
-            "https://news.google.com/rss/search?q="
-            + quote(query)
-            + "&hl=zh-CN&gl=CN&ceid=CN:zh-Hans"
-        )
+    raw = re.sub(r'<[^>]*>', ' ', raw)
+    raw = re.sub(r'\s+', ' ', raw)
+    raw = raw.strip(' \t\r\n-–—|·•:：;；')
 
     return (
-        "https://news.google.com/rss/search?q="
-        + quote(query)
-        + "&hl=en-US&gl=US&ceid=US:en"
+        raw[:limit].rstrip(' ，,。；;')
+        + ('…' if len(raw) > limit else '')
     )
 
 
-# ============================================================
-# 3. 新闻源
-# ============================================================
+def has_chinese(s):
+    return bool(re.search(r'[\u4e00-\u9fff]', s or ''))
+
+
+def norm_url(url):
+    try:
+        p = urlparse((url or '').strip())
+
+        q = [
+            (k, v)
+            for k, v in parse_qsl(
+                p.query,
+                keep_blank_values=True
+            )
+            if not k.lower().startswith((
+                'utm_', 'fbclid', 'gclid', 'ocid', 'cmpid'
+            ))
+            and k.lower() not in ('oc', 'ved', 'usg')
+        ]
+
+        return urlunparse((
+            p.scheme.lower(),
+            p.netloc.lower(),
+            p.path.rstrip('/'),
+            '',
+            urlencode(q),
+            ''
+        ))
+
+    except Exception:
+        return (url or '').strip()
+
+
+def fingerprint(title):
+    text = re.sub(
+        r'[^\w\u4e00-\u9fff]+',
+        '',
+        clean_text(title, 300).lower()
+    )
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def gnews(q, zh=False):
+    return (
+        'https://news.google.com/rss/search?q='
+        + quote(q)
+        + (
+            '&hl=zh-CN&gl=CN&ceid=CN:zh-Hans'
+            if zh
+            else '&hl=en-US&gl=US&ceid=US:en'
+        )
+    )
+
 
 FEEDS = [
-
-    # 国际财经
     {
-        "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
-        "source": "CNBC",
-        "channels": ["global"]
+        'url': 'https://www.cnbc.com/id/100003114/device/rss/rss.html',
+        'source': 'CNBC',
+        'channels': ['global']
     },
     {
-        "url": "https://feeds.bbci.co.uk/news/business/rss.xml",
-        "source": "BBC Business",
-        "channels": ["global"]
+        'url': 'https://feeds.bbci.co.uk/news/business/rss.xml',
+        'source': 'BBC Business',
+        'channels': ['global']
     },
     {
-        "url": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
-        "source": "WSJ Markets",
-        "channels": ["global", "earnings"]
+        'url': 'https://feeds.content.dowjones.io/public/rss/RSSMarketsMain',
+        'source': 'WSJ Markets',
+        'channels': ['global', 'earnings']
     },
     {
-        "url": google_news_feed("Reuters world business economy markets"),
-        "source": "Reuters",
-        "channels": ["global"]
+        'url': gnews('Reuters world business economy markets'),
+        'source': 'Reuters',
+        'channels': ['global']
     },
     {
-        "url": google_news_feed("Bloomberg global finance economy markets"),
-        "source": "Bloomberg",
-        "channels": ["global"]
+        'url': gnews('Bloomberg global finance economy markets'),
+        'source': 'Bloomberg',
+        'channels': ['global']
     },
     {
-        "url": google_news_feed(
-            '"Federal Reserve" OR FOMC meeting rate decision'
+        'url': gnews('"Federal Reserve" OR FOMC meeting rate decision'),
+        'source': '美联储会议报道',
+        'channels': ['global']
+    },
+    {
+        'url': 'https://feeds.bbci.co.uk/news/world/asia/rss.xml',
+        'source': 'BBC Asia',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511',
+        'source': 'CNA Asia',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936',
+        'source': 'CNA Business',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://feeds.feedburner.com/rsscna/politics',
+        'source': '台湾中央社政治',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://feeds.feedburner.com/rsscna/intworld',
+        'source': '台湾中央社国际',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://feeds.feedburner.com/rsscna/finance',
+        'source': '台湾中央社财经',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://feeds.feedburner.com/rsscna/technology',
+        'source': '台湾中央社科技',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://www3.nhk.or.jp/rj/podcast/rss/english.xml',
+        'source': 'NHK World',
+        'channels': ['asia']
+    },
+    {
+        'url': 'https://www.scmp.com/rss/91/feed',
+        'source': '南华早报',
+        'channels': ['asia']
+    },
+    {
+        'url': gnews(
+            '(site:asia.nikkei.com OR site:japantimes.co.jp OR '
+            'site:english.kyodonews.net) Japan politics economy business'
         ),
-        "source": "美联储会议报道",
-        "channels": ["global"]
-    },
-
-    # 亚太时政财经
-    {
-        "url": "https://feeds.bbci.co.uk/news/world/asia/rss.xml",
-        "source": "BBC Asia",
-        "channels": ["asia"]
+        'source': '日本主流媒体',
+        'channels': ['asia']
     },
     {
-        "url": "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511",
-        "source": "CNA Asia",
-        "channels": ["asia"]
-    },
-    {
-        "url": "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6936",
-        "source": "CNA Business",
-        "channels": ["asia"]
-    },
-    {
-        "url": "https://feeds.feedburner.com/rsscna/politics",
-        "source": "台湾中央社政治",
-        "channels": ["asia"]
-    },
-    {
-        "url": "https://feeds.feedburner.com/rsscna/intworld",
-        "source": "台湾中央社国际",
-        "channels": ["asia"]
-    },
-    {
-        "url": "https://feeds.feedburner.com/rsscna/finance",
-        "source": "台湾中央社财经",
-        "channels": ["asia"]
-    },
-    {
-        "url": "https://feeds.feedburner.com/rsscna/technology",
-        "source": "台湾中央社科技",
-        "channels": ["asia"]
-    },
-    {
-        "url": "https://www3.nhk.or.jp/rj/podcast/rss/english.xml",
-        "source": "NHK World",
-        "channels": ["asia"]
-    },
-    {
-        "url": "https://www.scmp.com/rss/91/feed",
-        "source": "南华早报",
-        "channels": ["asia"]
-    },
-    {
-        "url": google_news_feed(
-            '(site:asia.nikkei.com OR site:japantimes.co.jp '
-            'OR site:english.kyodonews.net) '
-            'Japan politics economy business'
-        ),
-        "source": "日本主流媒体",
-        "channels": ["asia"]
-    },
-    {
-        "url": google_news_feed(
+        'url': gnews(
             '(site:scmp.com OR site:hongkongfp.com) '
             'Hong Kong politics economy business'
         ),
-        "source": "香港主流媒体",
-        "channels": ["asia"]
+        'source': '香港主流媒体',
+        'channels': ['asia']
     },
     {
-        "url": google_news_feed(
+        'url': gnews(
             '(site:koreaherald.com OR site:koreatimes.co.kr) '
             'South Korea politics economy business'
         ),
-        "source": "韩国主流媒体",
-        "channels": ["asia"]
+        'source': '韩国主流媒体',
+        'channels': ['asia']
     },
     {
-        "url": google_news_feed(
+        'url': gnews(
             '(site:channelnewsasia.com OR site:straitstimes.com) '
             'Southeast Asia politics economy'
         ),
-        "source": "东南亚主流媒体",
-        "channels": ["asia"]
+        'source': '东南亚主流媒体',
+        'channels': ['asia']
     },
-
-    # 国内财经：只接受明确指定的大陆财经媒体
     {
-        "url": google_news_feed(
-            "site:caixin.com 中国财经 经济 金融",
-            "zh"
+        'url': gnews('site:caixin.com 中国财经 经济 金融', True),
+        'source': '财新网',
+        'channels': ['china'],
+        'domains': ['caixin.com'],
+        'names': ['财新', 'caixin']
+    },
+    {
+        'url': gnews('site:yicai.com 中国财经 A股 经济', True),
+        'source': '第一财经',
+        'channels': ['china'],
+        'domains': ['yicai.com'],
+        'names': ['第一财经', 'yicai']
+    },
+    {
+        'url': gnews('site:21jingji.com 中国财经 经济 金融', True),
+        'source': '21世纪经济报道',
+        'channels': ['china'],
+        'domains': ['21jingji.com'],
+        'names': ['21世纪经济报道', '21jingji']
+    },
+    {
+        'url': gnews('site:nbd.com.cn 中国财经 A股 公司', True),
+        'source': '每日经济新闻',
+        'channels': ['china'],
+        'domains': ['nbd.com.cn'],
+        'names': ['每日经济新闻', 'nbd']
+    },
+    {
+        'url': gnews('site:finance.sina.com.cn A股 中国经济', True),
+        'source': '新浪财经',
+        'channels': ['china'],
+        'domains': ['sina.com.cn'],
+        'names': ['新浪财经', '新浪']
+    },
+    {
+        'url': gnews('site:wallstreetcn.com 中国经济 A股 财经', True),
+        'source': '华尔街见闻',
+        'channels': ['china'],
+        'domains': ['wallstreetcn.com'],
+        'names': ['华尔街见闻', 'wallstreetcn']
+    },
+    {
+        'url': 'https://www.investors.com/feed/investing/',
+        'source': 'Investor’s Business Daily',
+        'channels': ['earnings']
+    },
+    {
+        'url': gnews(
+            'technology company earnings quarterly results revenue profit'
         ),
-        "source": "财新网",
-        "channels": ["china"],
-        "allowed_domains": ["caixin.com"],
-        "allowed_names": ["财新", "caixin"]
-    },
-    {
-        "url": google_news_feed(
-            "site:yicai.com 中国财经 A股 经济",
-            "zh"
-        ),
-        "source": "第一财经",
-        "channels": ["china"],
-        "allowed_domains": ["yicai.com"],
-        "allowed_names": ["第一财经", "yicai"]
-    },
-    {
-        "url": google_news_feed(
-            "site:21jingji.com 中国财经 经济 金融",
-            "zh"
-        ),
-        "source": "21世纪经济报道",
-        "channels": ["china"],
-        "allowed_domains": ["21jingji.com"],
-        "allowed_names": ["21世纪经济报道", "21jingji"]
-    },
-    {
-        "url": google_news_feed(
-            "site:nbd.com.cn 中国财经 A股 公司",
-            "zh"
-        ),
-        "source": "每日经济新闻",
-        "channels": ["china"],
-        "allowed_domains": ["nbd.com.cn"],
-        "allowed_names": ["每日经济新闻", "nbd"]
-    },
-    {
-        "url": google_news_feed(
-            "site:finance.sina.com.cn A股 中国经济",
-            "zh"
-        ),
-        "source": "新浪财经",
-        "channels": ["china"],
-        "allowed_domains": ["sina.com.cn"],
-        "allowed_names": ["新浪财经", "新浪"]
-    },
-    {
-        "url": google_news_feed(
-            "site:wallstreetcn.com 中国经济 A股 财经",
-            "zh"
-        ),
-        "source": "华尔街见闻",
-        "channels": ["china"],
-        "allowed_domains": ["wallstreetcn.com"],
-        "allowed_names": ["华尔街见闻", "wallstreetcn"]
-    },
-
-    # 核心财报
-    {
-        "url": "https://www.investors.com/feed/investing/",
-        "source": "Investor's Business Daily",
-        "channels": ["earnings"]
-    },
-    {
-        "url": google_news_feed(
-            "technology company earnings quarterly results revenue profit"
-        ),
-        "source": "全球科技企业财报",
-        "channels": ["earnings"]
+        'source': '全球科技企业财报',
+        'channels': ['earnings']
     }
 ]
 
 
-# ============================================================
-# 4. 国内新闻来源核验
-# ============================================================
+EARNINGS_TERMS = (
+    'earnings', 'earning', 'profit', 'quarter', 'quarterly',
+    'results', 'guidance', 'revenue', 'financial results',
+    'net income', 'fiscal', '财报', '业绩', '季度', '指引',
+    '营收', '净利润', '盈利', '财务报告'
+)
 
-def china_source_is_allowed(entry, config):
-    allowed_domains = config.get("allowed_domains", [])
-    allowed_names = config.get("allowed_names", [])
-
-    link = entry.get("link", "")
-    source_info = entry.get("source", {}) or {}
-
-    source_href = source_info.get("href", "")
-    source_title = clean_text(source_info.get("title", ""), 100).lower()
-
-    for candidate in (link, source_href):
-        host = urlparse(candidate).netloc.lower()
-
-        for domain in allowed_domains:
-            if host == domain or host.endswith("." + domain):
-                return True
-
-    # Google News 链接本身是 news.google.com，
-    # 此时只能依据其 RSS source.title 核验来源。
-    for name in allowed_names:
-        if name.lower() in source_title:
-            return True
-
-    return False
+FED_TERMS = (
+    'fomc meeting', 'federal reserve meeting', 'fed meeting',
+    'fed rate decision', 'fomc decision', 'fomc statement',
+    'fed policy decision', 'federal reserve policy',
+    'fed interest rate decision', '美联储会议',
+    '美联储利率决议', '美联储议息会议', '美联储政策会议',
+    'fomc会议', '联邦公开市场委员会会议'
+)
 
 
-# ============================================================
-# 5. 新闻关键词与优先级
-# ============================================================
-
-EARNINGS_KEYWORDS = {
-    "earnings", "earning", "profit", "quarter",
-    "quarterly", "results", "guidance", "revenue",
-    "financial results", "net income", "fiscal",
-    "财报", "业绩", "季度", "指引", "营收",
-    "净利润", "盈利", "财务报告"
-}
-
-FED_MEETING_KEYWORDS = {
-    "fomc meeting",
-    "federal reserve meeting",
-    "fed meeting",
-    "fed rate decision",
-    "fomc decision",
-    "fomc statement",
-    "fed policy decision",
-    "federal reserve policy",
-    "fed interest rate decision",
-    "美联储会议",
-    "美联储利率决议",
-    "美联储议息会议",
-    "美联储政策会议",
-    "fomc会议",
-    "联邦公开市场委员会会议"
-}
+def is_earnings(s):
+    return any(x in (s or '').lower() for x in EARNINGS_TERMS)
 
 
-def is_earnings_news(text):
-    text = (text or "").lower()
-    return any(k in text for k in EARNINGS_KEYWORDS)
+def is_fed(s):
+    return any(x in (s or '').lower() for x in FED_TERMS)
 
 
-def is_fed_meeting_news(text):
-    text = (text or "").lower()
-    return any(k in text for k in FED_MEETING_KEYWORDS)
-
-
-# ============================================================
-# 6. 动态市值名单
-# ============================================================
-
-def load_market_cap_cache():
-    """
-    只接受带有动态更新时间标记的缓存。
-    旧版静态备用名单不视为已经核实的当前市值。
-    """
-
-    if not MARKET_CAP_CACHE.exists():
-        return {}
-
-    try:
-        data = json.loads(
-            MARKET_CAP_CACHE.read_text(encoding="utf-8")
+def ensure_json(path, default):
+    if not path.exists():
+        path.write_text(
+            json.dumps(default, ensure_ascii=False, indent=2),
+            encoding='utf-8'
         )
 
-        if isinstance(data, dict) and data.get("_dynamic") is True:
-            companies = data.get("companies", {})
-            if isinstance(companies, dict):
-                return companies
 
-    except Exception as e:
-        print(f"⚠️ 市值缓存读取失败：{e}")
-
-    return {}
+def read_json(path, default):
+    try:
+        value = json.loads(path.read_text(encoding='utf-8'))
+        return value if isinstance(value, dict) else default
+    except Exception:
+        return default
 
 
-def refresh_mega_cap_companies():
-    companies = {}
+def write_json(path, data):
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding='utf-8'
+    )
+
+
+def refresh_market_caps():
+    ensure_json(
+        MARKET_CAP_CACHE,
+        {'_dynamic': False, 'companies': {}}
+    )
 
     try:
         url = (
-            "https://companiesmarketcap.com/tech/"
-            "largest-tech-companies-by-market-cap/"
+            'https://companiesmarketcap.com/tech/'
+            'largest-tech-companies-by-market-cap/'
         )
 
-        response = requests.get(
-            url,
-            headers=HEADERS,
-            timeout=20
-        )
-        response.raise_for_status()
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        r.raise_for_status()
 
+        found = {}
         rows = re.findall(
-            r"<tr[^>]*>(.*?)</tr>",
-            response.text,
-            flags=re.S | re.I
+            r'<tr[^>]*>(.*?)</tr>',
+            r.text,
+            re.S | re.I
         )
 
         for row in rows:
-            name_match = re.search(
+            nm = re.search(
                 r'<div class="company-name">\s*([^<]+)',
                 row,
-                flags=re.I
+                re.I
             )
-
-            symbol_match = re.search(
+            sm = re.search(
                 r'<div class="company-code">\s*([^<]+)',
                 row,
-                flags=re.I
+                re.I
             )
-
-            if not name_match:
-                continue
-
-            # 优先读取标注为 market cap 的单元格，
-            # 不再把整行第一个金额误当成市值。
-            cap_match = re.search(
-                r'<td[^>]*(?:data-label=["\']Market Cap["\']|class=["\'][^"\']*market-cap[^"\']*["\'])[^>]*>'
-                r'(.*?)</td>',
+            cm = re.search(
+                r'<td[^>]*(?:data-label=["\']Market Cap["\']|'
+                r'class=["\'][^"\']*market-cap[^"\']*["\'])'
+                r'[^>]*>(.*?)</td>',
                 row,
-                flags=re.S | re.I
+                re.S | re.I
             )
 
-            if not cap_match:
+            if not nm or not cm:
                 continue
 
-            cap_text = clean_text(cap_match.group(1), 100)
-            value_match = re.search(
-                r"\$?\s*([\d,.]+)\s*(T|B|M)\b",
-                cap_text,
-                flags=re.I
+            vm = re.search(
+                r'\$?\s*([\d,.]+)\s*(T|B|M)\b',
+                clean_text(cm.group(1), 100),
+                re.I
             )
 
-            if not value_match:
+            if not vm:
                 continue
 
-            value = float(value_match.group(1).replace(",", ""))
-            unit = value_match.group(2).upper()
+            mult = {
+                'T': 1e12,
+                'B': 1e9,
+                'M': 1e6
+            }[vm.group(2).upper()]
 
-            multiplier = {
-                "T": 1_000_000_000_000,
-                "B": 1_000_000_000,
-                "M": 1_000_000
-            }[unit]
+            value = float(vm.group(1).replace(',', '')) * mult
 
-            market_cap = value * multiplier
-
-            if market_cap < MARKET_CAP_THRESHOLD:
+            if value < MARKET_CAP_THRESHOLD:
                 continue
 
-            name = clean_text(
-                html.unescape(name_match.group(1)),
-                100
-            )
-
-            symbol = (
-                clean_text(symbol_match.group(1), 30)
-                if symbol_match else ""
-            )
-
+            name = clean_text(nm.group(1), 100)
             aliases = [name.lower()]
 
-            if symbol:
-                aliases.append(symbol.lower())
+            if sm:
+                aliases.append(
+                    clean_text(sm.group(1), 30).lower()
+                )
 
-            companies[name] = aliases
+            found[name] = aliases
 
-        if companies:
-            data = {
-                "_dynamic": True,
-                "updated_at": datetime.now(TZ).isoformat(),
-                "companies": companies
-            }
-
-            MARKET_CAP_CACHE.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2),
-                encoding="utf-8"
-            )
+        if found:
+            write_json(MARKET_CAP_CACHE, {
+                '_dynamic': True,
+                'updated_at': datetime.now(TZ).isoformat(),
+                'companies': found
+            })
 
             print(
-                f"✅ 动态市值名单更新成功：{len(companies)} 家"
+                f'动态市值名单更新：{len(found)} 家科技公司'
+                '市值超过1万亿美元'
             )
+            return found
 
-            return companies
-
-        print("⚠️ 市值页面没有解析出可核实的市值数据")
+        print('市值网页未解析到有效数据，尝试使用上次动态缓存')
 
     except Exception as e:
-        print(f"⚠️ 市值名单刷新失败：{e}")
+        print('市值刷新失败：' + str(e)[:180])
 
-    cached = load_market_cap_cache()
+    old = read_json(MARKET_CAP_CACHE, {})
 
-    if cached:
-        print("ℹ️ 使用上次成功核验的动态市值名单")
-        return cached
+    if old.get('_dynamic') is True:
+        return old.get('companies', {})
 
-    print("⚠️ 暂无可核实的万亿美元公司名单，本轮不授予财报优先资格")
     return {}
 
 
-# 每次运行前确保文件存在，避免 workflow git add 报错
-if not MARKET_CAP_CACHE.exists():
-    MARKET_CAP_CACHE.write_text(
-        json.dumps(
-            {
-                "_dynamic": False,
-                "companies": {}
-            },
-            ensure_ascii=False,
-            indent=2
-        ),
-        encoding="utf-8"
-    )
-
-MEGA_CAP_COMPANIES = refresh_mega_cap_companies()
+MEGA_CAP_COMPANIES = refresh_market_caps()
 
 
-def find_mega_cap_company(text):
-    text = (text or "").lower()
+def find_mega(text):
+    s = (text or '').lower()
 
-    for company, aliases in MEGA_CAP_COMPANIES.items():
+    for name, aliases in MEGA_CAP_COMPANIES.items():
         for alias in aliases:
-            alias = alias.lower().strip()
+            alias = (alias or '').lower().strip()
 
             if not alias:
                 continue
 
-            # 股票代码及英文简称按完整单词匹配
-            if re.fullmatch(r"[a-z0-9.]+", alias):
-                pattern = (
-                    r"(?<![a-z0-9])"
+            if re.fullmatch(r'[a-z0-9.]+', alias):
+                if re.search(
+                    r'(?<![a-z0-9])'
                     + re.escape(alias)
-                    + r"(?![a-z0-9])"
-                )
-
-                if re.search(pattern, text):
-                    return company
-
-            elif alias in text:
-                return company
+                    + r'(?![a-z0-9])',
+                    s
+                ):
+                    return name
+            elif alias in s:
+                return name
 
     return None
 
 
-def is_eligible_mega_cap_earnings(entry):
-    text = (
-        entry.get("title", "")
-        + " "
-        + entry.get("summary", "")
+def entry_time(e):
+    t = e.get('published_parsed') or e.get('updated_parsed')
+
+    try:
+        return datetime(*t[:6], tzinfo=UTC) if t else None
+    except Exception:
+        return None
+
+
+def china_allowed(e, cfg):
+    info = e.get('source') or {}
+    source_title = clean_text(
+        info.get('title', ''),
+        100
+    ).lower()
+
+    for url in (e.get('link', ''), info.get('href', '')):
+        host = urlparse(url).netloc.lower()
+
+        if any(
+            host == domain or host.endswith('.' + domain)
+            for domain in cfg.get('domains', [])
+        ):
+            return True
+
+    return any(
+        name.lower() in source_title
+        for name in cfg.get('names', [])
     )
 
-    return bool(
-        find_mega_cap_company(text)
-        and is_earnings_news(text)
-    )
 
-
-def get_importance_weight(entry, channels):
-    text = entry.get("title", "") + " " + entry.get("summary", "")
-
+def importance(item):
+    s = item['title'] + ' ' + item['summary']
     score = 50
 
-    if "earnings" in channels and is_earnings_news(text):
+    if is_earnings(s):
         score += 15
 
-    if find_mega_cap_company(text):
+    if find_mega(s):
         score += 20
 
-    if is_fed_meeting_news(text):
+    if is_fed(s):
         score += 50
 
     return min(score, 100)
 
 
-# ============================================================
-# 7. 时间处理与新闻抓取
-# ============================================================
-
-def parse_entry_time(entry):
-    parsed = (
-        entry.get("published_parsed")
-        or entry.get("updated_parsed")
-    )
-
-    if not parsed:
-        return None
-
-    try:
-        return datetime(*parsed[:6], tzinfo=UTC)
-    except Exception:
-        return None
-
-
 def fetch_all_news():
     now = datetime.now(UTC)
+    by_url = {}
+    by_title = {}
 
-    # URL 去重 + 标题去重；同一篇文章合并板块归属
-    news_by_url = {}
-    title_to_url = {}
-
-    for config in FEEDS:
-        source_name = config["source"]
-
+    for cfg in FEEDS:
         try:
-            response = requests.get(
-                config["url"],
+            resp = requests.get(
+                cfg['url'],
                 headers=HEADERS,
                 timeout=20
             )
-            response.raise_for_status()
+            resp.raise_for_status()
 
-            feed = feedparser.parse(response.content)
+            feed = feedparser.parse(resp.content)
+            count = 0
 
-            if not feed.entries:
-                print(f"⚠️ 新闻源无内容：{source_name}")
-                continue
-
-            feed_count = 0
-
-            for entry in feed.entries:
-                url = entry.get("link", "").strip()
+            for e in feed.entries:
+                url = (e.get('link') or '').strip()
 
                 if not url:
                     continue
 
-                # 国内板块必须通过来源核验
-                if "china" in config["channels"]:
-                    if not china_source_is_allowed(entry, config):
-                        continue
-
-                published = parse_entry_time(entry)
-
-                # 不接受没有明确发布时间的新闻
-                if not published:
+                if (
+                    'china' in cfg['channels']
+                    and not china_allowed(e, cfg)
+                ):
                     continue
 
-                age = now - published
+                pub = entry_time(e)
 
-                if age > TIME_LIMIT:
+                if (
+                    not pub
+                    or now - pub > TIME_LIMIT
+                    or pub - now > timedelta(minutes=30)
+                ):
                     continue
 
-                if age < timedelta(minutes=-30):
-                    continue
-
-                title = clean_text(entry.get("title", ""), 220)
+                title = clean_text(e.get('title', ''), 220)
                 summary = clean_text(
-                    entry.get("summary", "")
-                    or entry.get("description", ""),
+                    e.get('summary') or e.get('description', ''),
                     700
                 )
 
                 if not title:
                     continue
 
-                normalized_url = normalize_url(url)
-                fingerprint = article_fingerprint(title)
+                nu = norm_url(url)
+                fp = fingerprint(title)
 
-                existing_key = normalized_url
+                key = (
+                    nu
+                    if nu in by_url
+                    else by_title.get(fp, nu)
+                )
 
-                # 同标题不同跟踪链接也尽量合并
-                if existing_key not in news_by_url:
-                    existing_key = title_to_url.get(fingerprint, normalized_url)
+                if key in by_url:
+                    old = by_url[key]
 
-                if existing_key in news_by_url:
-                    old = news_by_url[existing_key]
-
-                    old["channels"] = sorted(
-                        set(old["channels"] + config["channels"])
+                    old['channels'] = sorted(
+                        set(old['channels'] + cfg['channels'])
                     )
 
-                    if len(summary) > len(old["summary"]):
-                        old["summary"] = summary
+                    if len(summary) > len(old['summary']):
+                        old['summary'] = summary
 
-                    # 优先保留更完整的来源名称
-                    if old["source"] in ("Google News", ""):
-                        old["source"] = source_name
+                    if old['source'] in ('Google News', ''):
+                        old['source'] = cfg['source']
 
                     continue
 
-                source_info = entry.get("source", {}) or {}
-                actual_source = clean_text(
-                    source_info.get("title", ""),
+                src = clean_text(
+                    (e.get('source') or {}).get('title', ''),
                     80
                 )
 
-                # 国内新闻来源已经核验，显示指定媒体名
-                if "china" in config["channels"]:
-                    display_source = source_name
-                elif actual_source and "news.google.com" in urlparse(url).netloc:
-                    display_source = actual_source
-                else:
-                    display_source = source_name
+                display = (
+                    cfg['source']
+                    if 'china' in cfg['channels']
+                    else (
+                        src
+                        if src and 'news.google.com' in urlparse(url).netloc
+                        else cfg['source']
+                    )
+                )
 
                 item = {
-                    "source": display_source,
-                    "url": url,
-                    "publishedAt": published.astimezone(TZ).strftime(
-                        "%Y-%m-%d %H:%M"
+                    'source': display,
+                    'url': url,
+                    'publishedAt': pub.astimezone(TZ).strftime(
+                        '%Y-%m-%d %H:%M'
                     ),
-                    "title": title,
-                    "summary": summary,
-                    "channels": list(config["channels"]),
-                    "_timestamp": int(published.timestamp())
+                    'title': title,
+                    'summary': summary,
+                    'channels': list(cfg['channels']),
+                    '_timestamp': int(pub.timestamp())
                 }
 
-                item["_importance"] = get_importance_weight(
-                    item,
-                    item["channels"]
+                item['_importance'] = importance(item)
+
+                item['_fed_meeting'] = (
+                    'global' in item['channels']
+                    and is_fed(title + ' ' + summary)
                 )
 
-                item["_fed_meeting"] = (
-                    "global" in item["channels"]
-                    and is_fed_meeting_news(title + " " + summary)
+                item['_mega_cap_earnings'] = (
+                    'earnings' in item['channels']
+                    and bool(find_mega(title + ' ' + summary))
+                    and is_earnings(title + ' ' + summary)
                 )
 
-                item["_mega_cap_earnings"] = (
-                    "earnings" in item["channels"]
-                    and is_eligible_mega_cap_earnings(item)
-                )
+                by_url[nu] = item
+                by_title[fp] = nu
+                count += 1
 
-                news_by_url[normalized_url] = item
-                title_to_url[fingerprint] = normalized_url
-
-                feed_count += 1
-
-            print(f"✅ {source_name}：有效 {feed_count} 条")
+            print(f"{cfg['source']}：{count} 条")
 
         except Exception as e:
-            print(f"⚠️ 新闻源失败 {source_name}：{e}")
+            print(
+                f"新闻源失败 {cfg['source']}："
+                f"{str(e)[:160]}"
+            )
 
-    news = list(news_by_url.values())
+    out = list(by_url.values())
 
-    news.sort(
+    out.sort(
         key=lambda x: (
-            x["_importance"],
-            x["_timestamp"]
+            x['_importance'],
+            x['_timestamp']
         ),
         reverse=True
     )
 
-    print(f"📊 去重合并后新闻：{len(news)} 条")
-    return news
+    print(f'去重后新闻：{len(out)} 条')
+    return out
 
 
-# ============================================================
-# 8. AI 缓存与中文翻译缓存
-# ============================================================
-
-def load_cache():
-    if not CACHE_FILE.exists():
-        return OrderedDict()
-
-    try:
-        data = json.loads(
-            CACHE_FILE.read_text(encoding="utf-8"),
-            object_pairs_hook=OrderedDict
-        )
-
-        if isinstance(data, dict):
-            return data
-
-    except Exception as e:
-        print(f"⚠️ AI 缓存读取失败：{e}")
-
-    return OrderedDict()
-
-
-def save_cache(cache):
-    # 兼容原有缓存格式，保留最近1200条
-    trimmed = OrderedDict(list(cache.items())[-1200:])
-
-    CACHE_FILE.write_text(
-        json.dumps(
-            trimmed,
-            ensure_ascii=False,
-            indent=2
+def sort_channel(ch, items):
+    items = sorted(
+        items,
+        key=lambda x: (
+            x.get('_importance', 0),
+            x.get('_timestamp', 0)
         ),
-        encoding="utf-8"
+        reverse=True
     )
 
-
-def make_cache_key(entry):
-    # 不加入频道，同一文章跨频道共用缓存
-    raw = normalize_url(entry.get("url", ""))
-
-    if not raw:
-        raw = (
-            entry.get("source", "")
-            + "|"
-            + entry.get("title", "")
+    if ch == 'global':
+        return (
+            [x for x in items if x.get('_fed_meeting')]
+            + [x for x in items if not x.get('_fed_meeting')]
         )
 
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    if ch == 'earnings':
+        priority = [
+            x for x in items
+            if x.get('_mega_cap_earnings')
+        ]
+
+        others = [
+            x for x in items
+            if not x.get('_mega_cap_earnings')
+        ]
+
+        return priority[:3] + others + priority[3:]
+
+    return items
 
 
-def translation_cache_key(text):
-    digest = hashlib.sha256(
-        text.encode("utf-8")
-    ).hexdigest()
+def cache_key(item):
+    value = (
+        norm_url(item.get('url', ''))
+        or item.get('source', '') + '|' + item.get('title', '')
+    )
 
-    return "translation:" + digest
-
-
-def translate_to_chinese(text, cache):
-    """
-    中文翻译与 DeepSeek 深度分析分离。
-    普通新闻也会翻译，不受每轮 DeepSeek 3 次限制。
-    """
-
-    text = clean_text(text, 700)
-
-    if not text:
-        return ""
-
-    if has_chinese(text):
-        # 已经有中文的内容不重复翻译
-        return text
-
-    key = translation_cache_key(text)
-
-    if cache.get(key):
-        return cache[key]
-
-    try:
-        response = requests.get(
-            "https://translate.googleapis.com/translate_a/single",
-            params={
-                "client": "gtx",
-                "sl": "auto",
-                "tl": "zh-CN",
-                "dt": "t",
-                "q": text
-            },
-            headers=HEADERS,
-            timeout=15
-        )
-
-        response.raise_for_status()
-        data = response.json()
-
-        translated = "".join(
-            part[0]
-            for part in data[0]
-            if part and part[0]
-        )
-
-        translated = clean_text(translated, 700)
-
-        if translated and has_chinese(translated):
-            cache[key] = translated
-            return translated
-
-    except Exception as e:
-        print(f"⚠️ 中文翻译失败：{str(e)[:150]}")
-
-    # 翻译接口不可用时不伪造中文，保留干净原文
-    return text
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
-# ============================================================
-# 9. DeepSeek 深度分析：每轮最多3次
-# ============================================================
-
-def call_deepseek_ai(entry):
+def call_deepseek(messages, max_tokens=500, timeout=70):
     if not API_KEY:
-        return None, "未配置 DEEPSEEK_API_KEY"
-
-    prompt = f"""
-请分析下面这条财经、宏观或时政新闻，使用简体中文输出。
-
-标题：{entry['title']}
-摘要：{entry['summary']}
-来源：{entry['source']}
-
-要求：
-1. 准确翻译标题，不改变事实。
-2. 摘要简洁客观。
-3. 解释核心逻辑。
-4. 分析潜在市场影响。
-5. 写明风险和不确定性。
-6. 不得编造数据、事实或结论。
-7. 输出合法 JSON，不要输出 Markdown。
-
-格式：
-{{
-  "zh_title": "中文标题",
-  "zh_summary": "中文摘要",
-  "importance": 70,
-  "analysis": "100字以内的分析",
-  "coreLogic": "核心逻辑",
-  "marketImpact": "潜在市场影响",
-  "risk": "风险提示"
-}}
-"""
+        return None, '未配置 DEEPSEEK_API_KEY'
 
     try:
-        response = requests.post(
-            API_BASE_URL + "/chat/completions",
+        r = requests.post(
+            API_BASE_URL + '/chat/completions',
             headers={
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + API_KEY
+                'Authorization': 'Bearer ' + API_KEY,
+                'Content-Type': 'application/json'
             },
             json={
-                "model": AI_MODEL,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.1,
-                "max_tokens": 700,
-                "response_format": {"type": "json_object"}
+                'model': AI_MODEL,
+                'messages': messages,
+                'temperature': 0.1,
+                'max_tokens': max_tokens,
+                'response_format': {'type': 'json_object'}
             },
-            timeout=45
+            timeout=timeout
         )
 
-        response.raise_for_status()
+        r.raise_for_status()
 
-        content = response.json()["choices"][0]["message"]["content"]
+        content = r.json()['choices'][0]['message']['content'].strip()
 
         content = re.sub(
-            r"^```(?:json)?\s*|\s*```$",
-            "",
-            content.strip(),
+            r'^```(?:json)?\s*|\s*```$',
+            '',
+            content,
             flags=re.I | re.M
         )
 
-        data = json.loads(content)
-
-        for field in (
-            "zh_title", "zh_summary", "analysis",
-            "coreLogic", "marketImpact", "risk"
-        ):
-            if not isinstance(data.get(field), str):
-                data[field] = ""
-
-        try:
-            data["importance"] = int(data.get("importance", 50))
-        except (TypeError, ValueError):
-            data["importance"] = 50
-
-        data["importance"] = max(
-            0,
-            min(100, data["importance"])
-        )
-
-        return data, None
+        return json.loads(content), None
 
     except Exception as e:
-        return None, str(e)
+        return None, str(e)[:240]
 
 
-# ============================================================
-# 10. 板块排序
-# ============================================================
+def translate_batch(items, tcache, call_counter):
+    pending = []
 
-def sort_channel_news(channel, entries):
-    if channel == "global":
-        fed = [
-            item for item in entries
-            if item.get("_fed_meeting")
-        ]
+    for item in items:
+        for field, limit in (
+            ('title', 180),
+            ('summary', 420)
+        ):
+            raw = clean_text(item.get(field, ''), limit)
 
-        others = [
-            item for item in entries
-            if not item.get("_fed_meeting")
-        ]
-
-        fed.sort(
-            key=lambda x: (
-                x.get("_importance", 0),
-                x.get("_timestamp", 0)
-            ),
-            reverse=True
-        )
-
-        others.sort(
-            key=lambda x: (
-                x.get("_importance", 0),
-                x.get("_timestamp", 0)
-            ),
-            reverse=True
-        )
-
-        return fed + others
-
-    if channel == "earnings":
-        priority = [
-            item for item in entries
-            if item.get("_mega_cap_earnings")
-        ]
-
-        others = [
-            item for item in entries
-            if not item.get("_mega_cap_earnings")
-        ]
-
-        priority.sort(
-            key=lambda x: (
-                x.get("_importance", 0),
-                x.get("_timestamp", 0)
-            ),
-            reverse=True
-        )
-
-        others.sort(
-            key=lambda x: (
-                x.get("_importance", 0),
-                x.get("_timestamp", 0)
-            ),
-            reverse=True
-        )
-
-        # 符合市值条件的科技公司财报优先进入前三
-        return priority[:3] + others + priority[3:]
-
-    return sorted(
-        entries,
-        key=lambda x: (
-            x.get("_importance", 0),
-            x.get("_timestamp", 0)
-        ),
-        reverse=True
-    )
-
-
-# ============================================================
-# 11. 构建新闻对象
-# ============================================================
-
-def build_news_item(entry, cache):
-    key = make_cache_key(entry)
-    ai_data = cache.get(key)
-
-    item = {
-        "source": entry["source"],
-        "url": entry["url"],
-        "publishedAt": entry["publishedAt"],
-        "title": entry["title"],
-        "summary": entry["summary"],
-        "_timestamp": entry["_timestamp"],
-        "_cache_key": key,
-        "_importance": entry["_importance"],
-        "_fed_meeting": entry["_fed_meeting"],
-        "_mega_cap_earnings": entry["_mega_cap_earnings"]
-    }
-
-    if ai_data:
-        item["title"] = ai_data.get("zh_title") or item["title"]
-        item["summary"] = ai_data.get("zh_summary") or item["summary"]
-        item["analysis"] = ai_data.get("analysis", "")
-        item["impact"] = ai_data.get("marketImpact", "")
-        item["coreLogic"] = ai_data.get("coreLogic", "")
-        item["risk"] = ai_data.get("risk", "")
-        item["_importance"] = ai_data.get(
-            "importance",
-            item["_importance"]
-        )
-    else:
-        item["ai_msg"] = "本条新闻暂未进行 AI 深度分析"
-
-    return item
-
-
-# ============================================================
-# 12. 主程序
-# ============================================================
-
-def main():
-    print("=" * 65)
-    print("财经与时政焦点看板：开始更新")
-    print("=" * 65)
-
-    # 每次启动都确保两个缓存文件存在
-    if not CACHE_FILE.exists():
-        CACHE_FILE.write_text("{}", encoding="utf-8")
-
-    if not MARKET_CAP_CACHE.exists():
-        MARKET_CAP_CACHE.write_text(
-            json.dumps(
-                {"_dynamic": False, "companies": {}},
-                ensure_ascii=False,
-                indent=2
-            ),
-            encoding="utf-8"
-        )
-
-    all_news = fetch_all_news()
-    cache = load_cache()
-
-    channel_pools = {
-        channel: [] for channel in CHANNELS
-    }
-
-    for entry in all_news:
-        for channel in entry["channels"]:
-            if channel in channel_pools:
-                channel_pools[channel].append(entry)
-
-    processed_by_channel = {}
-
-    for channel in CHANNELS:
-        processed = [
-            build_news_item(entry, cache)
-            for entry in channel_pools[channel]
-        ]
-
-        processed_by_channel[channel] = sort_channel_news(
-            channel,
-            processed
-        )
-
-    # --------------------------------------------------------
-    # A. 先翻译每个板块最终可能展示的新闻
-    #    不调用 DeepSeek，不占用3次深度分析额度
-    # --------------------------------------------------------
-
-    print("🌐 开始处理各板块中文标题和摘要")
-
-    for channel in CHANNELS:
-        selected = processed_by_channel[channel][
-            :CHANNEL_LIMITS[channel]
-        ]
-
-        for item in selected:
-            item["title"] = translate_to_chinese(
-                item["title"],
-                cache
-            )
-
-            item["summary"] = translate_to_chinese(
-                item["summary"],
-                cache
-            )
-
-            item["title"] = clean_text(item["title"], 180)
-            item["summary"] = clean_text(item["summary"], 420)
-
-    # --------------------------------------------------------
-    # B. 选择最多3条进行 DeepSeek 深度分析
-    #    同一新闻跨板块只进入一次候选
-    # --------------------------------------------------------
-
-    candidate_map = {}
-
-    for channel in CHANNELS:
-        selected = processed_by_channel[channel][
-            :CHANNEL_LIMITS[channel]
-        ]
-
-        for item in selected:
-            key = item["_cache_key"]
-
-            if cache.get(key):
+            if not raw or has_chinese(raw):
+                item[field] = raw
                 continue
 
-            if key not in candidate_map:
-                candidate_map[key] = item
+            key = hashlib.sha256(raw.encode()).hexdigest()
 
-    candidates = list(candidate_map.values())
+            if key in tcache:
+                item[field] = tcache[key]
+            else:
+                pending.append((item, field, key, raw))
 
-    def ai_priority(item):
-        score = item.get("_importance", 0)
+    if (
+        not pending
+        or call_counter['total'] >= MAX_TOTAL_CALLS
+    ):
+        return 0, 0
 
-        if item.get("_fed_meeting"):
-            score += 100
+    unique = OrderedDict()
 
-        if item.get("_mega_cap_earnings"):
-            score += 80
+    for _, _, key, raw in pending:
+        unique[key] = raw
 
-        return score
+    pairs = list(unique.items())[:100]
 
-    candidates.sort(
-        key=ai_priority,
-        reverse=True
+    payload = [
+        {'id': i, 'text': raw}
+        for i, (_, raw) in enumerate(pairs)
+    ]
+
+    prompt = (
+        '将以下新闻文本逐条翻译为准确、自然的简体中文。'
+        '保留公司名、数字、日期和专有名词，不要解释或添加事实。'
+        '只返回JSON对象，格式为'
+        '{"translations":[{"id":0,"text":"中文译文"}]}。文本：'
+        + json.dumps(payload, ensure_ascii=False)
     )
 
-    candidates = candidates[:MAX_AI_CALLS_PER_RUN]
+    call_counter['total'] += 1
+    call_counter['translation'] += 1
 
-    attempts = 0
+    data, error = call_deepseek(
+        [{'role': 'user', 'content': prompt}],
+        max_tokens=6000,
+        timeout=100
+    )
+
+    translated = {}
+
+    if data and isinstance(data.get('translations'), list):
+        for row in data['translations']:
+            try:
+                idx = int(row.get('id'))
+                txt = clean_text(row.get('text', ''), 700)
+
+                if (
+                    0 <= idx < len(pairs)
+                    and txt
+                    and has_chinese(txt)
+                ):
+                    translated[pairs[idx][0]] = txt
+
+            except Exception:
+                pass
+
+    if error:
+        print('批量中文翻译失败：' + error)
+
+    for item, field, key, raw in pending:
+        value = translated.get(key, raw)
+
+        if has_chinese(value):
+            tcache[key] = value
+
+        item[field] = value
+
+    return (
+        len(pending),
+        sum(
+            1 for _, _, key, _ in pending
+            if key in translated
+        )
+    )
+
+
+def analyze_one(item):
+    prompt = f'''你是严谨的财经与国际时政新闻分析员。请用简体中文分析，不得编造事实、数据或因果关系。若信息不足请明确说明。
+标题：{item['title']}
+摘要：{item['summary']}
+来源：{item['source']}
+请返回合法JSON，字段必须为：zh_title（中文标题）、zh_summary（中文摘要）、importance（0到100整数）、analysis（100字以内简评）、coreLogic（核心逻辑）、marketImpact（对相关市场的潜在影响）、risk（风险与不确定性）。'''
+
+    return call_deepseek(
+        [{'role': 'user', 'content': prompt}],
+        max_tokens=750,
+        timeout=75
+    )
+
+
+def is_valid_chinese(s):
+    return (
+        isinstance(s, str)
+        and bool(s.strip())
+        and has_chinese(s)
+    )
+
+
+def main():
+    print('=' * 68)
+    print('财经与时政焦点看板升级版开始运行')
+    print('每板块Top3深度评论；跨板块同新闻去重')
+    print('=' * 68)
+
+    ensure_json(CACHE_FILE, {})
+    ensure_json(TRANSLATION_CACHE_FILE, {})
+    ensure_json(
+        MARKET_CAP_CACHE,
+        {'_dynamic': False, 'companies': {}}
+    )
+
+    ai_cache = read_json(CACHE_FILE, {})
+    tcache = read_json(TRANSLATION_CACHE_FILE, {})
+
+    all_news = fetch_all_news()
+
+    pools = {channel: [] for channel in CHANNELS}
+
+    for news in all_news:
+        for channel in news['channels']:
+            if channel in pools:
+                pools[channel].append(news)
+
+    for channel in CHANNELS:
+        pools[channel] = sort_channel(
+            channel,
+            pools[channel]
+        )[:CHANNEL_LIMITS[channel]]
+
+    unique = OrderedDict()
+
+    for channel in CHANNELS:
+        for news in pools[channel]:
+            unique.setdefault(cache_key(news), dict(news))
+
+    visible = list(unique.values())
+
+    calls = {
+        'total': 0,
+        'translation': 0,
+        'analysis': 0
+    }
+
+    translated_count = 0
+    translated_ok = 0
+
+    if API_KEY:
+        translated_count, translated_ok = translate_batch(
+            visible,
+            tcache,
+            calls
+        )
+    else:
+        print('未配置DeepSeek密钥：跳过翻译和评论')
+
+    trans_by_key = {
+        cache_key(news): news
+        for news in visible
+    }
+
+    for channel in CHANNELS:
+        for news in pools[channel]:
+            translated = trans_by_key.get(cache_key(news))
+
+            if translated:
+                news['title'] = translated['title']
+                news['summary'] = translated['summary']
+
+    candidates = OrderedDict()
+
+    for channel in CHANNELS:
+        for news in pools[channel][:ANALYSIS_PER_CHANNEL]:
+            key = cache_key(news)
+
+            if key not in ai_cache:
+                candidates.setdefault(key, news)
+
     successes = 0
+    failed = 0
 
-    print(
-        f"🧠 DeepSeek 本轮候选：{len(candidates)} 条，"
-        f"上限：{MAX_AI_CALLS_PER_RUN} 条"
-    )
+    for i, (key, item) in enumerate(
+        candidates.items(),
+        1
+    ):
+        if (
+            calls['analysis'] >= MAX_ANALYSIS_CALLS
+            or calls['total'] >= MAX_TOTAL_CALLS
+        ):
+            break
 
-    for index, item in enumerate(candidates, 1):
         print(
-            f"🧠 深度分析 {index}/{len(candidates)}："
-            f"{item['title'][:65]}"
+            f"DeepSeek深度评论 {i}/{len(candidates)}："
+            f"{item['title'][:55]}"
         )
 
-        attempts += 1
+        calls['total'] += 1
+        calls['analysis'] += 1
 
-        ai_data, error = call_deepseek_ai(item)
+        data, error = analyze_one(item)
 
-        if ai_data:
-            cache[item["_cache_key"]] = ai_data
+        if data:
+            if is_valid_chinese(data.get('zh_title')):
+                item['title'] = clean_text(
+                    data['zh_title'],
+                    180
+                )
+
+            if is_valid_chinese(data.get('zh_summary')):
+                item['summary'] = clean_text(
+                    data['zh_summary'],
+                    420
+                )
+
+            data['zh_title'] = item['title']
+            data['zh_summary'] = item['summary']
+
+            for field, limit in (
+                ('analysis', 500),
+                ('coreLogic', 350),
+                ('marketImpact', 500),
+                ('risk', 350)
+            ):
+                data[field] = clean_text(
+                    data.get(field, ''),
+                    limit
+                )
+
+            try:
+                data['importance'] = max(
+                    0,
+                    min(
+                        100,
+                        int(
+                            data.get(
+                                'importance',
+                                item.get('_importance', 50)
+                            )
+                        )
+                    )
+                )
+            except Exception:
+                data['importance'] = item.get(
+                    '_importance',
+                    50
+                )
+
+            ai_cache[key] = data
             successes += 1
+
         else:
-            print(f"⚠️ DeepSeek 分析失败：{error}")
+            failed += 1
+            print('DeepSeek评论失败：' + str(error))
 
-        time.sleep(0.4)
-
-    # --------------------------------------------------------
-    # C. AI 结果回填所有板块
-    # --------------------------------------------------------
+        time.sleep(0.25)
 
     result = OrderedDict()
 
-    result["updatedAt"] = datetime.now(TZ).strftime(
-        "%Y-%m-%d %H:%M:%S"
+    result['updatedAt'] = datetime.now(TZ).strftime(
+        '%Y-%m-%d %H:%M:%S'
     )
 
-    result["aiEnabled"] = bool(API_KEY)
-    result["aiModel"] = AI_MODEL
+    result['aiEnabled'] = bool(API_KEY)
+    result['aiModel'] = AI_MODEL
 
-    result["aiStats"] = {
-        "attempts": attempts,
-        "successes": successes
+    result['aiStats'] = {
+        'attempts': calls['analysis'],
+        'successes': successes,
+        'translationCalls': calls['translation']
     }
 
     for channel in CHANNELS:
-        final_items = []
+        out = []
 
-        for item in processed_by_channel[channel]:
-            ai_data = cache.get(item["_cache_key"])
+        for original in pools[channel]:
+            item = dict(original)
+            key = cache_key(item)
+            analysis = ai_cache.get(key)
 
-            if ai_data:
-                item["title"] = (
-                    ai_data.get("zh_title")
-                    or item["title"]
+            if analysis:
+                if is_valid_chinese(analysis.get('zh_title')):
+                    item['title'] = analysis['zh_title']
+
+                if is_valid_chinese(analysis.get('zh_summary')):
+                    item['summary'] = analysis['zh_summary']
+
+                item['analysis'] = analysis.get('analysis', '')
+                item['impact'] = analysis.get('marketImpact', '')
+                item['coreLogic'] = analysis.get('coreLogic', '')
+                item['risk'] = analysis.get('risk', '')
+
+                item['_importance'] = analysis.get(
+                    'importance',
+                    item.get('_importance', 50)
                 )
 
-                item["summary"] = (
-                    ai_data.get("zh_summary")
-                    or item["summary"]
-                )
+            else:
+                item['ai_msg'] = '本条新闻暂未进行AI深度评论'
 
-                item["analysis"] = ai_data.get("analysis", "")
-                item["impact"] = ai_data.get("marketImpact", "")
-                item["coreLogic"] = ai_data.get("coreLogic", "")
-                item["risk"] = ai_data.get("risk", "")
-
-                item["_importance"] = ai_data.get(
-                    "importance",
-                    item["_importance"]
-                )
-
-                item.pop("ai_msg", None)
-
-            # AI 不是中文化的唯一途径；再次清理并翻译
-            item["title"] = clean_text(item["title"], 180)
-            item["summary"] = clean_text(item["summary"], 420)
-
-            item["title"] = translate_to_chinese(
-                item["title"],
-                cache
+            item['title'] = clean_text(
+                item.get('title', ''),
+                180
             )
 
-            item["summary"] = translate_to_chinese(
-                item["summary"],
-                cache
+            item['summary'] = clean_text(
+                item.get('summary', ''),
+                420
             )
 
-            # 清理 AI 字段，避免异常内容过长
             for field, limit in (
-                ("analysis", 500),
-                ("impact", 500),
-                ("coreLogic", 350),
-                ("risk", 350)
+                ('analysis', 500),
+                ('impact', 500),
+                ('coreLogic', 350),
+                ('risk', 350)
             ):
                 if field in item:
-                    item[field] = clean_text(item[field], limit)
+                    item[field] = clean_text(
+                        item[field],
+                        limit
+                    )
 
-            final_items.append(item)
+            out.append(item)
 
-        final_items = sort_channel_news(
+        out = sort_channel(
             channel,
-            final_items
-        )
+            out
+        )[:CHANNEL_LIMITS[channel]]
 
-        selected = final_items[:CHANNEL_LIMITS[channel]]
+        for item in out:
+            for key in (
+                'channels',
+                '_timestamp',
+                '_importance',
+                '_fed_meeting',
+                '_mega_cap_earnings'
+            ):
+                item.pop(key, None)
 
-        # 保持现有 index.html 使用的字段，不输出内部字段
-        for item in selected:
-            item.pop("_timestamp", None)
-            item.pop("_cache_key", None)
-            item.pop("_fed_meeting", None)
-            item.pop("_mega_cap_earnings", None)
-            item.pop("_importance", None)
+        result[channel] = out
 
-        result[channel] = selected
+    ai_cache = OrderedDict(
+        list(ai_cache.items())[-1500:]
+    )
 
-    # --------------------------------------------------------
-    # D. 保存缓存
-    # --------------------------------------------------------
+    tcache = OrderedDict(
+        list(tcache.items())[-2000:]
+    )
 
-    save_cache(cache)
+    write_json(CACHE_FILE, ai_cache)
+    write_json(TRANSLATION_CACHE_FILE, tcache)
 
-    # 再次确保 workflow git add 的文件存在
-    if not MARKET_CAP_CACHE.exists():
-        MARKET_CAP_CACHE.write_text(
-            json.dumps(
-                {"_dynamic": False, "companies": {}},
-                ensure_ascii=False,
-                indent=2
-            ),
-            encoding="utf-8"
-        )
-
-    # --------------------------------------------------------
-    # E. 只替换 index.html 的新闻数据区域
-    # --------------------------------------------------------
+    ensure_json(
+        MARKET_CAP_CACHE,
+        {'_dynamic': False, 'companies': {}}
+    )
 
     if not OUTPUT_FILE.exists():
         raise FileNotFoundError(
-            f"找不到网页文件：{OUTPUT_FILE}"
+            f'找不到网页文件：{OUTPUT_FILE}'
         )
 
-    page = OUTPUT_FILE.read_text(encoding="utf-8")
+    page = OUTPUT_FILE.read_text(encoding='utf-8')
 
-    start_marker = "<!-- NEWS_DATA_START -->"
-    end_marker = "<!-- NEWS_DATA_END -->"
+    start = '<!-- NEWS_DATA_START -->'
+    end = '<!-- NEWS_DATA_END -->'
 
-    if start_marker not in page or end_marker not in page:
+    if start not in page or end not in page:
         raise RuntimeError(
-            "index.html 缺少新闻数据标记。"
-            "为保护原页面，停止写入。"
+            'index.html缺少新闻数据标记，为保护原页面，停止写入。'
         )
 
-    json_data = json.dumps(
+    data = json.dumps(
         result,
         ensure_ascii=False,
         indent=2
     )
 
     injection = (
-        start_marker
-        + "\n<script>window.newsData="
-        + json_data
-        + ";</script>\n"
-        + end_marker
+        start
+        + '\n<script>window.newsData='
+        + data
+        + ';</script>\n'
+        + end
     )
 
-    new_page = re.sub(
-        re.escape(start_marker)
-        + r".*?"
-        + re.escape(end_marker),
+    page = re.sub(
+        re.escape(start) + r'.*?' + re.escape(end),
         lambda _: injection,
         page,
         flags=re.S
     )
 
     OUTPUT_FILE.write_text(
-        new_page,
-        encoding="utf-8"
+        page,
+        encoding='utf-8'
     )
 
-    # --------------------------------------------------------
-    # F. 更新报告
-    # --------------------------------------------------------
+    print('=' * 68)
+    print('四大板块更新完成')
 
-    print("=" * 65)
-    print("✅ 四大板块更新完成")
-
-    print(f"国际财经：{len(result['global'])} 条")
-    print(f"亚太财经：{len(result['asia'])} 条")
-    print(f"国内财经：{len(result['china'])} 条")
-    print(f"核心财报：{len(result['earnings'])} 条")
+    for channel, label in (
+        ('global', '国际财经'),
+        ('asia', '亚太财经'),
+        ('china', '国内财经'),
+        ('earnings', '核心财报')
+    ):
+        print(
+            f'{label}：{len(result[channel])} 条'
+        )
 
     print(
-        f"DeepSeek 调用：{attempts}/{MAX_AI_CALLS_PER_RUN}"
+        f'DeepSeek深度评论：{calls["analysis"]}次，'
+        f'成功{successes}次，失败{failed}次'
     )
-    print(f"DeepSeek 成功：{successes} 次")
 
-    print("中文翻译：独立处理，不占用 DeepSeek 调用额度")
-    print("RSS 清理：已启用")
-    print("新闻时效：最近24小时")
-    print("跨板块去重：已启用")
-    print("市值缓存文件：已确保存在")
+    print(
+        f'DeepSeek批量翻译：{calls["translation']}次；'
+        f'待翻译字段{translated_count}个，'
+        f'成功{translated_ok}个'
+    )
 
-    print("=" * 65)
+    print(
+        f'DeepSeek总调用：{calls["total"]}/{MAX_TOTAL_CALLS}'
+        '（最多12条评论+1次批量翻译）'
+    )
+
+    print(
+        'RSS清理、24小时过滤、跨板块去重、动态市值核验：已启用'
+    )
+
+    print(
+        'market_cap_cache.json、ai_cache.json、'
+        'translation_cache.json：均已确保存在'
+    )
+
+    print('=' * 68)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
