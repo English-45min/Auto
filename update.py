@@ -46,14 +46,12 @@ MACRO_EVENT_KEYWORDS = {
 
 EARNINGS_CHANNEL_KEYWORDS = {"earning", "profit", "quarter", "results", "guidance", "fiscal", "财报", "业绩", "季度", "指引"}
 
-# 🌟 完美对齐需求的高稳定 RSS 源配置：
-# - 全球/国际媒体为主：Reuters、CNBC、Yahoo Finance（天然覆盖国际、亚太与中国市场）
-# - 国内/亚太板块：由国际主流财经媒体的亚太/中国频道 + 港交所/高稳定国内源支撑
+# 专有源与板块通道精准绑定，绝不混淆
 FEEDS = [
-    {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "asia", "earnings"]},
-    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "asia", "china", "earnings"]},
+    {"url": "https://finance.yahoo.com/news/rssindex", "source": "Yahoo Finance", "channels": ["global", "earnings"]},
+    {"url": "https://www.cnbc.com/id/100003114/device/rss/rss.html", "source": "CNBC", "channels": ["global", "asia"]},
     {"url": "https://www.investors.com/feed/investing/", "source": "IBD", "channels": ["earnings"]},
-    {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["china", "asia", "earnings"]},
+    {"url": "https://sc.hkexnews.hk/rss", "source": "HKEx", "channels": ["asia", "china", "earnings"]},
     {"url": "http://www.nbd.com.cn/rss", "source": "NBD", "channels": ["china"]}
 ]
 
@@ -87,10 +85,8 @@ def fetch_all_news():
     
     for f in FEEDS:
         try:
-            print(f"正在抓取 {f['source']} ({f['url']})...")
             res = requests.get(f["url"], headers=headers, timeout=15)
             feed = feedparser.parse(res.content)
-            print(f"[{f['source']}] 抓取到原始条目数: {len(feed.entries)}")
             
             for entry in feed.entries:
                 url = entry.get("link", "")
@@ -123,7 +119,6 @@ def fetch_all_news():
             print(f"Error fetching feed {f['source']}: {e}")
             
     news_pool.sort(key=lambda x: x["_weight"], reverse=True)
-    print(f"✅ 最终筛选出的有效时效新闻总数: {len(news_pool)}")
     return news_pool
 
 def load_cache():
@@ -202,58 +197,61 @@ def main():
     for channel in ["global", "asia", "china", "earnings"]:
         result[channel] = []
 
-    limit = {"global": 20, "asia": 10, "china": 10, "earnings": 10}
-    count_limit = OrderedDict(limit)
+    # 独立分流池，防止板块内容相互串台
+    channel_pools = {"global": [], "asia": [], "china": [], "earnings": []}
+    
+    for entry in all_news:
+        for ch in entry["channels"]:
+            if ch in channel_pools:
+                channel_pools[ch].append(entry)
 
     ai_call_count = 0
-
-    for entry in all_news:
-        if all(c <= 0 for c in count_limit.values()): break
-        item_channels = entry["channels"]
-        can_add_to = [ch for ch in item_channels if ch in count_limit and count_limit[ch] > 0]
-        if not can_add_to: continue
-
-        cache_key = base64.b64encode(f"{entry['url']}_{entry['source']}".encode("utf-8")).decode("utf-8")
-        ai_data = cache.get(cache_key)
-        
-        news_item = {
-            "source": entry["source"], "url": entry["url"],
-            "publishedAt": entry["publishedAt"], "title": entry["title"], "summary": entry["summary"]
-        }
-        
-        ai_msg = None
-        if not ai_data:
-            if ai_call_count < MAX_AI_DAILY_CALLS:
-                result["aiStats"]["attempts"] += 1
-                ai_call_count += 1
-                ai_data, ai_msg = call_deepseek_ai(entry)
-                if ai_data:
-                    result["aiStats"]["successes"] += 1
-                    cache[cache_key] = ai_data
-                elif ai_msg:
-                    cache[cache_key] = {"ai_msg": ai_msg, "importance": 40}
-            else:
-                ai_msg = "已达今日AI分析配额上限"
-                cache[cache_key] = {"ai_msg": ai_msg, "importance": entry["_weight"]}
-
-        if ai_data and "ai_msg" not in ai_data:
-            news_item["title"] = ai_data.get("zh_title", entry["title"])
-            news_item["summary"] = ai_data.get("zh_summary", entry["summary"])
-            news_item["analysis"] = ai_data.get("analysis", "")
-            news_item["impact"] = ai_data.get("marketImpact", "")
-            news_item["coreLogic"] = ai_data.get("coreLogic", "")
-            news_item["risk"] = ai_data.get("risk", "")
-            news_item["_importance"] = ai_data.get("importance", 50)
-        else:
-            news_item["ai_msg"] = ai_msg or "AI分析未执行"
-            news_item["_importance"] = entry["_weight"]
-
-        for ch in can_add_to:
-            result[ch].append(news_item)
-            count_limit[ch] -= 1
+    limits = {"global": 20, "asia": 10, "china": 10, "earnings": 10}
 
     for ch in ["global", "asia", "china", "earnings"]:
-        result[ch].sort(key=lambda x: x["_importance"], reverse=True)
+        sorted_entries = sorted(channel_pools[ch], key=lambda x: x["_weight"], reverse=True)
+        added_count = 0
+        
+        for entry in sorted_entries:
+            if added_count >= limits[ch]: break
+            
+            cache_key = base64.b64encode(f"{entry['url']}_{entry['source']}_{ch}".encode("utf-8")).decode("utf-8")
+            ai_data = cache.get(cache_key)
+            
+            news_item = {
+                "source": entry["source"], "url": entry["url"],
+                "publishedAt": entry["publishedAt"], "title": entry["title"], "summary": entry["summary"]
+            }
+            
+            ai_msg = None
+            if not ai_data:
+                if ai_call_count < MAX_AI_DAILY_CALLS:
+                    result["aiStats"]["attempts"] += 1
+                    ai_call_count += 1
+                    ai_data, ai_msg = call_deepseek_ai(entry)
+                    if ai_data:
+                        result["aiStats"]["successes"] += 1
+                        cache[cache_key] = ai_data
+                    elif ai_msg:
+                        cache[cache_key] = {"ai_msg": ai_msg, "importance": 40}
+                else:
+                    ai_msg = "已达今日AI分析配额上限"
+                    cache[cache_key] = {"ai_msg": ai_msg, "importance": entry["_weight"]}
+
+            if ai_data and "ai_msg" not in ai_data:
+                news_item["title"] = ai_data.get("zh_title", entry["title"])
+                news_item["summary"] = ai_data.get("zh_summary", entry["summary"])
+                news_item["analysis"] = ai_data.get("analysis", "")
+                news_item["impact"] = ai_data.get("marketImpact", "")
+                news_item["coreLogic"] = ai_data.get("coreLogic", "")
+                news_item["risk"] = ai_data.get("risk", "")
+                news_item["_importance"] = ai_data.get("importance", 50)
+            else:
+                news_item["ai_msg"] = ai_msg or "AI分析未执行"
+                news_item["_importance"] = entry["_weight"]
+
+            result[ch].append(news_item)
+            added_count += 1
 
     save_cache(cache)
     
@@ -272,7 +270,7 @@ def main():
         new_page = page.replace("</head>", f"{injection_code}\n</head>")
 
     Path(OUTPUT_FILE).write_text(new_page, encoding="utf-8")
-    print(f"✅ 脚本执行完毕，本次共消耗 AI 指令: {ai_call_count} 条（已严格限制在 12 条以内）。")
+    print(f"✅ 独立板块分流完成，本次消耗 AI 指令: {ai_call_count} 条（严格限定在12条以内）。")
 
 if __name__ == "__main__":
     main()
