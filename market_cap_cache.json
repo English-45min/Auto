@@ -1,0 +1,60 @@
+{
+  "NVIDIA": [
+    "nvidia",
+    "英伟达",
+    "nvda"
+  ],
+  "Apple": [
+    "apple",
+    "苹果",
+    "aapl"
+  ],
+  "Microsoft": [
+    "microsoft",
+    "微软",
+    "msft"
+  ],
+  "Alphabet": [
+    "alphabet",
+    "google",
+    "谷歌",
+    "googl",
+    "goog"
+  ],
+  "Amazon": [
+    "amazon",
+    "亚马逊",
+    "amzn"
+  ],
+  "Meta": [
+    "meta platforms",
+    "facebook",
+    "脸书",
+    "meta"
+  ],
+  "TSMC": [
+    "tsmc",
+    "taiwan semiconductor",
+    "台积电"
+  ],
+  "Broadcom": [
+    "broadcom",
+    "博通",
+    "avgo"
+  ],
+  "Tesla": [
+    "tesla",
+    "特斯拉",
+    "tsla"
+  ],
+  "Tencent": [
+    "tencent",
+    "腾讯",
+    "0700"
+  ],
+  "Alibaba": [
+    "alibaba",
+    "阿里巴巴",
+    "baba"
+  ]
+}
