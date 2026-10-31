@@ -35,7 +35,12 @@ jobs:
       - name: 检查必要文件
         run: |
           test -f update.py
-          test -f index.html
+          test -f finance.html
+
+          grep -Fq '<!-- NEWS_DATA_START -->' finance.html
+          grep -Fq '<!-- NEWS_DATA_END -->' finance.html
+
+          echo "财经看板文件及新闻数据标记检查通过"
 
       - name: 执行新闻更新
         env:
@@ -43,15 +48,21 @@ jobs:
           PYTHONUTF8: "1"
         run: python update.py
 
+      - name: 检查更新结果
+        run: |
+          test -f finance.html
+          grep -Fq 'window.newsData=' finance.html
+          echo "财经新闻数据写入检查通过"
+
       - name: 提交更新后的网页和缓存
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add index.html ai_cache.json market_cap_cache.json
+          git add finance.html ai_cache.json translation_cache.json market_cap_cache.json
 
           if git diff --cached --quiet; then
-            echo "没有新的网页变化"
+            echo "没有新的网页或缓存变化"
           else
             git commit -m "auto: update finance and Asia Pacific news"
             git push
