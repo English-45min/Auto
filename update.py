@@ -22,7 +22,9 @@ TZ = timezone(timedelta(hours=8))
 UTC = timezone.utc
 BASE_DIR = Path(__file__).resolve().parent
 
-OUTPUT_FILE = BASE_DIR / 'index.html'
+# 财经看板网页文件名
+OUTPUT_FILE = BASE_DIR / 'finance.html'
+
 CACHE_FILE = BASE_DIR / 'ai_cache.json'
 TRANSLATION_CACHE_FILE = BASE_DIR / 'translation_cache.json'
 MARKET_CAP_CACHE = BASE_DIR / 'market_cap_cache.json'
@@ -1310,7 +1312,7 @@ def main():
 
     if start not in page or end not in page:
         raise RuntimeError(
-            'index.html缺少新闻数据标记，为保护原页面，停止写入。'
+            'finance.html缺少新闻数据标记，为保护原页面，停止写入。'
         )
 
     data = json.dumps(
