@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f19">
+<meta name="google" content="notranslate">
+<title>billboard // 财经时政看点</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0f19;color:#e2e8f0;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
+.tab{padding:.75rem .6rem;border-bottom:2px solid transparent;color:#94a3b8;font-weight:700;cursor:pointer;touch-action:pan-y}
+.tab.active{border-color:#f59e0b;color:#f59e0b}
+.card{background:#111827;border:1px solid #263244;border-radius:14px;padding:16px;overflow-wrap:anywhere}
+.muted{color:#94a3b8}
+.ai{background:#0d2430;border:1px solid #155e75;border-radius:10px;padding:12px}
+.pill{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#1e293b;color:#cbd5e1}
+.read{opacity:.72}
+.btn{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:7px 10px;cursor:pointer}
+.btn:hover{background:#334155}
+a{color:#fbbf24;text-decoration:none}
+a:hover{text-decoration:underline}
+input{outline:none}
+input:focus{border-color:#f59e0b}
+
+/* 3D 立体黑底金字 LOGO 样式 */
+.3d-gold-logo {
+  background: #090d16;
+  border: 1px solid #b45309;
+  border-radius: 12px;
+  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(251, 191, 36, 0.3);
+}
+
+.3d-gold-text {
+  background: linear-gradient(180deg, #ffe082 0%, #f59e0b 50%, #b45309 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  /* 打造 3D 浮雕与发光立体压感 */
+  filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.9)) drop-shadow(0px 0px 8px rgba(245, 158, 11, 0.3));
+}
+
+.adaptive-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 1.15em;
+  line-height: 1.55;
+  font-weight: 800;
+}
+@media (min-width: 640px) {
+  .adaptive-title {
+    display: block;
+    -webkit-line-clamp: unset;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* 经典醒目的 TOP 3 独立渲染区样式 */
+.featured-wrap{border:2px solid #b45309;background:linear-gradient(135deg,#291808,#111827 70%);border-radius:18px;padding:18px;margin-bottom:24px;box-shadow:0 10px 25px -5px rgba(180,83,9,0.2)}
+.featured-title{font-size:1.4rem;font-weight:900;color:#fbbf24;letter-spacing:.02em}
+.featured-card{border:1px solid #d97706;background:#171c28;border-radius:14px;padding:16px;margin-top:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+
+.priority-high{border-color:#ef4444!important;box-shadow:inset 4px 0 #ef4444}
+.priority-medium{border-color:#f59e0b!important;box-shadow:inset 4px 0 #f59e0b}
+.score-badge{display:inline-block;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:900;background:#451a03;color:#fde68a}
+
+.research-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.research-box{background:#0b1220;border:1px solid #263244;border-radius:9px;padding:10px;min-width:0}
+.research-box h4{font-size:.85em;font-weight:800;color:#7dd3fc;margin:0 0 6px}
+.research-box p,.research-box li{font-size:.92em;line-height:1.6;color:#dbeafe}
+.research-box ul{padding-left:1.2rem;margin:0}
+.research-wide{grid-column:1/-1}
+
+/* 下拉刷新提示条 */
+#ptr-spinner {
+  position: fixed;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99;
+  background: #1e293b;
+  color: #fbbf24;
+  border: 1px solid #d97706;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  transition: top 0.2s ease, opacity 0.2s ease;
+  opacity: 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+@media(max-width:520px){
+ .card{padding:12px}
+ .tab{font-size:12px;padding:.65rem .18rem}
+ .research-grid{grid-template-columns:1fr}
+ .research-wide{grid-column:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- 下拉刷新动画提示 -->
+<div id="ptr-spinner">🔄 下拉刷新中...</div>
+
+<header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+ <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+  <div>
+   <div class="3d-gold-logo">
+    <h1 class="text-lg sm:text-xl 3d-gold-text">📊 BILLBOARD // 财经时政看点</h1>
+   </div>
+   <p class="muted text-xs sm:text-sm mt-1.5 pl-1">全球公信力媒体 · 宏观深度分析 · 纯净直达</p>
+  </div>
+  <div class="text-xs muted">
+   最近更新：<span id="updateTime">2026-10-29 14:40:58</span>
+   <div id="aiStatus" class="mt-1">AI 状态读取中</div>
+  </div>
+ </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-5">
+ <div class="flex flex-wrap gap-2 items-center mb-4">
+  <input id="searchInput" type="search"
+   class="flex-1 min-w-48 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
+   placeholder="搜索标题、摘要、来源、逻辑或资产…"
+   aria-label="搜索新闻">
+ </div>
+
+ <nav class="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 mb-5" id="tabs">
+  <button class="tab" data-tab="global" type="button">国际财经 Top 20</button>
+  <button class="tab" data-tab="asia" type="button">亚太财经 Top 10</button>
+  <button class="tab" data-tab="china" type="button">国内财经 Top 10</button>
+  <button class="tab" data-tab="earnings" type="button">📊 核心财报 Top 10</button>
+ </nav>
+
+ <!-- 经典醒目的 TOP 3 独立置顶区 -->
+ <section id="featuredWrap" class="featured-wrap">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+   <h2 class="featured-title">🔥 当日重点新闻 · TOP 3 深度聚焦</h2>
+   <span class="pill bg-amber-900/60 text-amber-200 font-bold">高权重重磅事件</span>
+  </div>
+  <div id="featuredList"></div>
+ </section>
+
+ <div class="flex justify-between items-center gap-3 mb-3">
+  <h2 id="sectionTitle" class="text-lg font-bold">国际财经新闻</h2>
+  <span id="count" class="muted text-sm">0 条</span>
+ </div>
+
+ <p class="muted text-xs mb-4">
+  提示：上方独立呈现当日最强 TOP 3 焦点，下方展示常规资讯流；手机端可左右滑动切换栏目，顶部下拉可刷新页面。
+ </p>
+
+ <div id="newsList" class="space-y-4" aria-live="polite">
+  <div class="card muted">看板正在初始化……</div>
+ </div>
+
+ <footer class="muted text-xs mt-8 leading-relaxed">
+  免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。
+  <p class="mt-1">© 2026 billboard // 财经时政看点</p>
+ </footer>
+</main>
+
+<!-- NEWS_DATA_START -->
+<script>window.newsData={
+  "updatedAt": "2026-10-30 17:45:48",
+  "aiEnabled": true,
+  "aiModel": "deepseek-chat",
+  "aiStats": {
+    "attempts": 6,
+    "successes": 6,
+    "translationCalls": 1
+  },
+  "global": [
+    {
+      "source": "Business Chief",
+      "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxQNEZSRTdHcXJRa0ViNmQ5MjZaWVFLcV9Qd0VteVRRa0ZGVklrX3AxUmdxRzl3TFBjSEJoaEc0TW9MUFBnS3JGTWlDVk5KOW9rYzR4WE1BM2VrYmhhOWNnRmphZk55WUY0N2JSUmNWUDR2TkdHSUh6dnJzYzlqbTBpTFZlekhYWkgta0c0?oc=5",
+      "publishedAt": "2026-10-29 18:04",
+      "title": "美联储维持利率在4%：FOMC决议对CEO意味着什么",
+      "summary": "Business Chief报道，美联储联邦公开市场委员会决定将利率维持在4%不变，并解读该决议对企业首席执行官的影响",
+      "analysis": "美联储按兵不动，表明其在通胀与增长之间保持谨慎。对企业而言，融资成本短期稳定，但降息时点仍取决于后续数据",
+      "impact": "利率不变通常已被市场部分预期，短期对股债汇影响取决于决议措辞与市场预期的偏差；若措辞偏鹰，可能推高收益率、压制成长股估值，若偏鸽则相反。企业债发行与并购融资节奏也可能随预期调整",
+      "coreLogic": "FOMC将政策利率维持在4%，意味着当前货币政策立场未变。标题聚焦CEO，是因为利率水平直接影响企业融资成本、资本开支和投资决策，维持利率即延续现有资金价格环境",
+      "risk": "报道未提供投票结果、点阵图或主席表态等细节，实际市场反应可能受这些信息及后续通胀、就业数据影响；利率路径存在不确定性，不宜据此推断降息或加息的确定时点"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/30/amazon-intel-earnings-big-tech-ai-spending-concerns.html",
+      "publishedAt": "2026-10-30 17:16",
+      "title": "亚马逊盘前下跌7%，英特尔暴跌25%，财报后压力加剧",
+      "summary": "投资者对科技巨头巨额AI支出以及能否获得回报感到紧张",
+      "analysis": "财报后市场对AI资本开支的容忍度下降，亚马逊与英特尔分别代表云侧投入与芯片侧业绩，双双承压显示资金正重新定价AI回报周期",
+      "impact": "美股科技板块及半导体板块短期波动加大，AI算力与云服务相关个股可能承压；资金或阶段性转向现金流确定性较高的防御性板块，并提高对后续财报中AI资本开支指引的敏感度",
+      "coreLogic": "市场担忧点从“是否投入AI”转向“投入能否转化为利润”。亚马逊的巨额AI支出压缩短期自由现金流预期，英特尔暴跌则反映其自身业绩与竞争压力叠加，二者共同触发对科技股高估值和AI投资回报节奏的重新审视",
+      "risk": "单日盘前跌幅可能受流动性影响而放大，实际收盘表现存在差异；AI支出回报周期难以量化，若后续指引改善或宏观情绪回暖，抛压可能缓解；不宜将两家公司表现直接外推为全行业趋势"
+    },
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/livecoverage/stock-market-today-dow-sp-500-nasdaq-10-30-2026?mod=rss_markets_main",
+      "publishedAt": "2026-10-30 16:44",
+      "title": "今日股市：亚马逊、英特尔财报加剧科技股抛售",
+      "summary": "令人失望的业绩导致股价暴跌，进一步加剧围绕AI交易的担忧",
+      "analysis": "财报不及预期触发抛售，反映市场对AI高估值容错度下降；但单一财报季波动不宜直接等同于AI叙事逆转，需观察后续指引与资金流向",
+      "impact": "美股科技板块及纳斯达克承压，半导体与云计算相关标的波动加大；风险偏好回落可能波及亚太科技股与AI主题基金，避险资金或流向防御性板块",
+      "coreLogic": "科技巨头业绩低于预期→投资者下调AI相关资本开支回报预期→高估值科技股遭集中减仓，抛压从个股扩散至板块，形成对AI交易拥挤度的重新定价",
+      "risk": "财报解读存在样本偏差，单一季度业绩未必代表AI需求趋势；市场情绪放大波动，后续指引、宏观利率与监管变化均可能改变定价方向，信息不足处不宜过度推断"
+    },
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/finance/stocks/u-s-stocks-fall-as-alphabet-slide-weighs-on-ai-optimism-1a8d67b7?mod=rss_markets_main",
+      "publishedAt": "2026-10-30 04:43",
+      "title": "美国股市下跌，Alphabet股价重挫拖累AI乐观情绪",
+      "summary": "美股下跌，谷歌母公司营收不及预期，导致该公司创下史上单只股票单日市值最大跌幅之一，令市场对人工智能基础设施投入回报产生疑虑",
+      "analysis": "Alphabet营收缺口暴露AI投入与变现之间的时间差，龙头股大跌直接打压市场对AI叙事的估值溢价，短期或引发科技股回调与资金再配置",
+      "impact": "科技与AI相关板块承压，资金可能转向防御性资产或估值较低板块；AI资本开支敏感型公司（芯片、云服务、电力设备）波动加大；若后续财报持续验证回报滞后，可能引发更广泛的估值重估",
+      "coreLogic": "市场此前将AI基础设施支出视为确定性增长引擎，并给予高估值；Alphabet营收不及预期说明AI投入尚未转化为相应收入，预期差触发估值修正，并通过权重股拖累大盘",
+      "risk": "单一公司财报不足以判定AI整体回报趋势；后续其他科技巨头财报、AI商业化进展及宏观利率环境均可能改变市场解读，存在情绪过度反应后反弹的可能，不宜据单一事件线性外推"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/30/bp-earnings-oil-q3.html",
+      "publishedAt": "2026-10-30 17:00",
+      "title": "BP第三季度利润近乎翻两番至85亿美元，炼油利润率飙升",
+      "summary": "这家石油巨头是最新一家利润远超预期的公司，全球冲突持续推动能源市场波动",
+      "analysis": "利润跃升主要来自炼油利润率而非产量扩张，属周期性与地缘扰动叠加的结果，可持续性存疑",
+      "impact": "短期利好能源板块与炼油企业估值，强化欧洲油企高分红与回购预期；但高裂解价差可能加剧成品油终端价格压力，并抬升通胀预期",
+      "coreLogic": "全球冲突扰动能源供应与贸易流向，推高炼油裂解价差；BP炼油业务杠杆放大盈利弹性，叠加去年同期低基数，形成近乎翻两番的同比增幅",
+      "risk": "炼油利润率对裂解价差高度敏感，若冲突缓和或需求走弱，利润回落风险大；报道未披露产量、一次性项目及汇兑影响，数据可比性有限"
+    },
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/finance/stocks/ai-stocks-fall-after-alphabet-earnings-disappoint-61d526ed?mod=rss_markets_main",
+      "publishedAt": "2026-10-30 02:35",
+      "title": "Alphabet股价下挫，拖累纳斯达克走低",
+      "summary": "美国股市下跌，纳斯达克综合指数领跌，此前Alphabet财报令投资者失望，并引发新一轮人工智能担忧",
+      "analysis": "Alphabet财报不及预期，令市场对其AI投入回报产生疑虑，科技股承压并拖累纳指，反映AI叙事对估值支撑的敏感度上升",
+      "impact": "科技股及AI概念板块可能承压，纳指波动加大；资金或转向防御性板块，市场对后续大型科技股财报与AI资本开支的审视趋严",
+      "coreLogic": "财报失望削弱投资者对Alphabet盈利与AI变现能力的信心，作为权重科技股其下跌直接拖累纳指，并触发市场对AI相关高估值的再定价",
+      "risk": "单一财报解读可能放大短期情绪；AI投资回报周期与宏观利率环境存在不确定性，后续财报或政策信号可能改变市场方向，需警惕波动加剧"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/reddit-rddt-q3-2026.html",
+      "publishedAt": "2026-10-30 08:28",
+      "title": "Reddit股价下跌，因销售指引疲软及计划测试登录要求，谷歌搜索流量萎缩",
+      "summary": "Reddit公布第三季度财报，并披露因谷歌搜索流量萎缩计划要求所有用户创建官方账户",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "BBC Business",
+      "url": "https://www.bbc.co.uk/news/articles/cm9qzdqpxy48o?at_medium=RSS&at_campaign=rss",
+      "publishedAt": "2026-10-30 06:17",
+      "title": "谷歌市值暴跌5000亿美元，AI搜索冲击广告销售",
+      "summary": "谷歌令投资者大为恐慌，股价跌至六个月低点，此前其披露AI搜索摘要正在影响广告收入",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/aws-q3-earnings-report-2026.html",
+      "publishedAt": "2026-10-30 05:59",
+      "title": "亚马逊AWS营收增长39%，云竞争对手也在加速",
+      "summary": "亚马逊云业务本季度与Meta和OpenAI签署协议，推动营收超出市场预期",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/rivian-rivn-earnings-q3-2026.html",
+      "publishedAt": "2026-10-30 05:52",
+      "title": "Rivian第三季度业绩超预期，软件收入和R2交付量上升",
+      "summary": "Rivian还修订了2026年指引，以反映车辆交付、税前调整后收益和资本支出方面的预期改善",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/coinbase-coin-earnings-q3-2026-.html",
+      "publishedAt": "2026-10-30 05:38",
+      "title": "Coinbase第三季度净利润激增66%，受益于比特币投资收益",
+      "summary": "Coinbase第三季度盈利好于预期，主要得益于加密货币市场复苏",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "Reuters",
+      "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxNd0JuSzdaWWtxaGJGdW5CV0pONGc2dlpzMVJnaGl2UUIwQmtkc1FNSUVNQzhxTFRycVZ4dGpRaVlvbGdraXBWenkzY1otSno3TC1zWTlQUmFRandmM0hlSm14a1pfWTJMNjdNclo5bFlFQWt3UlpIcFlPY3RtZzBQVXhKUzVPSWMxUXZFckNVM3ZXZEU?oc=5",
+      "publishedAt": "2026-10-30 04:29",
+      "title": "强劲消费支出和AI相关投资推动美国第三季度经济 - 路透社",
+      "summary": "强劲消费支出和AI相关投资推动美国第三季度经济 路透社",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/alphabet-google-search-ai-earnings.html",
+      "publishedAt": "2026-10-30 04:16",
+      "title": "Alphabet财报不及预期，反映AI首次真正侵蚀搜索业务",
+      "summary": "华尔街因Alphabet财报不及预期而重挫该股，其中包括核心业务营收弱于预期",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/norwegian-earnings-guidance-shares.html",
+      "publishedAt": "2026-10-30 04:14",
+      "title": "挪威航空股价飙升13%，因盈利超预期并上调指引",
+      "summary": "挪威航空表示，公司预订量“略有改善”，但仍低于其最佳区间",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/big-oil-earnings-are-set-to-surge-why-investors-may-want-to-be-cautious.html",
+      "publishedAt": "2026-10-30 02:13",
+      "title": "大型石油公司盈利料将激增。为何投资者可能想保持谨慎",
+      "summary": "大型石油公司财报即将公布。为何指引可能最重要，以及为何图表显示投资者应保持谨慎",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNBC",
+      "url": "https://www.cnbc.com/2026/10/29/pce-inflation-report-september-2026-.html",
+      "publishedAt": "2026-10-30 02:06",
+      "title": "美国第三季度GDP增长3.4%，好于预期，9月通胀加速",
+      "summary": "据道琼斯共识，个人消费支出价格指数预计9月上涨0.5%，年率为3.7%",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "BigGo Finance",
+      "url": "https://news.google.com/rss/articles/CBMidkFVX3lxTE03OFFaMTZoaUpSUnRacnhPdE0ybEFlY0lPcVZVa1BBQUt6X1FwY1pDVVRBWnlLc0laZ0VwY2xaNUFLbFA1TFQtWkQ1b2llMVJROTlINUx1Y1o2ZS0yYmpWbGNwSC1WMlRpR2MxQk82cTBYejAzWnc?oc=5",
+      "publishedAt": "2026-10-29 17:56",
+      "title": "美联储以10比2投票维持利率不变；沃什拒绝提供前瞻指引，12月加息概率飙升至85% - BigGo Finance",
+      "summary": "美联储以10比2投票维持利率不变；沃什拒绝提供前瞻指引，12月加息概率飙升至85% BigGo Finance",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/business/earnings/intercontinental-exchange-posts-higher-profit-revenue-7fed5918?mod=rss_markets_main",
+      "publishedAt": "2026-10-29 20:15",
+      "title": "洲际交易所利润与营收增长",
+      "summary": "洲际交易所第三季度实现利润9.4亿美元，合每股1.67美元；上年同期为8.16亿美元，合每股1.42美元",
+      "analysis": "利润与营收同比双升，显示交易所核心业务量能稳健；但摘要未披露营收具体数字及增长驱动，需结合完整财报判断持续性",
+      "impact": "对交易所板块情绪偏正面，可能强化市场对交易基础设施类公司盈利韧性的预期；但单一季度数据对大盘和利率路径的指示有限，影响更多集中在个股及同业估值比较",
+      "coreLogic": "交易所盈利主要来自交易清算、数据服务等费用收入，利润增长通常反映交易活跃度提升或成本控制见效；每股收益同步上升，说明盈利增长未被股本稀释明显抵消",
+      "risk": "摘要信息有限，未说明营收规模、增长来源及一次性项目；利润增长可能受非经常性因素影响，后续交易量回落或监管政策变化均可能削弱盈利表现"
+    },
+    {
+      "source": "Bloomberg.com",
+      "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxNeENEVWQ1bnhyY2djcFFQMjZXWnVoaXdwZnZCUUN1UDNIckM4LVdPZTk3SHVzUWtWeVpCdG5RNUFGUzFqa2FlV0JMMXk1NTFNQUoyVDlPeGF6U0tveWxQMmQ0c0d6YW8zU1FkM2NzMkxfM1lMOFdHWTdpRldqaUdudG9oNVVTRjhvZXpqSkJHX2t1MnhkRzVRWjl5b3lWa3laUk1IOWphRkh4ZkZaQVhESzREQnA?oc=5",
+      "publishedAt": "2026-10-30 11:04",
+      "title": "大和证券利润攀升，受全球市场交易收入强劲推动",
+      "summary": "据Bloomberg.com报道，大和证券利润上升，主要受全球市场交易收入强劲推动。报道未在提供的信息中披露具体财务数据、同比变化幅度及交易收入构成细节",
+      "analysis": "该消息反映日本券商在全球市场波动中交易业务受益，但缺乏具体数据，难以判断增长可持续性，需结合后续财报核实",
+      "impact": "可能提振市场对日本券商板块交易业务前景的预期，但影响程度取决于具体业绩数据，当前信息不足以量化",
+      "coreLogic": "全球市场交易活跃度上升带动券商交易收入增长，进而推高整体利润，属于典型的周期性业务驱动",
+      "risk": "信息仅来自标题与摘要，缺少具体利润数字、同比基数及交易收入来源结构；全球市场交易收入具有波动性，若市场活跃度回落，利润增长可能难以持续"
+    },
+    {
+      "source": "BBC Business",
+      "url": "https://www.bbc.co.uk/news/articles/cwg7xp8kx4v5o?at_medium=RSS&at_campaign=rss",
+      "publishedAt": "2026-10-30 17:33",
+      "title": "加密巨头币安遭63亿美元黑客攻击，疑似史上最大规模",
+      "summary": "两家分析公司将此次事件归咎于名为TraderTraitor的朝鲜黑客组织",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    }
+  ],
+  "asia": [
+    {
+      "source": "南华早报",
+      "url": "https://www.scmp.com/business/banking-finance/article/3372681/evergrande-liquidators-sell-controlling-stake-property-services-unit-us513-million",
+      "publishedAt": "2026-10-30 13:24",
+      "title": "恒大清盘人以5.13亿美元出售物业服务子公司控股权",
+      "summary": "中国恒大集团清盘人已同意将恒大物业服务51.016%的控股权以40.3亿港元（约5.136亿美元）出售给投资公司PAG，旨在为欠款约460亿美元的债权人收回资产。交易可能使这项盈利业务获得新的控股股东；此前母公司曾动用该子公司数十亿元人民币的银行存款",
+      "analysis": "这是恒大清盘进程中少见的实质性资产处置，有助于债权人回收部分价值，但相对460亿美元债务规模仍属杯水车薪。交易凸显清盘人优先变现优质资产，也反映母公司挪用子公司资金后的治理修复需求",
+      "impact": "对港股恒大物业及内房物管板块可能带来短期交易性关注；对困境房企债务重组形成示范效应，或推动其他清盘资产加速处置；对PAG等私募资本而言，反映其对中国困境资产的持续布局",
+      "coreLogic": "清盘人通过出售恒大物业控股权快速变现优质资产，为境外债权人回收资金；PAG以折价获取盈利物业平台的控股权，属于困境资产投资逻辑",
+      "risk": "交易仍需监管及股东批准，存在不确定性；恒大物业与母公司历史资金往来可能引发后续追索或诉讼；清盘所得分配顺序及债权人受偿比例尚不明确；内地物业行业经营环境与关联方风险仍存"
+    },
+    {
+      "source": "南华早报",
+      "url": "https://www.scmp.com/news/world/middle-east/article/3372644/netanyahus-party-claims-election-stolen-results-show-him-losing-majority",
+      "publishedAt": "2026-10-30 07:32",
+      "title": "内塔尼亚胡阵营远未达到多数，其政党声称以色列选举被“窃取”",
+      "summary": "以色列大选最终结果显示，总理内塔尼亚胡的右翼与极右翼阵营赢得议会120席中的53席，领先反对派但远未过半，利库德集团以27席保持最大党地位。这为艰难的联盟谈判或可能再次选举埋下伏笔，其政党声称选举被“窃取”",
+      "analysis": "选举结果延续以色列政治僵局，组阁难度大，再次选举风险上升。内塔尼亚胡阵营指控“窃取”可能加剧政治对立，但需注意该指控缺乏独立证实",
+      "impact": "以色列资产（谢克尔、国债）短期波动风险上升，组阁僵局与重新选举预期可能压制投资情绪；地缘政治不确定性对能源价格影响有限，需观察实际政策变化",
+      "coreLogic": "右翼阵营席位不足半数，组阁需拉拢中间或宗教小党；若谈判失败，议会解散并重新选举。指控选举舞弊可能服务于动员支持者或谈判施压，但无证据支撑",
+      "risk": "组阁谈判破裂导致再次选举；选举舞弊指控引发国内政治动荡；信息不足，无法判断联盟谈判具体进展与各方底线"
+    },
+    {
+      "source": "南华早报",
+      "url": "https://www.scmp.com/tech/tech-trends/article/3372672/chinas-optical-suppliers-extend-sell-fears-slower-ai-growth-trump-upbeat-earnings",
+      "publishedAt": "2026-10-30 12:27",
+      "title": "中国光通信供应商延续抛售，因AI增长放缓担忧盖过乐观财报",
+      "summary": "中国主要光通信供应商股价周五下挫，随后收复部分失地，延续两日抛售，尽管受全球人工智能基础设施热潮推动的第三季度财报表现乐观。在深圳早盘交易中，总部位于成都的新易盛科技一度下跌15%，苏州天孚通信下跌10.3%，行业龙头……",
+      "analysis": "财报乐观却遭抛售，显示市场焦点已从当期业绩转向AI资本开支的可持续性预期，属估值层面的担忧而非基本面恶化",
+      "impact": "短期压制A股光模块、光器件板块情绪，可能拖累通信设备指数及相关ETF；若抛售延续，或波及上游光芯片、连接器等供应链标的，并加大板块波动",
+      "coreLogic": "光通信板块前期涨幅已充分计入AI基建高增长预期，财报利好兑现后，投资者转而担忧后续AI投资增速放缓，触发获利了结与估值回调，形成‘利好出尽’式抛售",
+      "risk": "报道摘要不完整，龙头名称及跌幅缺失；AI需求放缓尚属预期而非事实，若后续云厂商资本开支指引强劲，抛售可能快速逆转；需警惕情绪面超调与个股流动性风险"
+    },
+    {
+      "source": "Nikkei Asia",
+      "url": "https://news.google.com/rss/articles/CBMiuwFBVV95cUxPWnBXai14UXNvMGs4N2NQVGRza0dXWTF2QXg1bV9PNlQ5Q3VDbVQ0WmJNTl9fYzd3RzBiRHJfSFc4SkloUEZFNHpTWXhDY0hYNzQ2VGRTQkhhMDRVTnQ2b09CdGhCNGo0Q2ZKUDRONVRJX0VINzNwUWtScDZ3Z0JoZ0R0ZTJnWjQ0aC1kcTZTd3BjU2RnWXNjNlN1OTZpUl8zNzNGbWY3NHBDcE8wODI2OGpvblFSODg1RWhJ?oc=5",
+      "publishedAt": "2026-10-30 10:25",
+      "title": "日本丸红寻求从AI热潮带来的瓶颈中获利 - 日经亚洲",
+      "summary": "日本丸红寻求从AI热潮带来的瓶颈中获利 日经亚洲",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNA Business",
+      "url": "https://www.channelnewsasia.com/business/insurer-aia-groups-third-quarter-new-business-value-falls-5-6505096",
+      "publishedAt": "2026-10-30 06:31",
+      "title": "保险公司友邦集团第三季度新业务价值下降5%",
+      "summary": "",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNA Asia",
+      "url": "https://www.channelnewsasia.com/east-asia/has-china-ai-bubble-burst-global-tech-boom-6502616",
+      "publishedAt": "2026-10-29 17:53",
+      "title": "中国AI泡沫破灭了吗？这对全球科技繁荣意味着什么",
+      "summary": "尽管这轮下跌引发了对估值和盈利能力的担忧，但分析师表示，这未必意味着中国更广泛的AI雄心以及全球市场会遇到麻烦",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "CNA Business",
+      "url": "https://www.channelnewsasia.com/business/panasonics-battery-unit-posts-higher-q2-operating-profit-lifts-forecast-6506256",
+      "publishedAt": "2026-10-30 15:37",
+      "title": "松下电池部门第二季度营业利润上升，上调预测",
+      "summary": "据CNA Business报道，松下电池部门第二季度营业利润上升，并上调了业绩预测。报道未提供具体财务数据、上调幅度及驱动因素等细节",
+      "analysis": "标题显示电池业务盈利改善并上调指引，或反映车用电池需求与成本改善，但缺乏数据难以判断幅度与可持续性",
+      "impact": "可能提振市场对松下能源业务及日系车用电池供应链的预期，并间接影响特斯拉等客户的电池供应预期；因缺少数据，实际影响有限",
+      "coreLogic": "电池部门营业利润增长并上调预测，通常指向销量提升、产品结构优化或成本下降；但原文未披露具体原因，无法确认利润改善的驱动来源",
+      "risk": "信息不足：未披露利润金额、同比变化、上调幅度及原因；单一媒体标题报道，需以公司财报为准；电池需求与原材料价格波动存在不确定性"
+    },
+    {
+      "source": "CNA Business",
+      "url": "https://www.channelnewsasia.com/business/capgemini-raises-2026-guidance-ai-push-brings-work-it-consultants-6506206",
+      "publishedAt": "2026-10-30 15:13",
+      "title": "凯捷上调2026年指引，AI需求带动IT顾问业务增长",
+      "summary": "据CNA Business报道，凯捷（Capgemini）上调了2026年业绩指引，原因是人工智能相关需求为其IT咨询顾问业务带来增长动力。报道未提供具体财务数据、上调幅度或业务细节",
+      "analysis": "该消息反映AI正从概念转向企业IT服务需求，利好咨询与系统集成商。但缺乏具体数据，指引上调幅度与可持续性待观察",
+      "impact": "对IT咨询与系统集成板块构成温和正面信号，可能提振凯捷及同类企业（如埃森哲、印孚瑟斯）的估值预期；对AI基础设施与软件供应商亦属间接利好",
+      "coreLogic": "企业加速部署AI应用，需要咨询顾问协助规划、集成与落地，带动凯捷IT顾问业务量增长，公司因此上调中期业绩指引",
+      "risk": "报道未披露上调幅度与具体数据，实际影响有限；AI项目落地周期长、客户预算波动、宏观经济放缓及行业竞争加剧均可能使指引不及预期"
+    },
+    {
+      "source": "CNA Asia",
+      "url": "https://www.channelnewsasia.com/asia/thailand-extends-arnon-nampa-activist-jail-term-6506531",
+      "publishedAt": "2026-10-30 17:37",
+      "title": "泰国将活动人士刑期延长至34年以上",
+      "summary": "",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "南华早报",
+      "url": "https://www.scmp.com/news/people-culture/trending-china/article/3372646/kindness-returned-chinese-woman-helped-disabled-man-8-years-ago-now-gets-financial-aid",
+      "publishedAt": "2026-10-30 10:00",
+      "title": "善意得到回报：中国女子8年前帮助残疾男子，如今获得经济援助",
+      "summary": "据南华早报报道，一名中国女子8年前看到社交媒体帖子称一名18岁残疾陌生人穷得吃不起饭，向他捐赠500元人民币（75美元）。八年后，该男子得知她正经历困难时期，便加倍偿还这笔钱，感动许多网友。报道提及2018年来自山东的王树明曾发布视频称自己没钱、吃不起饭",
+      "analysis": "属社会温情类个案报道，不涉及政策或宏观数据。核心是民间互助与网络传播效应，宜作社会心态观察，不宜过度引申为经济信号",
+      "impact": "对相关市场基本无直接影响；或轻微利好公益众筹、社交平台内容生态等社会情绪面，但缺乏可量化传导",
+      "coreLogic": "陌生人小额赠与在多年后因受助者境况改善而获得回馈，经社交媒体放大形成正面叙事，反映民间互助与感恩文化",
+      "risk": "信息主要来自单一媒体报道，细节未经独立核实；个案不具代表性，不宜据此推断社会救助体系或消费能力状况"
+    }
+  ],
+  "china": [
+    {
+      "source": "每日经济新闻",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE1obC1YYU9BVDcwdm5XSXM3RWFER1ZZUnJpRFZWWUdRTVZJdVBDNGtjU19YdlNnMW1VdkRzaXFGbDNibVo2RW9TZ0NneVNMT2JDaVdpVFJFVkJpaHlONjhDeDJQdTNFZw?oc=5",
+      "publishedAt": "2026-10-30 17:41",
+      "title": "前三季度营收首次破百亿，中微公司归母净利大增241%，股权投资相关收益合计19.4亿元",
+      "summary": "据每日经济新闻报道，中微公司前三季度营收首次突破百亿元，归母净利润同比大增241%，其中股权投资相关收益合计19.4亿元",
+      "analysis": "营收破百亿体现主业规模扩张，但净利大增241%中含19.4亿元股权投资相关收益，利润弹性或更多来自非经营性因素，需区分主业盈利质量",
+      "impact": "对半导体设备板块情绪偏正面，营收里程碑或强化国产设备成长预期；但投资收益占比高可能使市场对扣非盈利与主业毛利率更为敏感，后续关注订单、验收节奏及投资收益可持续性",
+      "coreLogic": "营收首破百亿反映半导体设备需求与公司产品放量；归母净利高增部分由股权投资相关收益19.4亿元贡献，即净利润增速显著高于营收增速存在非经营性收益驱动，主业经营杠杆与投资收益共同作用",
+      "risk": "股权投资相关收益具有波动性和不可持续性，若剔除后主业利润增速可能明显低于241%；半导体设备行业受下游资本开支周期、客户验收节奏及外部出口管制等影响，营收与利润存在不确定性"
+    },
+    {
+      "source": "新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTFBYTnAwZ1U2blE2YlR6RWVQbUJ5WUxWYkpHUTh0VkVPWnpVRkxwYS1vXzQycVRVcmt2bHkzamY4MGg3bDBwY1VzZ01lOG1yMzhWYkhkR2JLZC1rY3hiSmh2S0paR1MyYlFtSVBhYVRLaklnVDgtekNRVQ?oc=5",
+      "publishedAt": "2026-10-30 17:07",
+      "title": "中国海油前三季度归母净利润同比增长16.8% - 新浪财经",
+      "summary": "中国海油前三季度归母净利润同比增长16.8% 新浪财经",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "每日经济新闻",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE9ObFgzVjlGUExqTmlkeXpoQkRRaXE5TEY4UGtVc201TmtyQkYyQ2xTRGtpaU1xY0xLcG5teGtrcG1wZXptb0xJM2g0TThnTmxIUWNFUk9YbjM1MHVfdjlQMmxxYUZQdw?oc=5",
+      "publishedAt": "2026-10-30 16:58",
+      "title": "歌力思：高质量发展成效显著，前三季度毛利率与扣非利润大幅提升 - 每日经济新闻",
+      "summary": "歌力思：高质量发展成效显著，前三季度毛利率与扣非利润大幅提升 每日经济新闻",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE1LOUF0ZzlMQTA5VHMxaW55N2RPdDVKMm9objB1QmZxcVpIT0NCRm9ZdUhnWmcwQXYxNVZndS12QVFvWlRqQUpET1kwZ0lpeWE1QWEtb1BnSko4ZzNRa3pTemlBY2RCZWRRaXVRay03akhnaUxHb1BOY1QteF9XcHc?oc=5",
+      "publishedAt": "2026-10-30 16:57",
+      "title": "中国光大银行：前三季度实现归母净利润282.71亿元，同比减少23.63% - 新浪财经",
+      "summary": "中国光大银行：前三季度实现归母净利润282.71亿元，同比减少23.63% 新浪财经",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "每日经济新闻",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFBTZXhvUERQWllxeThxaU1tZjJRMERxTWRsa2NTYTd4TFdlZ3hUWnJwaFRXQTFPLTZWTE1FMjFBWlRWazBKLW1JdXZaNnM4Z1RjZk5panBUSlA1eTl6VUp4eHFMN0FFZw?oc=5",
+      "publishedAt": "2026-10-30 16:55",
+      "title": "中国船舶：第三季度净利润同比增长68% - 每日经济新闻",
+      "summary": "中国船舶：第三季度净利润同比增长68% - 每日经济新闻",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "每日经济新闻",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFBTZXhvUERQWllxeThxaU1tZjJRMERxTWRsa2NTYTd4TFdlZ3hUWnJwaFRXQTFPLTZWTE1FMjFBWlRWazBKLW1JdXZaNnM4Z1RjZk5panBUSlA1eTl6VUp4eHFMN0FFZw?oc=5",
+      "publishedAt": "2026-10-30 16:54",
+      "title": "国新投资三季度新进成为烽火通信第七大股东 - 每日经济新闻",
+      "summary": "国新投资三季度新进成为烽火通信第七大股东 - 每日经济新闻",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMi1AFBVV95cUxPZDctbUNJUFFMalE4UTVwWF9HXy1oQ3RtVmNSSkI0LS1GSmZyckdUUGRYcEw4Mi1NVGo2YlBIa0FEU0pOeVpIMlVEaFlDZDB5cXR0S3Bwbl9xeFJqWW5NcFdrR0hHR0V0WWx1Q3JvMzE1eFN1V1lrV2tGWXQ1T18xbmxGeXZaQ3ZFTzdKQVc3Yk85MjhEVG1BS2FKbnBWbU43RzNFYnJ0enVIVFpvdEcyenZvb0RrU3lWaFZJVkNJdVdBemo0aHBXM2dzVVIta0d5M25yeg?oc=5",
+      "publishedAt": "2026-10-30 16:44",
+      "title": "工商银行：前三季度实现归母净利润2856.4亿元，同比增长5.83% - 新浪财经",
+      "summary": "工商银行：前三季度实现归母净利润2856.4亿元，同比增长5.83% - 新浪财经",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "每日经济新闻",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE5jeTRlNXBueVlsNXpTZUdWVkcycHdVYVZzenZUaVpNaG5Fc1llNjgtNU4tZEZvZzJoUFZOVTZQS1l2MXRYVmFEcDFnWjlKNjN4aTdxS05vaFVfMGpmNkZOaFIwa3BQQQ?oc=5",
+      "publishedAt": "2026-10-30 16:20",
+      "title": "中微公司：第三季度净利润同比增长159%",
+      "summary": "据每日经济新闻，中微公司披露第三季度净利润同比增长159%。该报道仅给出同比增速，未提供营收、毛利率、非经常性损益构成及上年同期基数等细节",
+      "analysis": "净利润高增显示盈利改善，但单季同比易受低基数与非经常性损益影响，需核对财报确认增长质量与可持续性",
+      "impact": "对半导体设备板块情绪偏正面，可能提振投资者对国产设备盈利能力的预期；但缺乏营收与订单等配套数据，实际股价反应取决于后续财报细节及行业景气度",
+      "coreLogic": "报道仅披露第三季度净利润同比增长159%，未说明增长来源（收入增长、毛利率提升、费用摊薄或非经常性收益）及基数情况，因此只能确认盈利同比大幅改善这一事实，无法推断其驱动因素",
+      "risk": "信息有限：未披露营收、扣非净利润、毛利率及在手订单，无法判断增长质量；单季同比受低基数影响可能失真；半导体设备行业受下游资本开支周期与出口管制等政策影响，业绩波动风险较高"
+    },
+    {
+      "source": "新浪财经",
+      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE9leEdIVThmTnJTaHJpdFREZndRWGhVMzVSRVh2bmZibWlEemVlYWEzblY2QW50RzZPZmxxdXM4anBNMmp5Y2JqU1k1d3NMVEtYOENPb2tYQ2drWEYyaGFUNnFaeEU2VmdNNkFEMzY1OVE3R2V5RG9HeQ?oc=5",
+      "publishedAt": "2026-10-30 17:13",
+      "title": "中国人寿前三季度总投资收益率达3.23%，近20年平均投资收益率达5.15%",
+      "summary": "新浪财经报道，中国人寿前三季度总投资收益率为3.23%，并披露近20年平均投资收益率达5.15%。报道未提供具体投资收益金额、资产配置结构及同比变化等细节",
+      "analysis": "该数据反映险资在低利率环境下的收益压力：前三季度3.23%明显低于近20年均值5.15%，显示当期投资端承压。但报道信息有限，缺少同比与同业对比，不宜过度推断",
+      "impact": "可能影响市场对保险板块投资端盈利预期及险资权益配置节奏的判断，但单一数据不足以形成趋势结论",
+      "coreLogic": "长期平均收益率体现险资跨周期配置能力，而单年前三季度数据受权益市场波动与利率下行影响，二者差距说明短期收益与长期中枢存在偏离",
+      "risk": "报道未披露资产配置、同比变化及口径细节；收益率受市场波动影响大，历史均值不代表未来表现，需以公司正式财报为准"
+    },
+    {
+      "source": "每日经济新闻",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE9jUzUzT0tNTzFvand1NVI2N1o0RVVuSG95TFd4UHNxbl9tRjFpR2k5YzJpS0V1RUJNYmd6MVB1OGJHb2lralN3d2tDYkpmRGYwNllfQjhvOVdTXzI3bWp5REhqSUtJQQ?oc=5",
+      "publishedAt": "2026-10-30 17:19",
+      "title": "云路股份第四大股东中国诚通控股集团有限公司三季度增仓185万股",
+      "summary": "据每日经济新闻报道，云路股份第四大股东中国诚通控股集团有限公司在2025年第三季度增持公司股份185万股。报道未披露增持均价、增持后持股比例及增持原因等细节",
+      "analysis": "该消息仅反映单一股东季度内增持行为，规模有限且缺乏增持动机与后续计划说明，对基本面判断的增量信息较少，宜视为中性偏正面信号，不宜过度解读",
+      "impact": "短期内可能对云路股份股价形成轻微正面情绪支撑，提升市场对股东结构的关注度；对云路股份所属板块及大盘的整体影响有限，不构成方向性驱动",
+      "coreLogic": "国有资本运营平台中国诚通对云路股份的增持，可能体现其对该公司所处行业或长期价值的认可，但单季度185万股的增持量相对有限，尚不足以构成趋势性判断依据",
+      "risk": "报道未披露增持价格区间、持股比例变化及后续增减持计划，存在信息不完整风险；股东后续减持、公司业绩不及预期或市场系统性波动均可能使该信号的正面效应减弱"
+    }
+  ],
+  "earnings": [
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/livecoverage/stock-market-today-dow-sp-500-nasdaq-10-30-2026?mod=rss_markets_main",
+      "publishedAt": "2026-10-30 16:44",
+      "title": "今日股市：亚马逊、英特尔财报加剧科技股抛售",
+      "summary": "令人失望的业绩导致股价暴跌，进一步加剧围绕AI交易的担忧",
+      "analysis": "财报不及预期触发抛售，反映市场对AI高估值容错度下降；但单一财报季波动不宜直接等同于AI叙事逆转，需观察后续指引与资金流向",
+      "impact": "美股科技板块及纳斯达克承压，半导体与云计算相关标的波动加大；风险偏好回落可能波及亚太科技股与AI主题基金，避险资金或流向防御性板块",
+      "coreLogic": "科技巨头业绩低于预期→投资者下调AI相关资本开支回报预期→高估值科技股遭集中减仓，抛压从个股扩散至板块，形成对AI交易拥挤度的重新定价",
+      "risk": "财报解读存在样本偏差，单一季度业绩未必代表AI需求趋势；市场情绪放大波动，后续指引、宏观利率与监管变化均可能改变定价方向，信息不足处不宜过度推断"
+    },
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/finance/stocks/u-s-stocks-fall-as-alphabet-slide-weighs-on-ai-optimism-1a8d67b7?mod=rss_markets_main",
+      "publishedAt": "2026-10-30 04:43",
+      "title": "美国股市下跌，Alphabet股价重挫拖累AI乐观情绪",
+      "summary": "美股下跌，谷歌母公司营收不及预期，导致该公司创下史上单只股票单日市值最大跌幅之一，令市场对人工智能基础设施投入回报产生疑虑",
+      "analysis": "Alphabet营收缺口暴露AI投入与变现之间的时间差，龙头股大跌直接打压市场对AI叙事的估值溢价，短期或引发科技股回调与资金再配置",
+      "impact": "科技与AI相关板块承压，资金可能转向防御性资产或估值较低板块；AI资本开支敏感型公司（芯片、云服务、电力设备）波动加大；若后续财报持续验证回报滞后，可能引发更广泛的估值重估",
+      "coreLogic": "市场此前将AI基础设施支出视为确定性增长引擎，并给予高估值；Alphabet营收不及预期说明AI投入尚未转化为相应收入，预期差触发估值修正，并通过权重股拖累大盘",
+      "risk": "单一公司财报不足以判定AI整体回报趋势；后续其他科技巨头财报、AI商业化进展及宏观利率环境均可能改变市场解读，存在情绪过度反应后反弹的可能，不宜据单一事件线性外推"
+    },
+    {
+      "source": "Reuters",
+      "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxObTRZdktaNHNaUkc2SG45TFV3V3hKRlMwdWdFTEhyUVFSRnBodWFIM0gxSHh5NWZDVkp3WnJOX3RTZGFtUDVIN3ZPQnB6NlNOQ01OOXhTRnNhNjkyajZ2ejhEZkRBS1IxMkxjVWJmY3FYa3lqcHUxajVqRXpWdS1UWjdxZFZYTW8tUjBtN2NZTGlLSWFiRlpjTDNKaVlVbHRiLVRCcA?oc=5",
+      "publishedAt": "2026-10-30 07:35",
+      "title": "华尔街收低，Alphabet营收不及预期重燃AI资本支出担忧",
+      "summary": "路透社报道，华尔街主要股指收低，Alphabet营收未达预期，市场对人工智能相关资本支出的担忧再度升温",
+      "analysis": "该消息将AI高投入与盈利兑现之间的落差重新摆上台面，属情绪面利空；但仅凭标题无法判断跌幅与具体财务细节，需以原文数据为准",
+      "impact": "可能压制美股科技股与AI概念板块情绪，并波及半导体、云计算等相关产业链；对A股AI主题或形成短期情绪传导，但幅度取决于后续财报与指引",
+      "coreLogic": "大型科技公司AI资本开支持续扩张，而营收不及预期使投资者质疑投入回报周期，进而压低估值与风险偏好",
+      "risk": "信息仅来自标题与摘要，缺少具体营收数据、指引变化及指数跌幅；单一公司业绩不宜外推为行业趋势，市场反应也可能受利率与宏观数据干扰"
+    },
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/finance/stocks/ai-stocks-fall-after-alphabet-earnings-disappoint-61d526ed?mod=rss_markets_main",
+      "publishedAt": "2026-10-30 02:35",
+      "title": "Alphabet股价下挫，拖累纳斯达克走低",
+      "summary": "美国股市下跌，纳斯达克综合指数领跌，此前Alphabet财报令投资者失望，并引发新一轮人工智能担忧",
+      "analysis": "Alphabet财报不及预期，令市场对其AI投入回报产生疑虑，科技股承压并拖累纳指，反映AI叙事对估值支撑的敏感度上升",
+      "impact": "科技股及AI概念板块可能承压，纳指波动加大；资金或转向防御性板块，市场对后续大型科技股财报与AI资本开支的审视趋严",
+      "coreLogic": "财报失望削弱投资者对Alphabet盈利与AI变现能力的信心，作为权重科技股其下跌直接拖累纳指，并触发市场对AI相关高估值的再定价",
+      "risk": "单一财报解读可能放大短期情绪；AI投资回报周期与宏观利率环境存在不确定性，后续财报或政策信号可能改变市场方向，需警惕波动加剧"
+    },
+    {
+      "source": "Instacart - Investor Relations",
+      "url": "https://news.google.com/rss/articles/CBMi1AFBVV95cUxONDgwdFBDekhKS3p0S1g2QkRDOXBFZ0R1SlFKRWVTMzJPcUxSV0RfcHBuWVhzZWozd0dQWl9sRE9DRE5xaVpqRmtoTnFkcjl0Q3FSWm9NaEh4N0RwUTJ6akFxdXl0MkFReldCQWlzVVZFa2NFTVB6Rmp3bHllMzNlTFFGSVBMLWk4eUFiRW9uTDZQWmRJV1kxazZnS3NkYk9BNVRlVkxZRzdldGtqN1RpSmpKZ0NuUTJLNTRnYVpKY0xzNHlkNHlXczhvWHQyRGNVaUpSQw?oc=5",
+      "publishedAt": "2026-10-29 19:20",
+      "title": "Instacart公布2026年第三季度财务业绩 - Instacart - 投资者关系",
+      "summary": "Instacart公布2026年第三季度财务业绩 Instacart - 投资者关系",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "StockStory",
+      "url": "https://news.google.com/rss/articles/CBMi2gFBVV95cUxNX01kbFFNNnpieFdfbWR4TUJpWlp0ZFNkWDMyX2RNR1E3RVJTbV9KNnZLRVRvM3h3d3B4WVRsUklWTHYzaFNOZ3ctUUpFbUQ2VDJFenRYVF9iam5FTnRIamc4UlBBTHBtZk1MNzRtYU9HekNrN0xSNGZNa3dCT0RsS1psXzFMZEppNUUyci00RWwwbVI4eEl5bWY1QnQyckd1dkxDeXJibzdLZVJnOFhJZFhZdTBpWEVLWUJ0ME5aN2pjUEZpb2xxM3E5M0ZQdkFRRTQxNk80M2Z6QQ?oc=5",
+      "publishedAt": "2026-10-29 19:14",
+      "title": "Garrett Motion（纳斯达克：GTX）2026年第三季度财报：营收符合预期 - StockStory",
+      "summary": "Garrett Motion（纳斯达克：GTX）2026年第三季度财报：营收符合预期 StockStory",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "Cognizant Technology Solutions",
+      "url": "https://news.google.com/rss/articles/CBMixwFBVV95cUxNZFFuNWlMck55NzF4WXI1cERDWmplYXZZcGNaaXo4SGhra1pfWjh5YkpYemoyOXZPOWhXelBJeWgxV3JEdFVVWWpSX2xpVGkwX2pYaFlnWDduM3VwLU56VTM5S2lGajRfUUc5RTVLaXktLW82SVA3RXFOdUV0TkpZOVNuOXJmZEI5VjFCU09aR3hwbzFibzUtUjBWV0RWWmI0ZE5DanpyZ3hKQzFIR3ZkaF9PSXJOMl92TTBaNmY3TWlGOVVVSnlj?oc=5",
+      "publishedAt": "2026-10-29 18:48",
+      "title": "Cognizant公布2026年第三季度业绩 - Cognizant Technology Solutions",
+      "summary": "Cognizant公布2026年第三季度业绩 - Cognizant Technology Solutions",
+      "ai_msg": "本条新闻暂未进行AI深度评论"
+    },
+    {
+      "source": "Yahoo Finance Singapore",
+      "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPWS02NmpaMXp2WjRqQ1ZaVnlFLWxoXzlmdnFHLTI0S2h1b0ktSDktMzZoVHA3UXFUbzlYN2ttRy12dk5sSWE4amJKV00wdExtUWJVZVFKdnl5VzVYbS13cE5nYkRDd0FRYU1TWDV3T2JXTENOOGhyb3F3ZzMwUkswZzJJSk4?oc=5",
+      "publishedAt": "2026-10-30 16:24",
+      "title": "科技公司再遭打击，盈利不及预期加剧AI担忧",
+      "summary": "雅虎财经新加坡报道称，科技公司再度遭遇业绩打击，盈利表现不及市场预期，进一步加剧了投资者对人工智能相关业务的担忧",
+      "analysis": "标题与摘要信息有限，仅表明科技板块业绩疲弱与AI担忧升温，具体公司、数据及因果链条未披露，需谨慎解读",
+      "impact": "可能压制科技股及AI概念板块风险偏好，短期或引发估值回调与资金轮动，但缺乏具体数据支撑，影响幅度难以量化",
+      "coreLogic": "盈利不及预期被视为科技公司基本面承压的信号，叠加市场对AI投入回报周期的疑虑，形成负面情绪共振",
+      "risk": "原文信息不足，未披露具体公司、财务数据及下跌原因；不宜推断单一因果，市场反应可能受宏观与情绪因素放大"
+    },
+    {
+      "source": "The Hindu",
+      "url": "https://news.google.com/rss/articles/CBMivwFBVV95cUxQN0p0S2NMWWZWdWJDYUY1VVRtdzVVVzk0RHFYS29JVEJBTXdFUVB6d2k1LVRTME94cW1NMmF5ZjMwb0lFRGNSWHc3dlhHVDZXN2l1dlF6eWgzM08ybkVhbWJpSXU5RjhtQWdlbW0tTnphUGFRZUZ0QXJTNHY3X1B6bzJXYUp6STdnYUZqM09JeGFfWkx5QlFhblF3Y1FoRjRxMkIxQVo5MWhuRXJ4RnZWNm5McC1sNlVuYkcySzF1SdIBxgFBVV95cUxQSHJsaUNrOHJ1d0pacFdjNXV3UTFxWW9Mc2FDdzc2VTQyRU1idzVvSTFhbzFXQUY5dWRIY0pDNUNNUlJYZmN2VEl4b2x2OWUtVGotNWlSR1JyTlF0WVNvby1hWFdzSkxQZGV5WFRtU3EzSjhTMFNTYlJrSUlENncwQllLYXhSMGFTalZMazJ4S1BHR1ZuYlZyYTNkeVhxcmU2bGdXeGhEQVVzSnpkSThOTko5YW1tbGdRZEVadm5WSzlMQTljT3c?oc=5",
+      "publishedAt": "2026-10-30 12:47",
+      "title": "科技公司再遭打击，盈利不及预期加剧AI担忧",
+      "summary": "据《印度教徒报》报道，科技公司再度遭遇业绩打击，盈利表现不及市场预期，进一步加剧了市场对人工智能相关业务的担忧",
+      "analysis": "报道仅给出标题与摘要，未提供具体公司、财务数据或市场反应细节，难以判断影响范围。核心信息是科技板块盈利不及预期与AI担忧相互强化，但因果关系需以原始报道为准",
+      "impact": "可能压制科技股及AI概念相关资产的风险偏好，但缺乏具体数据，影响幅度与范围无法量化",
+      "coreLogic": "科技公司盈利不及预期，叠加市场对AI投入回报的疑虑，形成负面情绪共振，导致板块承压",
+      "risk": "信息不足：未披露涉事公司、盈利差距、时间与市场反应；AI担忧的具体来源不明，存在过度解读风险"
+    },
+    {
+      "source": "WSJ Markets",
+      "url": "https://www.wsj.com/business/earnings/intercontinental-exchange-posts-higher-profit-revenue-7fed5918?mod=rss_markets_main",
+      "publishedAt": "2026-10-29 20:15",
+      "title": "洲际交易所利润与营收增长",
+      "summary": "洲际交易所第三季度实现利润9.4亿美元，合每股1.67美元；上年同期为8.16亿美元，合每股1.42美元",
+      "analysis": "利润与营收同比双升，显示交易所核心业务量能稳健；但摘要未披露营收具体数字及增长驱动，需结合完整财报判断持续性",
+      "impact": "对交易所板块情绪偏正面，可能强化市场对交易基础设施类公司盈利韧性的预期；但单一季度数据对大盘和利率路径的指示有限，影响更多集中在个股及同业估值比较",
+      "coreLogic": "交易所盈利主要来自交易清算、数据服务等费用收入，利润增长通常反映交易活跃度提升或成本控制见效；每股收益同步上升，说明盈利增长未被股本稀释明显抵消",
+      "risk": "摘要信息有限，未说明营收规模、增长来源及一次性项目；利润增长可能受非经常性因素影响，后续交易量回落或监管政策变化均可能削弱盈利表现"
+    }
+  ]
+};</script>
+<!-- NEWS_DATA_END -->
+
+<script>
+"use strict";
+const labels = { global: "国际财经新闻", asia: "亚太财经新闻", china: "国内财经新闻", earnings: "核心财报新闻" };
+const activeKey = "financeDashboardActiveTab_v6";
+const validTabs = ["global", "asia", "china", "earnings"];
+let active = "global";
+
+try {
+ const savedTab = localStorage.getItem(activeKey);
+ if (validTabs.includes(savedTab)) active = savedTab;
+} catch(e) {}
+
+const readKey = "financeDashboardRead_v6";
+let readIds = new Set();
+try { readIds = new Set(JSON.parse(localStorage.getItem(readKey) || "[]")); } catch(e) {}
+
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function safeUrl(v) {
+ try {
+  const u = new URL(String(v || ""), location.href);
+  if (["https:", "http:"].includes(u.protocol)) return u.href;
+ } catch(e) {}
+ return "#";
+}
+
+/* 修改点：原文在当前页面打开，不再创建新标签页 */
+function articleLink(n) {
+ const href = String(n.url || "");
+ if (!href || href === "#") return '<span class="muted text-xs">暂无可用原文链接</span>';
+ return '<a href="' + esc(safeUrl(href)) + '" target="_self">查看原始报道 ↗</a>';
+}
+
+function list(items) {
+ if (Array.isArray(items) && items.length) {
+  return "<ul>" + items.map(x => `<li>${esc(x)}</li>`).join("") + "</ul>";
+ }
+ return "<p>暂无足够信息。</p>";
+}
+
+function getRankedData() {
+ const all = (typeof window.newsData !== "undefined" && window.newsData && Array.isArray(window.newsData[active])) ? window.newsData[active] : [];
+ return all;
+}
+
+function renderAIResearch(n) {
+ if (!n.analysis) return `
+  <div class="mt-3 p-3 rounded bg-slate-900/60 border border-slate-800 text-xs muted">
+   💡 本条资讯暂未加载 AI 深度宏观拆解，可点击下方链接直达原文进行深度阅读。
+  </div>`;
+ return `
+  <section class="ai mt-3 mb-3">
+   <div class="font-bold text-cyan-300 mb-2">🧭 AI 深度宏观与时政分析 <span class="pill">${esc(n.confidence || "置信度未标注")}</span></div>
+   <p class="leading-relaxed mb-3">${esc(n.analysis)}</p>
+   <div class="research-grid">
+    <div class="research-box"><h4>📌 核心逻辑</h4><p>${esc(n.coreLogic || "暂无。")}</p></div>
+    <div class="research-box"><h4>📈 潜在市场影响</h4><p>${esc(n.marketImpact || n.impact || "暂无法判断。")}</p></div>
+    <div class="research-box"><h4>🔗 传导机制</h4><p>${esc(n.transmission || "当前信息不足。")}</p></div>
+    <div class="research-box"><h4>⏳ 影响周期</h4><p>${esc(n.timeHorizon || "暂不确定。")}</p></div>
+    <div class="research-box"><h4>🧾 证据线索</h4>${list(n.evidence)}</div>
+    <div class="research-box"><h4>⚖️ 情景分析</h4>${list(n.scenarios)}</div>
+    <div class="research-box research-wide"><h4>⚠️ 风险与缺口</h4><p>${esc(n.risk || "尚未识别。")}</p></div>
+   </div>
+  </section>`;
+}
+
+function renderCard(n, i, listLen, isFeatured = false) {
+ const rid = active + "_" + String(n.url || n.title || i);
+ const read = readIds.has(rid);
+ const assets = Array.isArray(n.asset) ? n.asset : [];
+ const score = n._importance || 50;
+ const level = score >= 65 ? "高" : score >= 45 ? "中" : "常规";
+
+ if (isFeatured) {
+  return `
+   <article class="featured-card priority-${level === "高" ? "high" : "medium"}">
+    <div class="flex flex-wrap gap-2 items-center mb-2">
+     <span class="score-badge">🔥 TOP ${i + 1} · 权重 ${score}/100</span>
+     <span class="pill">评级：${level}</span>
+     <span class="pill">${esc(n.source || "国际权威媒体")}</span>
+     <span class="pill">${esc(n.publishedAt || "")}</span>
+    </div>
+    <h3 class="adaptive-title font-bold text-amber-200 mb-2">${esc(n.title || "无标题")}</h3>
+    <p class="featured-meta mt-2 text-slate-300 leading-relaxed">${esc(n.summary || "暂无摘要")}</p>
+
+    <div class="flex flex-wrap gap-2 mt-3 mb-2">
+     <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
+     ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
+    </div>
+
+    ${renderAIResearch(n)}
+    <div class="mt-3 text-sm flex justify-between items-center">
+     ${articleLink(n)}
+     <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">${read ? "✓ 已读" : "标记已读"}</button>
+    </div>
+   </article>`;
+ }
+
+ return `
+  <article class="card ${read ? "read" : ""} priority-${level === "高" ? "high" : "low"}">
+   <div class="flex flex-wrap justify-between gap-2 items-center mb-3">
+    <div class="flex flex-wrap gap-2 items-center">
+     <span class="score-badge">权重 ${score}/100</span>
+     <span class="pill">${esc(n.id || ("NO." + (listLen - i)))}</span>
+     <span class="pill">${esc(n.source || "国际权威媒体")}</span>
+     <span class="pill">${esc(n.publishedAt || "")}</span>
+    </div>
+    <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">${read ? "✓ 已读" : "标记已读"}</button>
+   </div>
+
+   <h3 class="adaptive-title font-bold text-slate-100 mb-2" title="${esc(n.title || "")}">${esc(n.title || "无标题")}</h3>
+
+   <p class="text-slate-300 leading-relaxed mb-3">${esc(n.summary || "暂无摘要")}</p>
+
+   <div class="flex flex-wrap gap-2 mb-3">
+    <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
+    ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
+   </div>
+
+   ${renderAIResearch(n)}
+   <div class="text-sm">${articleLink(n)}</div>
+  </article>`;
+}
+
+function render() {
+ const container = document.getElementById("newsList");
+ const featuredWrap = document.getElementById("featuredWrap");
+ const featuredList = document.getElementById("featuredList");
+ if (!container) return;
+
+ const all = getRankedData();
+ const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
+ const filtered = all.filter(n => [
+  n.title, n.summary, n.source, (n.asset || []).join(" "),
+  n.analysis, n.coreLogic, n.marketImpact, n.transmission, n.risk, n.originalTitle
+ ].join(" ").toLowerCase().includes(q));
+
+ document.getElementById("sectionTitle").textContent = labels[active] || "财经新闻";
+
+ // 经典分层：只要有新闻，前 3 条独立渲染为醒目的 TOP 3，其余作为常规资讯流
+ const useFeatured = filtered.length > 0 && !q;
+
+ if (featuredWrap) {
+  if (useFeatured) {
+   featuredWrap.style.display = "block";
+   const top3 = filtered.slice(0, 3);
+   if (featuredList) featuredList.innerHTML = top3.map((n, i) => renderCard(n, i, top3.length, true)).join("");
+  } else {
+   featuredWrap.style.display = "none";
+  }
+ }
+
+ const regularItems = useFeatured ? filtered.slice(3) : filtered;
+ document.getElementById("count").textContent = `显示常规资讯 ${regularItems.length} 条`;
+
+ if (!regularItems.length) {
+  container.innerHTML = `<div class="card muted">当前栏目常规资讯已全部在上方 TOP 3 区域置顶展示。</div>`;
+  return;
+ }
+
+ container.innerHTML = regularItems.map((n, i) => renderCard(n, i, regularItems.length, false)).join("");
+
+ container.querySelectorAll("[data-read-id]").forEach(button => {
+  button.addEventListener("click", () => {
+   readIds.add(button.getAttribute("data-read-id"));
+   try { localStorage.setItem(readKey, JSON.stringify([...readIds])); } catch(e) {}
+   render();
+  });
+ });
+}
+
+function setTab(name) {
+ if (!validTabs.includes(name)) return;
+ active = name;
+ try { localStorage.setItem(activeKey, name); } catch(e) {}
+ document.querySelectorAll("[data-tab]").forEach(button => {
+  button.classList.toggle("active", button.dataset.tab === name);
+ });
+ render();
+ window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.querySelectorAll("[data-tab]").forEach(button => {
+ button.addEventListener("click", () => setTab(button.dataset.tab));
+});
+
+const searchInput = document.getElementById("searchInput");
+if (searchInput) searchInput.addEventListener("input", render);
+
+/* 手机手势逻辑：同时支持左右滑动切换栏目 与 顶部下拉刷新 */
+(() => {
+ let startX = 0, startY = 0, tracking = false;
+ const MIN_X = 70, DOMINANCE = 2, MAX_MS = 900;
+ const ptrSpinner = document.getElementById("ptr-spinner");
+
+ document.addEventListener("touchstart", e => {
+  if (e.touches.length !== 1) { tracking = false; return; }
+  if (e.target.closest("input, textarea, select, button, a, summary")) { tracking = false; return; }
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+  tracking = true;
+ }, { passive: true });
+
+ document.addEventListener("touchmove", e => {
+  if (!tracking || !e.touches.length) return;
+  const dy = e.touches[0].clientY - startY;
+  // 当页面处于最顶端且向下拖动时，显示刷新提示
+  if (window.scrollY === 0 && dy > 40 && ptrSpinner) {
+   ptrSpinner.style.top = "15px";
+   ptrSpinner.style.opacity = "1";
+  }
+ }, { passive: true });
+
+ document.addEventListener("touchend", e => {
+  if (!tracking || !e.changedTouches.length) { tracking = false; return; }
+  tracking = false;
+
+  const dx = e.changedTouches[0].clientX - startX;
+  const dy = e.changedTouches[0].clientY - startY;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+
+  // 1. 下拉刷新逻辑：页面在最顶部且下滑距离超过 90px
+  if (window.scrollY <= 10 && dy > 90 && ay > ax * 1.5) {
+   if (ptrSpinner) {
+    ptrSpinner.innerHTML = "⚡ 正在刷新页面...";
+    ptrSpinner.style.top = "15px";
+    ptrSpinner.style.opacity = "1";
+   }
+   setTimeout(() => {
+    window.location.reload();
+   }, 300);
+   return;
+  }
+
+  // 隐藏刷新提示
+  if (ptrSpinner) {
+   ptrSpinner.style.top = "-50px";
+   ptrSpinner.style.opacity = "0";
+  }
+
+  // 2. 左右滑动切换栏目逻辑
+  if (ax >= MIN_X && ax > ay * DOMINANCE) {
+   const i = validTabs.indexOf(active);
+   if (dx < 0 && i < validTabs.length - 1) setTab(validTabs[i + 1]);
+   else if (dx > 0 && i > 0) setTab(validTabs[i - 1]);
+  }
+ }, { passive: true });
+})();
+
+if (typeof window.newsData !== "undefined" && window.newsData?.updatedAt) {
+ const ut = document.getElementById("updateTime");
+ if (ut) ut.textContent = window.newsData.updatedAt;
+}
+
+const st = window.newsData?.aiStats;
+const aiStatusEl = document.getElementById("aiStatus");
+if (aiStatusEl) {
+ aiStatusEl.textContent = window.newsData?.aiEnabled
+  ? `🟢 DeepSeek 已配置 · ${window.newsData.aiModel || "deepseek-chat"}${st ? ` · 成功 ${st.successes}/${st.attempts}` : ""}`
+  : "🟠 未检测到 DeepSeek API 密钥";
+}
+
+document.querySelectorAll("[data-tab]").forEach(button => {
+ button.classList.toggle("active", button.dataset.tab === active);
+});
+
+document.addEventListener("DOMContentLoaded", render);
+render();
+</script>
+</body>
+</html>
