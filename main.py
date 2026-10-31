@@ -2,7 +2,6 @@ import os
 import requests
 import feedparser
 
-# 读取 Telegram 配置
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 
@@ -27,69 +26,65 @@ def get_working_node():
             continue
     return "https://rsshub.rssforever.com"
 
-def fetch_reliable_tech_posts():
+def fetch_comprehensive_posts():
     node = get_working_node()
-    print("🚀 正在拉取 36氪及全网科技 AI 核心快讯...")
     posts = []
 
-    # 抓取 36氪快讯（最稳健的科技资讯源）
+    # 1. 抓取 36氪快讯（科技与 AI 核心硬核资讯）
+    print("🚀 正在拉取 36氪科技 AI 快讯...")
     try:
-        url = f"{node}/36kr/newsflashes"
-        resp = requests.get(url, timeout=8)
+        resp = requests.get(f"{node}/36kr/newsflashes", timeout=6)
         if resp.status_code == 200:
             feed = feedparser.parse(resp.content)
-            keywords = ["AI", "大模型", "智能体", "芯片", "科技", "开源", "Claude", "GPT", "算力", "机器人"]
-            
+            keywords = ["AI", "大模型", "智能体", "芯片", "科技", "开源", "Claude", "GPT", "算力"]
             for entry in feed.entries:
                 title = entry.title.strip().replace('\n', ' ')
-                link = entry.link
-                
-                # 优先挑选科技/AI相关，若数量不够则按顺序补充
-                if any(kw.lower() in title.lower() for kw in keywords) or len(posts) < 4:
-                    if not any(p['link'] == link for p in posts):
+                # 优先匹配科技AI，若数量不够则按顺序补充
+                if any(kw.lower() in title.lower() for kw in keywords) or len(posts) < 2:
+                    if not any(p['link'] == entry.link for p in posts):
                         posts.append({
-                            "title": title[:85] + "..." if len(title) > 85 else title,
-                            "link": link
+                            "source": "科技AI",
+                            "title": title[:75] + "..." if len(title) > 75 else title,
+                            "link": entry.link
                         })
-                if len(posts) >= 8: # 严格控制在 8 条以内
+                if len(posts) >= 4:
                     break
     except Exception as e:
         print(f"抓取 36氪快讯失败: {e}")
 
-    # 如果数量不够，用知乎科技热榜作为补充，确保每次都有优质内容
-    if len(posts) < 8:
-        try:
-            url_zhihu = f"{node}/zhihu/hotlist"
-            resp = requests.get(url_zhihu, timeout=8)
-            if resp.status_code == 200:
-                feed = feedparser.parse(resp.content)
-                for entry in feed.entries:
-                    title = entry.title.strip().replace('\n', ' ')
-                    link = entry.link
-                    if not any(p['link'] == link for p in posts):
-                        posts.append({
-                            "title": title[:85] + "..." if len(title) > 85 else title,
-                            "link": link
-                        })
-                    if len(posts) >= 8:
-                        break
-        except Exception as e:
-            print(f"补充知乎热榜失败: {e}")
+    # 2. 抓取知乎热榜（涵盖中文圈时政、社会议题、经济与综合热点）
+    print("🌐 正在拉取中文圈时政与社会热点...")
+    try:
+        resp = requests.get(f"{node}/zhihu/hotlist", timeout=6)
+        if resp.status_code == 200:
+            feed = feedparser.parse(resp.content)
+            for entry in feed.entries:
+                title = entry.title.strip().replace('\n', ' ')
+                if not any(p['link'] == entry.link for p in posts):
+                    posts.append({
+                        "source": "时政热点",
+                        "title": title[:75] + "..." if len(title) > 75 else title,
+                        "link": entry.link
+                    })
+                if len(posts) >= 8: # 总计控制在 8 条以内
+                    break
+    except Exception as e:
+        print(f"抓取知乎热榜失败: {e}")
 
     return posts
 
 def format_board(posts):
-    board = "🔥 <b>【中文科技 & AI 圈精选快讯看板】</b>\n"
+    board = "🔥 <b>【科技 AI & 中文圈时政热点看板】</b>\n"
     board += "───────────────────────────\n\n"
     
     if not posts:
-        board += "<i>当前时间窗口内暂无新快讯</i>\n"
+        board += "<i>当前时间窗口内暂无新推送</i>\n"
     else:
         for i, post in enumerate(posts, 1):
-            board += f"🔹 <b>#{i}</b> <a href='{post['link']}'>{post['title']}</a>\n\n"
+            board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>多节点自动容灾 | 36氪科技与AI精选推送</i>"
+    board += "🤖 <i>多节点自动容灾 | 科技 AI 与中文圈时政综合推送</i>"
     return board
 
 def send_telegram(text):
@@ -114,6 +109,6 @@ def send_telegram(text):
         print(f"❌ 发送 Telegram 消息失败: {e}")
 
 if __name__ == "__main__":
-    posts = fetch_reliable_tech_posts()
+    posts = fetch_comprehensive_posts()
     board_content = format_board(posts)
     send_telegram(board_content)
