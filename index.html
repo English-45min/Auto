@@ -1,944 +1,127 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0f19">
-<meta name="google" content="notranslate">
-<title>billboard // 财经时政看点</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:#0b0f19;color:#e2e8f0;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
-.tab{padding:.75rem .6rem;border-bottom:2px solid transparent;color:#94a3b8;font-weight:700;cursor:pointer;touch-action:pan-y}
-.tab.active{border-color:#f59e0b;color:#f59e0b}
-.card{background:#111827;border:1px solid #263244;border-radius:14px;padding:16px;overflow-wrap:anywhere}
-.muted{color:#94a3b8}
-.ai{background:#0d2430;border:1px solid #155e75;border-radius:10px;padding:12px}
-.pill{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#1e293b;color:#cbd5e1}
-.read{opacity:.72}
-.btn{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:7px 10px;cursor:pointer}
-.btn:hover{background:#334155}
-a{color:#fbbf24;text-decoration:none}
-a:hover{text-decoration:underline}
-input{outline:none}
-input:focus{border-color:#f59e0b}
+import os
+import requests
+import feedparser
 
-/* 3D 立体黑底金字 LOGO 样式 */
-.3d-gold-logo {
-  background: #090d16;
-  border: 1px solid #b45309;
-  border-radius: 12px;
-  padding: 6px 14px;
-  display: inline-flex;
-  align-items: center;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(251, 191, 36, 0.3);
-}
+TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
+TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 
-.3d-gold-text {
-  background: linear-gradient(180deg, #ffe082 0%, #f59e0b 50%, #b45309 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: 900;
-  letter-spacing: 0.03em;
-  /* 打造 3D 浮雕与发光立体压感 */
-  filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.9)) drop-shadow(0px 0px 8px rgba(245, 158, 11, 0.3));
-}
+RSSHUB_NODES = [
+    os.getenv('RSSHUB_URL', '').rstrip('/'),
+    "https://rsshub.rssforever.com",
+    "https://rsshub.app"
+]
 
-.adaptive-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 1.15em;
-  line-height: 1.55;
-  font-weight: 800;
-}
-@media (min-width: 640px) {
-  .adaptive-title {
-    display: block;
-    -webkit-line-clamp: unset;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
+def get_working_node():
+    for node in RSSHUB_NODES:
+        if not node:
+            continue
+        try:
+            res = requests.get(f"{node}/36kr/newsflashes", timeout=4)
+            if res.status_code == 200:
+                print(f"✅ 使用可用节点: {node}")
+                return node
+        except Exception:
+            continue
+    return "https://rsshub.rssforever.com"
 
-/* 经典醒目的 TOP 3 独立渲染区样式 */
-.featured-wrap{border:2px solid #b45309;background:linear-gradient(135deg,#291808,#111827 70%);border-radius:18px;padding:18px;margin-bottom:24px;box-shadow:0 10px 25px -5px rgba(180,83,9,0.2)}
-.featured-title{font-size:1.4rem;font-weight:900;color:#fbbf24;letter-spacing:.02em}
-.featured-card{border:1px solid #d97706;background:#171c28;border-radius:14px;padding:16px;margin-top:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+def fetch_comprehensive_posts():
+    node = get_working_node()
+    posts = []
 
-.priority-high{border-color:#ef4444!important;box-shadow:inset 4px 0 #ef4444}
-.priority-medium{border-color:#f59e0b!important;box-shadow:inset 4px 0 #f59e0b}
-.score-badge{display:inline-block;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:900;background:#451a03;color:#fde68a}
+    # 1. 抓取【硬核科技 AI】板块（强关键词过滤，严格取 4 条）
+    print("🚀 正在拉取 36氪科技 AI 精选快讯...")
+    try:
+        resp = requests.get(f"{node}/36kr/newsflashes", timeout=8)
+        if resp.status_code == 200:
+            feed = feedparser.parse(resp.content)
+            tech_keywords = ["ai", "大模型", "智能体", "芯片", "科技", "开源", "claude", "gpt", "算力", "机器人", "nvidia", "微软", "谷歌", "anthropic", "openai"]
+            
+            for entry in feed.entries:
+                title = entry.title.strip().replace('\n', ' ')
+                # 只有标题包含科技/AI核心词汇才保留，杜绝票房/金融杂讯
+                if any(kw in title.lower() for kw in tech_keywords):
+                    posts.append({
+                        "source": "科技AI",
+                        "title": title[:75] + "..." if len(title) > 75 else title,
+                        "link": entry.link
+                    })
+                if len([p for p in posts if p['source'] == '科技AI']) >= 4:
+                    break
+    except Exception as e:
+        print(f"❌ 抓取 36氪快讯失败: {e}")
 
-.research-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.research-box{background:#0b1220;border:1px solid #263244;border-radius:9px;padding:10px;min-width:0}
-.research-box h4{font-size:.85em;font-weight:800;color:#7dd3fc;margin:0 0 6px}
-.research-box p,.research-box li{font-size:.92em;line-height:1.6;color:#dbeafe}
-.research-box ul{padding-left:1.2rem;margin:0}
-.research-wide{grid-column:1/-1}
+    # 2. 抓取【中文圈时政/社会热点】板块（多路由强拉取，严格取 4 条）
+    print("🌐 正在拉取中文圈时政与社会热点...")
+    politics_sources = [
+        f"{node}/zaobao/realtime/china",  # 联合早报 - 中国实时（最稳的时政源）
+        f"{node}/thepaper/featured",      # 澎湃新闻
+        f"{node}/zhihu/hotlist"           # 知乎热榜
+    ]
 
-/* 下拉刷新提示条 */
-#ptr-spinner {
-  position: fixed;
-  top: -50px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 99;
-  background: #1e293b;
-  color: #fbbf24;
-  border: 1px solid #d97706;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: bold;
-  transition: top 0.2s ease, opacity 0.2s ease;
-  opacity: 0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-}
+    for p_url in politics_sources:
+        try:
+            resp = requests.get(p_url, timeout=6)
+            if resp.status_code == 200:
+                feed = feedparser.parse(resp.content)
+                if feed.entries:
+                    p_count = 0
+                    for entry in feed.entries:
+                        title = entry.title.strip().replace('\n', ' ')
+                        # 避免重复
+                        if not any(p['link'] == entry.link for p in posts):
+                            posts.append({
+                                "source": "中文圈时政",
+                                "title": title[:75] + "..." if len(title) > 75 else title,
+                                "link": entry.link
+                            })
+                            p_count += 1
+                        if p_count >= 4:
+                            break
+                    if p_count >= 4:
+                        print(f"✅ 成功获取 4 条中文圈时政热点！")
+                        break
+        except Exception as e:
+            print(f"⚠️ 抓取 {p_url} 异常: {e}")
+            continue
 
-@media(max-width:520px){
- .card{padding:12px}
- .tab{font-size:12px;padding:.65rem .18rem}
- .research-grid{grid-template-columns:1fr}
- .research-wide{grid-column:auto}
-}
-</style>
-</head>
-<body>
+    return posts
 
-<!-- 下拉刷新动画提示 -->
-<div id="ptr-spinner">🔄 下拉刷新中...</div>
+def format_board(posts):
+    board = "🔥 <b>【科技 AI & 中文圈时政热点看板】</b>\n"
+    board += "───────────────────────────\n\n"
+    
+    if not posts:
+        board += "<i>当前时间窗口内暂无新推送</i>\n"
+    else:
+        for i, post in enumerate(posts, 1):
+            board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
+            
+    board += "───────────────────────────\n"
+    board += "🤖 <i>多节点自动容灾 | 纯正科技 AI (4条) + 中文时政 (4条)</i>"
+    return board
 
-<header class="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
- <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-  <div>
-   <div class="3d-gold-logo">
-    <h1 class="text-lg sm:text-xl 3d-gold-text">📊 BILLBOARD // 财经时政看点</h1>
-   </div>
-   <p class="muted text-xs sm:text-sm mt-1.5 pl-1">全球公信力媒体 · 宏观深度分析 · 纯净直达</p>
-  </div>
-  <div class="text-xs muted">
-   最近更新：<span id="updateTime">2026-10-29 14:40:58</span>
-   <div id="aiStatus" class="mt-1">AI 状态读取中</div>
-  </div>
- </div>
-</header>
-
-<main class="max-w-6xl mx-auto px-4 py-5">
- <div class="flex flex-wrap gap-2 items-center mb-4">
-  <input id="searchInput" type="search"
-   class="flex-1 min-w-48 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-slate-100"
-   placeholder="搜索标题、摘要、来源、逻辑或资产…"
-   aria-label="搜索新闻">
- </div>
-
- <nav class="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 mb-5" id="tabs">
-  <button class="tab" data-tab="global" type="button">国际财经 Top 20</button>
-  <button class="tab" data-tab="asia" type="button">亚太财经 Top 10</button>
-  <button class="tab" data-tab="china" type="button">国内财经 Top 10</button>
-  <button class="tab" data-tab="earnings" type="button">📊 核心财报 Top 10</button>
- </nav>
-
- <!-- 经典醒目的 TOP 3 独立置顶区 -->
- <section id="featuredWrap" class="featured-wrap">
-  <div class="flex flex-wrap items-center justify-between gap-2">
-   <h2 class="featured-title">🔥 当日重点新闻 · TOP 3 深度聚焦</h2>
-   <span class="pill bg-amber-900/60 text-amber-200 font-bold">高权重重磅事件</span>
-  </div>
-  <div id="featuredList"></div>
- </section>
-
- <div class="flex justify-between items-center gap-3 mb-3">
-  <h2 id="sectionTitle" class="text-lg font-bold">国际财经新闻</h2>
-  <span id="count" class="muted text-sm">0 条</span>
- </div>
-
- <p class="muted text-xs mb-4">
-  提示：上方独立呈现当日最强 TOP 3 焦点，下方展示常规资讯流；手机端可左右滑动切换栏目，顶部下拉可刷新页面。
- </p>
-
- <div id="newsList" class="space-y-4" aria-live="polite">
-  <div class="card muted">看板正在初始化……</div>
- </div>
-
- <footer class="muted text-xs mt-8 leading-relaxed">
-  免责声明：本看板用于财经信息整理与阅读，不代表任何媒体官方产品，不构成投资建议。
-  <p class="mt-1">© 2026 billboard // 财经时政看点</p>
- </footer>
-</main>
-
-<!-- NEWS_DATA_START -->
-<script>window.newsData={
-  "updatedAt": "2026-10-31 10:34:33",
-  "aiEnabled": true,
-  "aiModel": "deepseek-chat",
-  "aiStats": {
-    "attempts": 3,
-    "successes": 3,
-    "translationCalls": 1
-  },
-  "global": [
-    {
-      "source": "Tekedia",
-      "url": "https://news.google.com/rss/articles/CBMisgFBVV95cUxPcVdDeDVRTzN2M1lBekN3NHF4cXdCSjFFUVRmWXNLb3FpT0pNbTVNMF9ndXpuS0ZaTE9RSWJXNGcwRXMzdFpfdlc5amNvTklzcTk5LTFKbmhwaEsyVV8yRVEtNUlXX2UwV0pxZUcyNEpiX1liYy0yU0VGaEt2ZndoSUlaNV9NdGFKaGVoS21MRXVoMDNDVDdoZFNZeS1sRC1SYTAwOFQzZHBjSFBIYmNnX0FR?oc=5",
-      "publishedAt": "2026-10-31 00:57",
-      "title": "美联储维持利率在3.75%–4%不变，凯文·沃什宣布FOMC会议变动",
-      "summary": "据Tekedia报道，美联储将联邦基金利率目标区间维持在3.75%–4%不变；报道同时称凯文·沃什宣布了FOMC会议变动。该报道未在标题与摘要中说明会议变动的具体内容、生效时间及决策依据，相关细节需以美联储官方声明与会议纪要为准",
-      "analysis": "利率维持不变本身符合观望基调，但“FOMC会议变动”表述含糊，若涉及会议安排或沟通机制调整，可能影响政策可预期性。在缺乏官方细节前，不宜推断其政策含义",
-      "impact": "利率不变通常对短端利率与美元影响中性；若会议变动被解读为沟通或决策流程调整，可能抬升利率路径不确定性，波及美债收益率曲线、美元指数及成长股估值。具体影响取决于官方细节，当前不宜量化",
-      "coreLogic": "美联储按兵不动，体现对通胀与增长前景的谨慎平衡；凯文·沃什相关会议变动消息构成额外制度性变量，但报道信息有限，核心逻辑应落在“政策利率稳定＋会议机制不确定性”两条线上，而非对利率路径的方向性判断",
-      "risk": "主要风险是信息不完整：报道未披露会议变动的性质与范围，存在误读或过度解读风险；若后续官方信息与报道不符，市场预期可能快速修正。此外，利率维持不变的时长取决于通胀与就业数据，存在数据超预期风险"
-    },
-    {
-      "source": "BBC Business",
-      "url": "https://www.bbc.co.uk/news/articles/cm9qzdqpxy48o?at_medium=RSS&at_campaign=rss",
-      "publishedAt": "2026-10-30 20:04",
-      "title": "谷歌自身AI搜索冲击广告销售，市值暴跌5000亿美元",
-      "summary": "谷歌披露其自有AI搜索摘要正在影响广告收入后，令投资者大为恐慌，股价跌至六个月低点",
-      "analysis": "核心矛盾在于AI搜索摘要减少用户点击广告链接，侵蚀谷歌核心广告模式。市场担忧其AI转型以牺牲短期收入为代价，估值逻辑面临重估",
-      "impact": "谷歌股价承压，可能拖累科技股与纳斯达克指数；数字广告行业或重估AI对点击率的影响；竞争对手搜索与AI广告平台或获关注",
-      "coreLogic": "AI搜索摘要直接回答用户问题，降低点击广告和外部链接的必要性，导致广告曝光与点击率下降，进而冲击谷歌搜索广告收入",
-      "risk": "信息仅来自单一报道，谷歌未披露具体财务影响数据；AI搜索对广告收入的实际冲击程度与持续时间不确定；监管与竞争因素可能放大市场反应"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/stocks/u-s-stocks-slide-as-amazon-intel-earnings-spark-more-ai-selling-5670f50d?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 06:04",
-      "title": "亚马逊和英特尔财报引发更多AI抛售，美国股市下滑",
-      "summary": "随着亚马逊和英特尔更多令人失望的财报使AI抛售自我强化，美国股市下跌，投资者不禁怀疑科技股回调是否会演变成投机性崩盘",
-      "analysis": "财报失望与AI交易拥挤叠加，抛售呈自我强化特征；但“崩盘”仍属市场猜测，需更多数据验证",
-      "impact": "美股科技与半导体板块承压，AI相关高估值资产波动上升；避险情绪或利好美债与黄金，并外溢至亚太科技股",
-      "coreLogic": "龙头科技股业绩不及预期削弱AI叙事盈利支撑，触发拥挤交易平仓，卖压通过情绪与仓位传导放大，形成负反馈式回调",
-      "risk": "单一财报样本有限，抛售是否演变为系统性崩盘不确定；后续指引、利率路径及仓位数据可能改变走势，勿将回调直接等同于崩盘"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/livecoverage/stock-market-today-dow-sp-500-nasdaq-10-30-2026?mod=rss_markets_main",
-      "publishedAt": "2026-10-30 16:44",
-      "title": "今日股市：亚马逊、英特尔财报加剧科技股抛售",
-      "summary": "令人失望的业绩导致股价暴跌，进一步加剧围绕AI交易的担忧",
-      "analysis": "财报不及预期触发抛售，反映市场对AI高估值容错度下降；但单一财报季波动不宜直接等同于AI叙事逆转，需观察后续指引与资金流向",
-      "impact": "美股科技板块及纳斯达克承压，半导体与云计算相关标的波动加大；风险偏好回落可能波及亚太科技股与AI主题基金，避险资金或流向防御性板块",
-      "coreLogic": "科技巨头业绩低于预期→投资者下调AI相关资本开支回报预期→高估值科技股遭集中减仓，抛压从个股扩散至板块，形成对AI交易拥挤度的重新定价",
-      "risk": "财报解读存在样本偏差，单一季度业绩未必代表AI需求趋势；市场情绪放大波动，后续指引、宏观利率与监管变化均可能改变定价方向，信息不足处不宜过度推断"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/stocks/ai-selloff-deepens-oil-jumps-and-crypto-falls-4703d21b?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 03:25",
-      "title": "AI抛售加深，油价跳涨，加密货币下跌",
-      "summary": "在新一批季度业绩公布后，AI股票抛售加速，投资者寻求安全的资金避风港，推动美国国债收益率降至数周低点",
-      "analysis": "AI板块业绩兑现压力引发估值重估，资金转向国债避险；油价与加密资产同步异动，显示风险偏好分化而非全面避险",
-      "impact": "美股AI及科技板块短期波动加大，资金或轮动至防御性资产；美债收益率下行利好债券价格；油价跳涨推升通胀预期，可能制约降息节奏；加密货币跟随风险资产走弱",
-      "coreLogic": "季度业绩成为AI高估值的检验点，不及预期触发获利了结与仓位调整；避险资金流入美债压低收益率，油价受自身供需因素独立走强，加密资产作为高贝塔风险资产承压",
-      "risk": "单一业绩批次不足以判定AI长期趋势，需警惕情绪化超调；油价跳涨若持续将强化通胀黏性，与债市降息预期形成矛盾；加密市场流动性薄，跌幅可能被放大"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/chevron-exxon-cvx-xom-earnings-q3-2026.html",
-      "publishedAt": "2026-10-31 00:44",
-      "title": "雪佛龙盈利超预期，柴油价格高企推动炼油利润飙升",
-      "summary": "随着乌克兰和伊朗轰炸俄罗斯和中东的炼油厂，全球柴油价格飙升",
-      "analysis": "炼油利润受地缘冲突推升，但需核实袭击细节与传导链条；盈利超预期或为短期现象",
-      "impact": "利好炼油商与柴油多头；利空航空、物流等柴油消费行业；原油与成品油价差走阔",
-      "coreLogic": "地缘冲突打击炼油产能，柴油供给收紧推高裂解价差，雪佛龙炼油板块受益，盈利超预期",
-      "risk": "袭击事件真实性及持续性存疑；需求走弱或OPEC+增产可能逆转价差；数据未经独立核实"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/jim-cramer-week-ahead-apple-amd-jobs-report.html",
-      "publishedAt": "2026-10-31 06:17",
-      "title": "克莱默下周展望：科技股财报与中期选举临近，预计波动加剧",
-      "summary": "投资者等待苹果、AMD及其他大型公司的财报，以及中期选举和月度就业报告",
-      "analysis": "多重事件叠加将放大市场波动，科技股财报与政治不确定性共同主导短期情绪",
-      "impact": "美股科技板块及大盘指数波动可能加大，避险情绪或阶段性升温，债市与波动率相关资产受关注",
-      "coreLogic": "财报密集披露与中期选举、就业数据形成事件共振，投资者风险偏好趋于谨慎，波动率易升难降",
-      "risk": "财报不及预期、选举结果争议或就业数据超预期变化均可能引发剧烈调整，事件时点与市场反应存在不确定性"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/swiss-national-bank-q3-profit-gold-foreign-asset.html",
-      "publishedAt": "2026-10-30 23:07",
-      "title": "瑞士央行因黄金和外国资产飙升而实现230亿美元丰厚利润",
-      "summary": "瑞士国家银行凭借黄金和外国资产的升值获得约230亿美元利润；与其他主要央行不同，该行持有大量股票投资组合",
-      "analysis": "利润主要来自估值效应而非货币政策操作，反映其独特资产结构；不宜据此推断政策转向",
-      "impact": "可能影响市场对瑞郎及瑞士央行分红能力的预期；对全球资产价格影响有限，不直接改变利率路径",
-      "coreLogic": "瑞央行资产负债表含大量黄金与外国证券（含股票），相关资产价格上涨带来账面重估收益，形成高额利润",
-      "risk": "金价与股市回调可能使利润逆转；汇率波动影响折算；报道未披露具体构成与统计口径，数据需以官方为准"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/cheap-cars-selling-fast.html",
-      "publishedAt": "2026-10-31 02:45",
-      "title": "低价汽车销售速度明显快于年初",
-      "summary": "数据显示低价汽车销售迅速，但部分较低价位细分市场第三季度销量仍出现下滑。CNBC分析了可能的原因",
-      "analysis": "低价车整体走强与部分细分市场下滑并存，说明需求结构分化，不宜简单归结为消费降级或全面复苏",
-      "impact": "若低价车需求持续，可能利好主打性价比的车型与相关供应链，并加剧车企在入门级市场的价格竞争；但细分市场分化意味着车企需按价位段精细化管理库存与产品投放",
-      "coreLogic": "低价车销售加快可能反映价格敏感型需求释放或库存与促销推动；但部分低价细分市场三季度仍下滑，表明不同价位段供需与产品周期存在差异，整体趋势并非单一方向",
-      "risk": "报道未给出具体销量数据、统计口径与细分市场定义，原因分析多为推测；单一季度数据可能受促销、车型换代等短期因素扰动，结论外推需谨慎"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/trump-tech-allies-swap-ai-for-super-intelligence-in-earnings-calls.html",
-      "publishedAt": "2026-10-30 23:14",
-      "title": "马斯克与扎克伯格在财报电话会上呼应特朗普对“超级智能”的提法，其他公司未跟进",
-      "summary": "据CNBC报道，Meta的马克·扎克伯格以及特斯拉和SpaceX的埃隆·马斯克在第三季度财报电话会上采用了特朗普偏好的“超级智能”一词，而其他公司没有这样做",
-      "analysis": "该报道显示个别科技领袖在措辞上与特朗普的AI话语趋同，但仅凭用词变化不足以证明政策或战略转向，需观察后续实质动作",
-      "impact": "可能强化市场对AI监管话语和政商关系变化的关注，但单一措辞对具体资产定价的直接影响有限，需结合后续政策与资本开支信号判断",
-      "coreLogic": "报道的核心是措辞层面的呼应：两位科技公司CEO在财报电话会这一公开场合使用了“超级智能”这一被特朗普偏好的表述，而其他公司未采用，形成对比",
-      "risk": "信息仅基于CNBC报道的措辞观察，缺乏对用词动机、政策含义及公司战略调整的充分证据；不宜据此推断监管走向或企业AI路线已发生实质变化"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/business/earnings/natwest-earnings-boosted-by-higher-net-interest-income-20ebc371?mod=rss_markets_main",
-      "publishedAt": "2026-10-30 22:17",
-      "title": "NatWest股价下跌，因该行利息收入指引令人失望",
-      "summary": "这家英国高街银行在预测明年利息收入弱于预期后，股价下跌",
-      "analysis": "指引弱于预期直接打击股价，反映市场对净息差见顶的担忧。但报道未提供具体数据，需谨慎看待跌幅与预期差",
-      "impact": "可能拖累英国银行板块情绪，引发对高街银行净息差见顶的重新定价；若同类指引偏弱，或波及欧洲银行股",
-      "coreLogic": "银行盈利高度依赖净利息收入。NatWest对明年利息收入的指引低于市场预期，意味着净息差可能承压或贷款增长放缓，投资者据此下调盈利预期并抛售股票",
-      "risk": "报道未披露具体指引数值、预期差幅度及股价跌幅，分析受限；利率路径、英国经济与监管政策变化亦可能改变实际结果"
-    },
-    {
-      "source": "Bloomberg.com",
-      "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxNeENEVWQ1bnhyY2djcFFQMjZXWnVoaXdwZnZCUUN1UDNIckM4LVdPZTk3SHVzUWtWeVpCdG5RNUFGUzFqa2FlV0JMMXk1NTFNQUoyVDlPeGF6U0tveWxQMmQ0c0d6YW8zU1FkM2NzMkxfM1lMOFdHWTdpRldqaUdudG9oNVVTRjhvZXpqSkJHX2t1MnhkRzVRWjl5b3lWa3laUk1IOWphRkh4ZkZaQVhESzREQnA?oc=5",
-      "publishedAt": "2026-10-30 11:04",
-      "title": "大和证券利润攀升，受全球市场交易收入强劲推动",
-      "summary": "据Bloomberg.com报道，大和证券利润上升，主要受全球市场交易收入强劲推动。报道未在提供的信息中披露具体财务数据、同比变化幅度及交易收入构成细节",
-      "analysis": "该消息反映日本券商在全球市场波动中交易业务受益，但缺乏具体数据，难以判断增长可持续性，需结合后续财报核实",
-      "impact": "可能提振市场对日本券商板块交易业务前景的预期，但影响程度取决于具体业绩数据，当前信息不足以量化",
-      "coreLogic": "全球市场交易活跃度上升带动券商交易收入增长，进而推高整体利润，属于典型的周期性业务驱动",
-      "risk": "信息仅来自标题与摘要，缺少具体利润数字、同比基数及交易收入来源结构；全球市场交易收入具有波动性，若市场活跃度回落，利润增长可能难以持续"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/the-new-bottleneck-in-americas-ai-build-out-a-shortage-of-cheap-money-0c14c84d?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 09:00",
-      "title": "美国AI建设的新瓶颈：廉价资金短缺",
-      "summary": "随着AI建设进入新阶段，贷款机构和投资者对押注愈发挑剔，并要求更严格的条款",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/currencies/behind-the-scenes-of-cryptos-biggest-nightmare-a-record-breaking-cyber-heist-ffe1d9a3?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 07:29",
-      "title": "加密货币最大噩梦的幕后：一场创纪录的网络盗窃",
-      "summary": "币安创始人赵长鹏一周前曾警告“没有加密钱包是100%安全的”。20分钟内，黑客盗走了至少63亿美元",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/alaska-senate-election-doj-lawsuit-sullivan-peltola.html",
-      "publishedAt": "2026-10-31 06:57",
-      "title": "阿拉斯加参议院选举：司法部希望将第二位沙利文候选人的所有选票“隔离”",
-      "summary": "阿拉斯加选举的胜者可能决定共和党能否保住美国参议院多数席位，还是民主党将控制该院",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/jim-cramer-consumer-staples-stocks.html",
-      "publishedAt": "2026-10-31 06:52",
-      "title": "吉姆·克莱默称是时候放眼科技股之外了。以下是他看好的4只消费股",
-      "summary": "克莱默表示，希望在被困的AI交易之外进行多元化的投资者应考虑必需消费品",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/investing/hedge-fund-arini-offloads-800-million-in-debt-as-losses-deepen-2d24626c?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 06:43",
-      "title": "对冲基金Arini在亏损加深之际抛售8亿美元债务",
-      "summary": "哈姆扎·莱姆苏格的基金以大胆押注著称，在多项投资暴跌后遭遇追加保证金",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/meta-outlook-to-revised-to-negative-by-sp-after-cash-flow-negative.html",
-      "publishedAt": "2026-10-31 06:42",
-      "title": "标普因现金流和资本支出担忧下调Meta展望",
-      "summary": "由于Meta巨额资本支出以及对自由现金流的担忧，标普全球评级给予该公司负面展望",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/gamble-on-democracy-inside-suspicious-election-contracts-trading-on-prediction-markets-.html",
-      "publishedAt": "2026-10-31 06:00",
-      "title": "押注民主：预测市场上可疑选举合约交易内幕",
-      "summary": "CNBC调查选举预测市场中异常的价格飙升，以及低成交量合约如何被相对较小的交易推动",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "CNBC",
-      "url": "https://www.cnbc.com/2026/10/30/musalem-fed-monetary-policy-tightening.html",
-      "publishedAt": "2026-10-31 05:53",
-      "title": "美联储官员已表示他们将需要恢复加息",
-      "summary": "美联储主席阿尔贝托·穆萨莱姆和洛里·洛根的言论，首次透露了美联储领导层对下一步行动的见解",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
+def send_telegram(text):
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        print("❌ 错误: 未检测到 Telegram 密钥。")
+        return
+        
+    url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TG_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
     }
-  ],
-  "asia": [
-    {
-      "source": "台湾中央社国际",
-      "url": "https://www.cna.com.tw/news/aopl/202610300319.aspx",
-      "publishedAt": "2026-10-30 21:35",
-      "title": "美伊战争推升油价 美国石油巨擘获利再度攀升",
-      "summary": "中央社纽约30日综合外电报道，受美伊战争推升国际油价及炼油利润率影响，美国石油巨擘当天公布的季度财报再度奏捷，获利大幅成长",
-      "analysis": "报道将油企获利增长归因于战争推升油价与炼油利润，属常见归因框架；但未披露具体公司、财报数据及涨幅，信息有限，需谨慎看待单一来源的因果表述",
-      "impact": "利好美国大型综合油企股价与能源板块；油价上行可能推升通胀预期，对航空、运输等用油行业构成成本压力，并影响货币政策预期",
-      "coreLogic": "地缘冲突（美伊战争）推高国际原油价格并扩大炼油利润率，石油巨擘上游勘探与下游炼化业务同步受益，带动季度获利显著增长",
-      "risk": "报道未指明具体企业与财务数据，归因可能过度简化；战事走向、油价回落、炼油利润收窄及政策干预均可能使获利趋势逆转，需以官方财报核实"
-    },
-    {
-      "source": "Nikkei Asia",
-      "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxNZnp0MGViN0NIcXBlRGIzUjhMU0FCRWxZZDYxNDN3MUh3dzNhb1VtU0FFa3MycGRNOXd5RG9Ebl9fNFNnSk9SVEFzN2U4akdjaUNva1l0Ymhydi1JWEgybVlYZWVEclJvVVo5Tm1ieFRiUWpyMDY4MGhCUjhjdDc1eklhLXA3Q0hDQXZrUVpSRllvbXpxTEN4ZHFFNTl2WGlKUFlFODltZTEyRThWbkl6V2o4dlI?oc=5",
-      "publishedAt": "2026-10-30 17:42",
-      "title": "中国航运、煤炭股表现优于AI股，因盈利前景分化",
-      "summary": "据日经亚洲报道，中国航运与煤炭板块近期表现强于AI相关股票，主要原因是市场对两类资产的盈利前景判断出现分化",
-      "analysis": "该报道将板块相对表现归因于盈利前景分化，属市场结构性轮动观察；但摘要未提供具体涨幅、时间区间与盈利数据，结论的稳健性有待原始报道细节验证",
-      "impact": "若分化延续，航运与煤炭等周期价值板块可能获得阶段性资金流入与估值修复；AI板块短期波动或加大，资金对其业绩兑现的敏感度上升",
-      "coreLogic": "资金更青睐盈利可见度较高、现金流相对稳定的航运与煤炭板块，而对盈利兑现节奏尚不明确的AI概念股趋于谨慎，从而形成板块间的相对强弱分化",
-      "risk": "报道未披露具体数据与统计区间，分化可能只是短期轮动而非趋势；航运受运价与全球贸易周期影响，煤炭受能源价格与政策调控影响，AI板块则受技术进展与估值情绪驱动，均存在较大不确定性"
-    },
-    {
-      "source": "南华早报",
-      "url": "https://www.scmp.com/news/hong-kong/education/article/3372790/hong-kong-primary-pupils-study-ai-under-new-technology-subject",
-      "publishedAt": "2026-10-30 23:37",
-      "title": "香港小学生将在新技术科目中学习AI",
-      "summary": "香港小学将从2028年9月起逐步推出一门名为“信息与创新科技”（IIT）的新科目，以提升学生的数字素养，人工智能（AI）是其亮点之一。年仅七岁的学生在学习该技术后，将能够使用简单的提示或指令与AI系统进行简单的“对话”。教育局…",
-      "analysis": "这是香港基础教育课程的一次前瞻性调整，将AI素养下沉至小学阶段，方向值得肯定。但报道未披露课时安排、师资培训与评估方式，落地效果有待观察",
-      "impact": "对教育科技、AI教学工具与师资培训相关领域构成温和的长期需求预期；短期对资本市场直接影响有限，更多体现为教育信息化赛道的政策信号",
-      "coreLogic": "香港教育局通过新设IIT科目，把AI使用能力纳入小学课程体系，以课程改革回应数字时代对人才素养的需求，属于教育政策层面的主动布局",
-      "risk": "报道信息不完整，课时、师资、教材与评估标准尚未明确；低龄学生使用AI涉及隐私、依赖性与内容安全等伦理问题；2028年推行时间较远，政策细节可能调整"
-    },
-    {
-      "source": "南华早报",
-      "url": "https://www.scmp.com/news/world/americas/article/3372806/trump-and-milei-under-pressure-explain-role-flavio-bolsonaros-dramatic-escape-us",
-      "publishedAt": "2026-10-31 10:16",
-      "title": "特朗普和米莱面临压力，需解释在弗拉维奥·博索纳罗戏剧性逃往美国一事中的角色",
-      "summary": "美国总统唐纳德·特朗普和阿根廷的哈维尔·米莱周五面临越来越大的压力，需解释两国在帮助弗拉维奥·博索纳罗护照被取消后逃离巴西一事中所扮演的角色。这位45岁的巴西参议员在周日总统选举中被现任总统路易斯·伊纳西奥·卢拉·达席尔瓦击败两天后逃离本国。他此前被命令交出所有护照…",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "BBC Asia",
-      "url": "https://www.bbc.co.uk/news/articles/crm941n0413o?at_medium=RSS&at_campaign=rss",
-      "publishedAt": "2026-10-31 10:02",
-      "title": "将咖喱带到美国的印度厨师——然后消失了",
-      "summary": "印度厨师兰吉·斯迈尔于1901年开设了美国第一家印度餐厅——随后成了假王子",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "南华早报",
-      "url": "https://www.scmp.com/news/people-culture/trending-china/article/3372804/zero-cost-lifestyle-china-cash-strapped-youth-embrace-thrifty-living-mental-relief",
-      "publishedAt": "2026-10-31 10:00",
-      "title": "“零成本”生活方式：中国手头拮据的年轻人拥抱节俭生活以寻求精神解脱",
-      "summary": "越来越多的中国年轻人拥抱“零成本”生活方式，寻找免费福利、赠品和试用服务。在中国大陆社交媒体上，数以万计的帖子分享在商场领取免费样品或无意购买却预约试驾的技巧。一种流行的变体是“商场漫步”，即精打细算的购物者在有空调的商场里闲逛…",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "台湾中央社国际",
-      "url": "https://www.cna.com.tw/news/aopl/202610310031.aspx",
-      "publishedAt": "2026-10-31 09:55",
-      "title": "中東戰火波及巴拿馬籍油輪 阿聯官媒：已停止漏油",
-      "summary": "（中央社杜拜30日綜合外電報導）阿拉伯聯合大公國官方媒體「阿拉伯聯合大公國通訊社」（WAM）今天引述阿聯能源部報導，一艘自10月9日遇襲以來持續向波斯灣洩漏原油的油輪已停止漏油",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "台湾中央社国际",
-      "url": "https://www.cna.com.tw/news/aopl/202610310028.aspx",
-      "publishedAt": "2026-10-31 09:50",
-      "title": "德日宣布深化核融合合作 打造下一代能源供應鏈",
-      "summary": "（中央社記者林尚縈柏林30日專電）德國總理梅爾茨本週訪日期間，與日本首相高市早苗宣布深化核融合合作，德國核融合新創公司Proxima Fusion也同步與兩家日本製造商簽署合作備忘錄，將共同開發核融合關鍵技術，在德國建立超導材料生產基地",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "南华早报",
-      "url": "https://www.scmp.com/news/world/russia-central-asia/article/3372805/g20-talks-expose-deep-rift-russia-stays-defiant-while-rubio-pursues-sideline-diplomacy",
-      "publishedAt": "2026-10-31 09:45",
-      "title": "G20会谈暴露深刻分歧，俄罗斯立场强硬，鲁比奥开展场外外交",
-      "summary": "周五，G20外长在美国开始会谈之际，俄罗斯没有表现出软化对基辅立场的迹象，乌克兰和伊朗战争加深了这个庞大论坛成员之间的裂痕。圆桌会议上出现尖锐分歧，欧盟外交政策负责人卡娅·卡拉斯指责俄罗斯外长谢尔盖·拉夫罗夫在乌克兰冲突等问题上提出“谎言”。“他提出了…”",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "南华早报",
-      "url": "https://www.scmp.com/week-asia/lifestyle-culture/article/3372753/dark-past-japans-unit-731-buried-under-airport-expansion",
-      "publishedAt": "2026-10-31 09:30",
-      "title": "日本731部队的黑暗历史被埋在机场扩建之下",
-      "summary": "一个曾向日本帝国最臭名昭著的战时部队之一输送数百名男子的村庄正被拆除，为东京成田国际机场的一条跑道让路。731部队在二战期间对俘虏（其中许多是中国人）进行致命实验，以开发生物武器。其约3000名人员中约有300人来自千叶县芝山町的加茂地区…",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    }
-  ],
-  "china": [
-    {
-      "source": "每日经济新闻",
-      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFBXdG10amxYYjFUMnRSangtblp2WHFqNW1COWs5SVV1akxIbm44SUJHTW4tNEEzdmtneFBkT1JVOHpzeEdYZWZONUN1WGgtU05GTExSSWRzYUtycjZkb3gwcU5mWjZuUQ?oc=5",
-      "publishedAt": "2026-10-31 08:46",
-      "title": "超5500家A股公司披露三季报 电子等行业前三季度净利同比增幅居前 - 每日经济新闻",
-      "summary": "超5500家A股公司披露三季报 电子等行业前三季度净利同比增幅居前 每日经济新闻",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "每日经济新闻",
-      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE91Q3lFX2JPTTRfc18xLWdrM2NvRG96aXlJM1lPWEd5TWczOUNrS0tFVDJiejdvWktsYnJGUXM5U2tJakI3ek5kMDN6NlpCTUE0OUJuS0pmUGtUOWdId1FuSjJJQmhGQQ?oc=5",
-      "publishedAt": "2026-10-31 08:34",
-      "title": "三季度券商新晋逾80家公司前十大流通股股东 - 每日经济新闻",
-      "summary": "三季度券商新晋逾80家公司前十大流通股股东 每日经济新闻",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE4zc3E4RFlFMmVLLXpUMzZTblJvQ0d1OWUyTGhRb0dWQzAyS2VETlpBQU1XQkdHanJFanlvQzRxLXhSR2VZaVN6bkFzbW5ydlhXMXN0cTRNQlVfQk00SU1aMDFYS0xvVEw3MjF0aTdZX2F6UGJUQVQwUg?oc=5",
-      "publishedAt": "2026-10-31 08:30",
-      "title": "常熟银行2026年第三季度报告 - 新浪财经",
-      "summary": "常熟银行2026年第三季度报告 新浪财经",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE9kZzFvajY3MTZNNlJJNTdXWDVLYzUzMFZINzFXbnl1LVJTZDhiX0JGeFgxTERVTzlVNXBhenp3eHYzeHVIOHVYTzdGOUNaMmlyYW9wd003eEtOUkRfOVhSRDlGZ0FxNTVXWTdNek5VTW9qZ0d4VGhTUQ?oc=5",
-      "publishedAt": "2026-10-31 08:23",
-      "title": "三季度券商新晋逾80家公司前十大流通股股东 后市配置看好资源品及高股息龙头 - 新浪财经",
-      "summary": "三季度券商新晋逾80家公司前十大流通股股东 后市配置看好资源品及高股息龙头 新浪财经",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "每日经济新闻",
-      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE40aXpjUjlVTlZFRnJ5dXN6WXZtLVhTbU1sa2VuUzNwZ1JEV0RUR0FUbWNtaEo2Y2phV2hyWVRNN0hkN3FzX2J2X0ZxaHQwelo5dElUQ1l3aGJ5cTNSSkVoNGxjdnl0dw?oc=5",
-      "publishedAt": "2026-10-30 23:03",
-      "title": "陈华掌舵一周年，贵州茅台单季度净利润重回增长，“i茅台”前三季度销售收入增超360% - 每日经济新闻",
-      "summary": "陈华掌舵一周年，贵州茅台单季度净利润重回增长，“i茅台”前三季度销售收入增超360% 每日经济新闻",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE5RYnhWUEVDQ1djb1VDVmFtMUxpNVBJaFN6OTBOc2FGNUFfcUt0UVN3bTBOYkF6dkhFYUczMm9ZZzhVNVpRR29nTFVHSWd1RGFrRmR3RGNBTEhISm1XU3JicVdMazZEalR0T21BOGRyRTlfR1Z5VGNNdA?oc=5",
-      "publishedAt": "2026-10-31 05:48",
-      "title": "中国银行股份有限公司2026年第三季度报告",
-      "summary": "新浪财经页面标题显示为中国银行股份有限公司2026年第三季度报告，但所给信息仅为标题与来源，未包含报告正文、财务数据或具体披露内容",
-      "analysis": "仅凭标题无法评估业绩与资产质量；需核对原文数据后再判断对银行板块的影响",
-      "impact": "若后续披露的盈利与资产质量偏离预期，可能影响银行股及金融板块情绪；当前信息不足以判断方向",
-      "coreLogic": "信息仅表明中国银行披露2026年三季度报告这一事件，缺乏营收、净利润、净息差、不良率等关键数据，无法形成实质性分析",
-      "risk": "所给摘要无正文与数据，存在信息不完整风险；报告日期为2026年，需核实来源真实性与披露时点，避免误读"
-    },
-    {
-      "source": "新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE84RUo5dFpZMmI0TEliZE4yb09mV0dwTmtrZU9TemQ3UWFiSGZ4enc0TzZsNEVSdTgtbmhmdnl1X3NaTnQxNVhNelMwY19qWWpabVo4WGVIcUU2b1NCYmxQV3NON292ZGlkSjNkTmJTNkxwMjhOVWJxeA?oc=5",
-      "publishedAt": "2026-10-31 08:51",
-      "title": "前三季度业绩稳步增长 券业分化格局凸显",
-      "summary": "新浪财经报道称，前三季度券商业绩整体稳步增长，但行业内部呈现明显分化格局",
-      "analysis": "标题仅概括业绩增长与分化趋势，未提供具体数据、公司名称或驱动因素，无法判断增长幅度与分化程度，需以正式财报为准",
-      "impact": "若分化属实，可能强化市场对头部券商盈利稳定性的关注，并影响券商板块估值结构；但缺乏数据支撑，实际影响有限",
-      "coreLogic": "报道核心逻辑为：券业前三季度整体业绩增长，但增长并非均匀分布，头部与中小券商之间差距拉大，行业分化格局凸显",
-      "risk": "信息仅来自标题与摘要，缺少营收、净利润、同比增速及样本范围等关键数据，存在以偏概全风险；具体业绩以公司公告和交易所披露为准"
-    },
-    {
-      "source": "每日经济新闻",
-      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFB3cHRROHVtY1ZkdjNNc0pEeXNpVTQxODBGUWFJODZFXzNIRU5PNHZ4eGJDa1FPUkNPS28yTWJCSW1ZT1lPNjlGZXdaNWtTa0JEQkc5T1VnZWpGWW5FOW1TVkhRSWptUQ?oc=5",
-      "publishedAt": "2026-10-30 22:18",
-      "title": "近50亿元买入两只A股！隧道股份拿下徐工机械4.72%股权，前三季营收净利双降",
-      "summary": "据每日经济新闻报道，隧道股份以近50亿元买入两只A股，其中包括徐工机械4.72%股权；报道同时提及隧道股份前三季度营收和净利润同比双降",
-      "analysis": "该交易属产业资本对工程机械龙头的股权投资，但报道未披露另一只A股标的及交易对价细节，且隧道股份自身业绩下滑，需关注资金来源与战略协同",
-      "impact": "对徐工机械而言，引入产业股东可能影响股权结构与治理预期；对隧道股份而言，大额投资或增加资金占用与资产配置风险，短期市场可能关注其投资回报与主业改善情况",
-      "coreLogic": "隧道股份通过大额股权投资获取徐工机械4.72%股权，可能意在产业链协同或财务投资；但其前三季营收净利双降，显示主业承压，大额对外投资与自身业绩走势形成对比",
-      "risk": "报道未说明另一只A股标的、交易定价依据及资金来源；隧道股份营收净利双降背景下，大额投资可能带来现金流与减值风险；股权比例较低，战略影响力有限，协同效果存在不确定性"
-    },
-    {
-      "source": "新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE5SUTRZd3p1bHdxVmNyNS1yLVd2TDR1SlpkdjNHc1Zvd3VsaFhSVFhTWWJ0Um5lVUpIMEtiRXBXS295SXhDU0taNjJOdTRzc29LX1J5cGEtZ1ZNUElYUzNORmdJWlFmT3c2MmVyY1VRdEh3RGNFN3c1YQ?oc=5",
-      "publishedAt": "2026-10-31 09:02",
-      "title": "三季度成功扭亏、双主业格局成形 *ST景谷迎来“价值重估”新参照系",
-      "summary": "新浪财经报道称，*ST景谷在三季度实现扭亏，并形成双主业格局，市场对其价值重估出现新的参照系。该报道未在摘要中披露具体财务数据、双主业构成及扭亏原因，相关细节需以公司公告和定期报告为准",
-      "analysis": "该消息属公司层面事件，扭亏与双主业或改善基本面预期，但摘要信息有限，*ST标的波动与退市风险仍高，不宜过度解读",
-      "impact": "短期可能提升*ST景谷的市场关注度与交易活跃度，并对ST板块中具备扭亏和业务转型预期的个股形成情绪性参照；对大盘及相关行业影响有限，更多体现为个股事件驱动",
-      "coreLogic": "若公司三季度扭亏且双主业格局确立，则盈利改善与业务结构变化可能改变市场对其估值参照，从而引发价值重估预期；但该逻辑成立需以经审计或正式披露的财务数据及业务实质为前提",
-      "risk": "摘要未披露扭亏的具体金额、扣非后盈利情况、双主业收入占比及可持续性，存在信息不完整风险；*ST公司面临退市风险警示、财务规范与持续经营不确定性，股价波动可能较大，媒体报道不构成投资依据"
-    },
-    {
-      "source": "新浪财经",
-      "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTFA3TlVKQzZSRXMyU2lPRUc0R0huZDEtSktQR2V1QUNKQmtjWkREUm5PRFpHTTQ5TnVGU1Rna2Jjdy1sckpvRkI3R1pjeTQ0NkkxZ3NTcGpEWnE3S1NlX3E3eVk1ejk0OWJCa3FoUlRqbWZQOEt5T3VvNw?oc=5",
-      "publishedAt": "2026-10-31 10:19",
-      "title": "机构风向标 | 东山精密(002384)2026年三季度已披露前十大机构累计持仓占比6.91% - 新浪财经",
-      "summary": "新浪财经报道称，东山精密(002384)2026年三季度已披露的前十大机构累计持仓占比为6.91%。该数据仅反映已披露的机构持仓情况，具体机构名单、持仓变动及统计口径未在摘要中说明",
-      "analysis": "该信息仅披露单一季度机构持仓比例，缺乏同比环比及机构明细，信号意义有限，需结合公司基本面与后续披露判断",
-      "impact": "对东山精密股价的直接影响预计有限；该数据可能被部分投资者用于观察机构关注度，但缺乏增量信息，难以形成明确交易指引",
-      "coreLogic": "已披露前十大机构合计持仓6.91%，反映部分机构对该股的配置情况，但披露范围有限，不能代表全部机构持仓或资金流向趋势",
-      "risk": "数据仅覆盖已披露机构，统计口径与披露完整性不明；机构持仓可能随后续报告更新而变化；不应据此推断机构整体态度或公司经营前景"
-    }
-  ],
-  "earnings": [
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/stocks/u-s-stocks-slide-as-amazon-intel-earnings-spark-more-ai-selling-5670f50d?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 06:04",
-      "title": "亚马逊和英特尔财报引发更多AI抛售，美国股市下滑",
-      "summary": "随着亚马逊和英特尔更多令人失望的财报使AI抛售自我强化，美国股市下跌，投资者不禁怀疑科技股回调是否会演变成投机性崩盘",
-      "analysis": "财报失望与AI交易拥挤叠加，抛售呈自我强化特征；但“崩盘”仍属市场猜测，需更多数据验证",
-      "impact": "美股科技与半导体板块承压，AI相关高估值资产波动上升；避险情绪或利好美债与黄金，并外溢至亚太科技股",
-      "coreLogic": "龙头科技股业绩不及预期削弱AI叙事盈利支撑，触发拥挤交易平仓，卖压通过情绪与仓位传导放大，形成负反馈式回调",
-      "risk": "单一财报样本有限，抛售是否演变为系统性崩盘不确定；后续指引、利率路径及仓位数据可能改变走势，勿将回调直接等同于崩盘"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/livecoverage/stock-market-today-dow-sp-500-nasdaq-10-30-2026?mod=rss_markets_main",
-      "publishedAt": "2026-10-30 16:44",
-      "title": "今日股市：亚马逊、英特尔财报加剧科技股抛售",
-      "summary": "令人失望的业绩导致股价暴跌，进一步加剧围绕AI交易的担忧",
-      "analysis": "财报不及预期触发抛售，反映市场对AI高估值容错度下降；但单一财报季波动不宜直接等同于AI叙事逆转，需观察后续指引与资金流向",
-      "impact": "美股科技板块及纳斯达克承压，半导体与云计算相关标的波动加大；风险偏好回落可能波及亚太科技股与AI主题基金，避险资金或流向防御性板块",
-      "coreLogic": "科技巨头业绩低于预期→投资者下调AI相关资本开支回报预期→高估值科技股遭集中减仓，抛压从个股扩散至板块，形成对AI交易拥挤度的重新定价",
-      "risk": "财报解读存在样本偏差，单一季度业绩未必代表AI需求趋势；市场情绪放大波动，后续指引、宏观利率与监管变化均可能改变定价方向，信息不足处不宜过度推断"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/stocks/ai-selloff-deepens-oil-jumps-and-crypto-falls-4703d21b?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 03:25",
-      "title": "AI抛售加深，油价跳涨，加密货币下跌",
-      "summary": "在新一批季度业绩公布后，AI股票抛售加速，投资者寻求安全的资金避风港，推动美国国债收益率降至数周低点",
-      "analysis": "AI板块业绩兑现压力引发估值重估，资金转向国债避险；油价与加密资产同步异动，显示风险偏好分化而非全面避险",
-      "impact": "美股AI及科技板块短期波动加大，资金或轮动至防御性资产；美债收益率下行利好债券价格；油价跳涨推升通胀预期，可能制约降息节奏；加密货币跟随风险资产走弱",
-      "coreLogic": "季度业绩成为AI高估值的检验点，不及预期触发获利了结与仓位调整；避险资金流入美债压低收益率，油价受自身供需因素独立走强，加密资产作为高贝塔风险资产承压",
-      "risk": "单一业绩批次不足以判定AI长期趋势，需警惕情绪化超调；油价跳涨若持续将强化通胀黏性，与债市降息预期形成矛盾；加密市场流动性薄，跌幅可能被放大"
-    },
-    {
-      "source": "Reuters",
-      "url": "https://news.google.com/rss/articles/CBMimAFBVV95cUxPT3h0ZnhqQXNOaC15cXFDMlJfa0kwa0xKeDloU0hKQVducC1rOERkX2R5bG1rQ1JSUFpYMUVaZ0p5RGw1eDZEMVliNTJ6V2s3elFyaks4UDg4UWNMMklreW9iUHBoZWpVZE5mZmxnY2JybHI3bUI3SWxuVV9lZVFvUDRYREYydzN5dDVHMXV6bXp5T3ZHZTlIXw?oc=5",
-      "publishedAt": "2026-10-30 22:29",
-      "title": "BP凭借创纪录利润超预期，目标提前了结深水地平线账单",
-      "summary": "路透社报道，BP凭借创纪录利润超出市场预期，并计划提前了结与2010年深水地平线漏油事故相关的赔付账单",
-      "analysis": "高油价与炼油利润支撑业绩，提前清偿事故负债有助改善资产负债表与股东回报预期，但需关注利润的可持续性",
-      "impact": "可能提振BP股价与欧洲能源板块情绪，增强其分红与回购能力预期；对油气行业而言，显示大型一体化能源公司在高油价周期中的现金流韧性",
-      "coreLogic": "能源价格高企与炼油 margins 扩张推动BP利润创纪录，现金流改善使其有能力加速处理深水地平线事故的长期赔付义务，从而降低财务不确定性并释放资本配置空间",
-      "risk": "利润受油气价格波动影响较大，若能源价格回落业绩可持续性存疑；深水地平线相关赔付的最终规模与时间仍存在不确定性；监管与环保压力可能带来额外成本"
-    },
-    {
-      "source": "Reuters",
-      "url": "https://news.google.com/rss/articles/CBMitwFBVV95cUxPc2RJZzlhbDJyYjh5N01HbHFhNUFLbWU3czVrSjVkZ2ZLR05HRGNUVDNLX2ZCcF8wbkotRzdXTGprYjN6VVU0ZVNwVnF0U3BPUkJZTjNac0wwWEx3SGd5MERFYXA4elBUeDcxUE9VR1RFbW92X0N6aUFRSXZEQlhrYTdqLTlJVWpSNGJiVmlCcU5tN0s0cWRRaW9lUXlJXzA5QzY3OWNYdDdzVDdpQXo3ZldDNHZPZWs?oc=5",
-      "publishedAt": "2026-10-30 22:20",
-      "title": "安巴尼的Jio在重磅上市后首份财报中利润增长约14% - 路透社",
-      "summary": "安巴尼的Jio在重磅上市后首份财报中利润增长约14% 路透社",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/business/earnings/natwest-earnings-boosted-by-higher-net-interest-income-20ebc371?mod=rss_markets_main",
-      "publishedAt": "2026-10-30 22:17",
-      "title": "NatWest股价下跌，因该行利息收入指引令人失望",
-      "summary": "这家英国高街银行在预测明年利息收入弱于预期后，股价下跌",
-      "analysis": "指引弱于预期直接打击股价，反映市场对净息差见顶的担忧。但报道未提供具体数据，需谨慎看待跌幅与预期差",
-      "impact": "可能拖累英国银行板块情绪，引发对高街银行净息差见顶的重新定价；若同类指引偏弱，或波及欧洲银行股",
-      "coreLogic": "银行盈利高度依赖净利息收入。NatWest对明年利息收入的指引低于市场预期，意味着净息差可能承压或贷款增长放缓，投资者据此下调盈利预期并抛售股票",
-      "risk": "报道未披露具体指引数值、预期差幅度及股价跌幅，分析受限；利率路径、英国经济与监管政策变化亦可能改变实际结果"
-    },
-    {
-      "source": "Stock Titan",
-      "url": "https://news.google.com/rss/articles/CBMirgFBVV95cUxPQ0hFQ1VYU1hSV3pqTVA1VEdiZVd5ZGZCWXZnX3pRNElLY1Z6TGxtOEdVeEdncjNfOEI5X3E2RTNXR210cFFiWkhnckhacXFkUkFZRG5VUDY2YThYREJVNVFhVGR3dm03bloxVFJlSGJBV1U4R2F5aUFpYTM5bjVrd3hLVUtkV0dtMDRlS0x5MGI5eXdiVzJFNDRSY01DX1ctZEIyc1lBMGN0aVp2QXc?oc=5",
-      "publishedAt": "2026-10-30 18:09",
-      "title": "基础设施利润下降45.9%，DXC Technology公布季度盈利下滑",
-      "summary": "据Stock Titan报道，DXC Technology（DXC）公布季度盈利下滑，其中基础设施业务利润同比下降45.9%",
-      "analysis": "该消息显示DXC核心基础设施业务盈利承压，反映传统IT服务需求与利润率面临挑战。但报道未提供营收、每股收益及指引等细节，影响评估受限",
-      "impact": "可能对DXC股价及IT服务板块情绪构成短期压力；投资者或关注后续财报中营收、利润率及转型进展，同业传统IT外包公司也可能被连带审视",
-      "coreLogic": "基础设施业务利润大幅下降拖累整体季度盈利，表明公司传统IT基础设施服务板块盈利能力走弱，可能源于定价压力、成本上升或业务结构转型",
-      "risk": "信息仅来自单一媒体报道，缺乏完整财务数据与公司指引；利润下降的具体原因、是否一次性因素及全年影响尚不明确，不宜过度推断"
-    },
-    {
-      "source": "Microsoft",
-      "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxPaXNEUTdVWndDS3RFQS13VmtYUjYya2J6NTJvOU5rX29OY25MVjd0ZDFrakZJanZ6TXpmYnduckNrQ2FkaUFRaXlaR1ktNXhwdEozTUVGcVUwRDRLa3BjdkUyNDU1Skk3cnA1NnlxQWFBWG5JRUNlNU9UQjFueDM1V2pla21XZmFfWUE?oc=5",
-      "publishedAt": "2026-10-31 10:27",
-      "title": "FY27第一季度 - 新闻稿 - 投资者关系 - 微软",
-      "summary": "FY27第一季度 - 新闻稿 - 投资者关系 微软",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/the-new-bottleneck-in-americas-ai-build-out-a-shortage-of-cheap-money-0c14c84d?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 09:00",
-      "title": "美国AI建设的新瓶颈：廉价资金短缺",
-      "summary": "随着AI建设进入新阶段，贷款机构和投资者对押注愈发挑剔，并要求更严格的条款",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    },
-    {
-      "source": "WSJ Markets",
-      "url": "https://www.wsj.com/finance/currencies/behind-the-scenes-of-cryptos-biggest-nightmare-a-record-breaking-cyber-heist-ffe1d9a3?mod=rss_markets_main",
-      "publishedAt": "2026-10-31 07:29",
-      "title": "加密货币最大噩梦的幕后：一场创纪录的网络盗窃",
-      "summary": "币安创始人赵长鹏一周前曾警告“没有加密钱包是100%安全的”。20分钟内，黑客盗走了至少63亿美元",
-      "ai_msg": "本条新闻暂未进行AI深度评论"
-    }
-  ]
-};</script>
-<!-- NEWS_DATA_END -->
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            print("✅ Telegram 爆文看板推送成功！")
+        else:
+            print(f"❌ 推送失败: {response.text}")
+    except Exception as e:
+        print(f"❌ 发送 Telegram 消息失败: {e}")
 
-<script>
-"use strict";
-const labels = { global: "国际财经新闻", asia: "亚太财经新闻", china: "国内财经新闻", earnings: "核心财报新闻" };
-const activeKey = "financeDashboardActiveTab_v6";
-const validTabs = ["global", "asia", "china", "earnings"];
-let active = "global";
-
-try {
- const savedTab = localStorage.getItem(activeKey);
- if (validTabs.includes(savedTab)) active = savedTab;
-} catch(e) {}
-
-const readKey = "financeDashboardRead_v6";
-let readIds = new Set();
-try { readIds = new Set(JSON.parse(localStorage.getItem(readKey) || "[]")); } catch(e) {}
-
-const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-function safeUrl(v) {
- try {
-  const u = new URL(String(v || ""), location.href);
-  if (["https:", "http:"].includes(u.protocol)) return u.href;
- } catch(e) {}
- return "#";
-}
-
-/* 修改点：原文在当前页面打开，不再创建新标签页 */
-function articleLink(n) {
- const href = String(n.url || "");
- if (!href || href === "#") return '<span class="muted text-xs">暂无可用原文链接</span>';
- return '<a href="' + esc(safeUrl(href)) + '" target="_self">查看原始报道 ↗</a>';
-}
-
-function list(items) {
- if (Array.isArray(items) && items.length) {
-  return "<ul>" + items.map(x => `<li>${esc(x)}</li>`).join("") + "</ul>";
- }
- return "<p>暂无足够信息。</p>";
-}
-
-function getRankedData() {
- const all = (typeof window.newsData !== "undefined" && window.newsData && Array.isArray(window.newsData[active])) ? window.newsData[active] : [];
- return all;
-}
-
-function renderAIResearch(n) {
- if (!n.analysis) return `
-  <div class="mt-3 p-3 rounded bg-slate-900/60 border border-slate-800 text-xs muted">
-   💡 本条资讯暂未加载 AI 深度宏观拆解，可点击下方链接直达原文进行深度阅读。
-  </div>`;
- return `
-  <section class="ai mt-3 mb-3">
-   <div class="font-bold text-cyan-300 mb-2">🧭 AI 深度宏观与时政分析 <span class="pill">${esc(n.confidence || "置信度未标注")}</span></div>
-   <p class="leading-relaxed mb-3">${esc(n.analysis)}</p>
-   <div class="research-grid">
-    <div class="research-box"><h4>📌 核心逻辑</h4><p>${esc(n.coreLogic || "暂无。")}</p></div>
-    <div class="research-box"><h4>📈 潜在市场影响</h4><p>${esc(n.marketImpact || n.impact || "暂无法判断。")}</p></div>
-    <div class="research-box"><h4>🔗 传导机制</h4><p>${esc(n.transmission || "当前信息不足。")}</p></div>
-    <div class="research-box"><h4>⏳ 影响周期</h4><p>${esc(n.timeHorizon || "暂不确定。")}</p></div>
-    <div class="research-box"><h4>🧾 证据线索</h4>${list(n.evidence)}</div>
-    <div class="research-box"><h4>⚖️ 情景分析</h4>${list(n.scenarios)}</div>
-    <div class="research-box research-wide"><h4>⚠️ 风险与缺口</h4><p>${esc(n.risk || "尚未识别。")}</p></div>
-   </div>
-  </section>`;
-}
-
-function renderCard(n, i, listLen, isFeatured = false) {
- const rid = active + "_" + String(n.url || n.title || i);
- const read = readIds.has(rid);
- const assets = Array.isArray(n.asset) ? n.asset : [];
- const score = n._importance || 50;
- const level = score >= 65 ? "高" : score >= 45 ? "中" : "常规";
-
- if (isFeatured) {
-  return `
-   <article class="featured-card priority-${level === "高" ? "high" : "medium"}">
-    <div class="flex flex-wrap gap-2 items-center mb-2">
-     <span class="score-badge">🔥 TOP ${i + 1} · 权重 ${score}/100</span>
-     <span class="pill">评级：${level}</span>
-     <span class="pill">${esc(n.source || "国际权威媒体")}</span>
-     <span class="pill">${esc(n.publishedAt || "")}</span>
-    </div>
-    <h3 class="adaptive-title font-bold text-amber-200 mb-2">${esc(n.title || "无标题")}</h3>
-    <p class="featured-meta mt-2 text-slate-300 leading-relaxed">${esc(n.summary || "暂无摘要")}</p>
-
-    <div class="flex flex-wrap gap-2 mt-3 mb-2">
-     <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
-     ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
-    </div>
-
-    ${renderAIResearch(n)}
-    <div class="mt-3 text-sm flex justify-between items-center">
-     ${articleLink(n)}
-     <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">${read ? "✓ 已读" : "标记已读"}</button>
-    </div>
-   </article>`;
- }
-
- return `
-  <article class="card ${read ? "read" : ""} priority-${level === "高" ? "high" : "low"}">
-   <div class="flex flex-wrap justify-between gap-2 items-center mb-3">
-    <div class="flex flex-wrap gap-2 items-center">
-     <span class="score-badge">权重 ${score}/100</span>
-     <span class="pill">${esc(n.id || ("NO." + (listLen - i)))}</span>
-     <span class="pill">${esc(n.source || "国际权威媒体")}</span>
-     <span class="pill">${esc(n.publishedAt || "")}</span>
-    </div>
-    <button class="btn text-xs" type="button" data-read-id="${esc(rid)}">${read ? "✓ 已读" : "标记已读"}</button>
-   </div>
-
-   <h3 class="adaptive-title font-bold text-slate-100 mb-2" title="${esc(n.title || "")}">${esc(n.title || "无标题")}</h3>
-
-   <p class="text-slate-300 leading-relaxed mb-3">${esc(n.summary || "暂无摘要")}</p>
-
-   <div class="flex flex-wrap gap-2 mb-3">
-    <span class="pill">潜在影响：${esc(n.impact || "待分析")}</span>
-    ${assets.map(a => `<span class="pill">${esc(a)}</span>`).join("")}
-   </div>
-
-   ${renderAIResearch(n)}
-   <div class="text-sm">${articleLink(n)}</div>
-  </article>`;
-}
-
-function render() {
- const container = document.getElementById("newsList");
- const featuredWrap = document.getElementById("featuredWrap");
- const featuredList = document.getElementById("featuredList");
- if (!container) return;
-
- const all = getRankedData();
- const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
- const filtered = all.filter(n => [
-  n.title, n.summary, n.source, (n.asset || []).join(" "),
-  n.analysis, n.coreLogic, n.marketImpact, n.transmission, n.risk, n.originalTitle
- ].join(" ").toLowerCase().includes(q));
-
- document.getElementById("sectionTitle").textContent = labels[active] || "财经新闻";
-
- // 经典分层：只要有新闻，前 3 条独立渲染为醒目的 TOP 3，其余作为常规资讯流
- const useFeatured = filtered.length > 0 && !q;
-
- if (featuredWrap) {
-  if (useFeatured) {
-   featuredWrap.style.display = "block";
-   const top3 = filtered.slice(0, 3);
-   if (featuredList) featuredList.innerHTML = top3.map((n, i) => renderCard(n, i, top3.length, true)).join("");
-  } else {
-   featuredWrap.style.display = "none";
-  }
- }
-
- const regularItems = useFeatured ? filtered.slice(3) : filtered;
- document.getElementById("count").textContent = `显示常规资讯 ${regularItems.length} 条`;
-
- if (!regularItems.length) {
-  container.innerHTML = `<div class="card muted">当前栏目常规资讯已全部在上方 TOP 3 区域置顶展示。</div>`;
-  return;
- }
-
- container.innerHTML = regularItems.map((n, i) => renderCard(n, i, regularItems.length, false)).join("");
-
- container.querySelectorAll("[data-read-id]").forEach(button => {
-  button.addEventListener("click", () => {
-   readIds.add(button.getAttribute("data-read-id"));
-   try { localStorage.setItem(readKey, JSON.stringify([...readIds])); } catch(e) {}
-   render();
-  });
- });
-}
-
-function setTab(name) {
- if (!validTabs.includes(name)) return;
- active = name;
- try { localStorage.setItem(activeKey, name); } catch(e) {}
- document.querySelectorAll("[data-tab]").forEach(button => {
-  button.classList.toggle("active", button.dataset.tab === name);
- });
- render();
- window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-document.querySelectorAll("[data-tab]").forEach(button => {
- button.addEventListener("click", () => setTab(button.dataset.tab));
-});
-
-const searchInput = document.getElementById("searchInput");
-if (searchInput) searchInput.addEventListener("input", render);
-
-/* 手机手势逻辑：同时支持左右滑动切换栏目 与 顶部下拉刷新 */
-(() => {
- let startX = 0, startY = 0, tracking = false;
- const MIN_X = 70, DOMINANCE = 2, MAX_MS = 900;
- const ptrSpinner = document.getElementById("ptr-spinner");
-
- document.addEventListener("touchstart", e => {
-  if (e.touches.length !== 1) { tracking = false; return; }
-  if (e.target.closest("input, textarea, select, button, a, summary")) { tracking = false; return; }
-  startX = e.touches[0].clientX;
-  startY = e.touches[0].clientY;
-  tracking = true;
- }, { passive: true });
-
- document.addEventListener("touchmove", e => {
-  if (!tracking || !e.touches.length) return;
-  const dy = e.touches[0].clientY - startY;
-  // 当页面处于最顶端且向下拖动时，显示刷新提示
-  if (window.scrollY === 0 && dy > 40 && ptrSpinner) {
-   ptrSpinner.style.top = "15px";
-   ptrSpinner.style.opacity = "1";
-  }
- }, { passive: true });
-
- document.addEventListener("touchend", e => {
-  if (!tracking || !e.changedTouches.length) { tracking = false; return; }
-  tracking = false;
-
-  const dx = e.changedTouches[0].clientX - startX;
-  const dy = e.changedTouches[0].clientY - startY;
-  const ax = Math.abs(dx), ay = Math.abs(dy);
-
-  // 1. 下拉刷新逻辑：页面在最顶部且下滑距离超过 90px
-  if (window.scrollY <= 10 && dy > 90 && ay > ax * 1.5) {
-   if (ptrSpinner) {
-    ptrSpinner.innerHTML = "⚡ 正在刷新页面...";
-    ptrSpinner.style.top = "15px";
-    ptrSpinner.style.opacity = "1";
-   }
-   setTimeout(() => {
-    window.location.reload();
-   }, 300);
-   return;
-  }
-
-  // 隐藏刷新提示
-  if (ptrSpinner) {
-   ptrSpinner.style.top = "-50px";
-   ptrSpinner.style.opacity = "0";
-  }
-
-  // 2. 左右滑动切换栏目逻辑
-  if (ax >= MIN_X && ax > ay * DOMINANCE) {
-   const i = validTabs.indexOf(active);
-   if (dx < 0 && i < validTabs.length - 1) setTab(validTabs[i + 1]);
-   else if (dx > 0 && i > 0) setTab(validTabs[i - 1]);
-  }
- }, { passive: true });
-})();
-
-if (typeof window.newsData !== "undefined" && window.newsData?.updatedAt) {
- const ut = document.getElementById("updateTime");
- if (ut) ut.textContent = window.newsData.updatedAt;
-}
-
-const st = window.newsData?.aiStats;
-const aiStatusEl = document.getElementById("aiStatus");
-if (aiStatusEl) {
- aiStatusEl.textContent = window.newsData?.aiEnabled
-  ? `🟢 DeepSeek 已配置 · ${window.newsData.aiModel || "deepseek-chat"}${st ? ` · 成功 ${st.successes}/${st.attempts}` : ""}`
-  : "🟠 未检测到 DeepSeek API 密钥";
-}
-
-document.querySelectorAll("[data-tab]").forEach(button => {
- button.classList.toggle("active", button.dataset.tab === active);
-});
-
-document.addEventListener("DOMContentLoaded", render);
-render();
-</script>
-</body>
-</html>
+if __name__ == "__main__":
+    posts = fetch_comprehensive_posts()
+    board_content = format_board(posts)
+    send_telegram(board_content)
