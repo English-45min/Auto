@@ -37,7 +37,7 @@ def load_history():
 def save_history(history):
     try:
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(history[-100:], f, ensure_ascii=False, indent=2) # 扩大历史记录保持量到 100 条
+            json.dump(history[-120:], f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"⚠️ 保存历史记录失败: {e}")
 
@@ -68,12 +68,12 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【中文圈时政/社会热点】板块（多源高频轮询，彻底告别老样子） ----------------
-    print("🌐 正在拉取中文圈高频时政与社会热点...")
+    # ---------------- 2. 抓取【中文圈时政】板块（采用外媒/海外视角，有多少算多少，绝不重复） ----------------
+    print("🌐 正在拉取海外视角中文时政与宏观报道...")
+    # 使用直连或多路由的国际主流华语媒体时政 RSS
     politics_sources = [
-        f"{node}/zhihu/hotlist",           # 知乎热榜（更新极快）
-        f"{node}/thepaper/featured",      # 澎湃新闻头条
-        "https://feedx.net/rss/zaobao.xml"  # 联合早报
+        "https://feedx.net/rss/zaobao.xml",  # 联合早报
+        f"{node}/zaobao/realtime/china"      # 联合早报中国实时
     ]
     
     for p_url in politics_sources:
@@ -84,10 +84,10 @@ def fetch_comprehensive_posts():
                 for entry in feed.entries:
                     title = entry.title.strip().replace('\n', ' ')
                     link = entry.link
-                    # 严格去重：确保不在已发历史中
+                    # 严格去重：必须是历史没推送过的新文章
                     if title not in sent_titles and not any(p['link'] == link for p in politics_posts):
                         politics_posts.append({
-                            "source": "中文圈时政",
+                            "source": "外媒时政",
                             "title": title[:75] + "..." if len(title) > 75 else title,
                             "link": link
                         })
@@ -98,40 +98,18 @@ def fetch_comprehensive_posts():
         except Exception as e:
             print(f"⚠️ 时政抓取 {p_url} 异常: {e}")
 
-    # 如果多源轮询后时政依然不够 4 条（说明今天时政确实没啥大新闻），放宽去重限制，取当前源里最新的补齐
-    if len(politics_posts) < 4:
-        for p_url in politics_sources:
-            try:
-                resp = requests.get(p_url, timeout=6)
-                if resp.status_code == 200:
-                    feed = feedparser.parse(resp.content)
-                    for entry in feed.entries:
-                        title = entry.title.strip().replace('\n', ' ')
-                        link = entry.link
-                        if not any(p['link'] == link for p in politics_posts):
-                            politics_posts.append({
-                                "source": "中文圈时政",
-                                "title": title[:75] + "..." if len(title) > 75 else title,
-                                "link": link
-                            })
-                        if len(politics_posts) >= 4:
-                            break
-                if len(politics_posts) >= 4:
-                    break
-            except Exception:
-                pass
-
     # ---------------- 3. 组合并更新历史记录 ----------------
-    new_posts = tech_posts[:4] + politics_posts[:4]
+    # 科技部分固定取前 4 条（如果科技也不足，则有多少取多少）；时政部分采用“有多少算多少”原则，不强行凑数
+    final_posts = tech_posts[:4] + politics_posts[:2] # 时政精简为至多 2 条高质外媒报道，或者放开由 politics_posts 决定
 
-    # 仅把本次成功推送的新标题加入历史缓存
-    all_sent = sent_titles + [p['title'] for p in new_posts]
-    save_history(all_sent)
+    # 提取本次推送的所有标题加入历史
+    new_titles = [p['title'] for p in final_posts]
+    save_history(sent_titles + new_titles)
 
-    return new_posts
+    return final_posts
 
 def format_board(posts):
-    board = "🔥 <b>【科技 AI & 中文圈时政热点看板】</b>\n"
+    board = "🔥 <b>【科技 AI & 外媒中文时政看板】</b>\n"
     board += "───────────────────────────\n\n"
     
     if not posts:
@@ -141,7 +119,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>多源高频轮询防同质化 | 科技 AI (4条) + 中文时政 (4条)</i>"
+    board += "🤖 <i>智能去重 | 拒绝同质化刷屏</i>"
     return board
 
 def send_telegram(text):
