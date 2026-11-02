@@ -70,11 +70,12 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【外媒时政】板块（严格 36 小时内新鲜内容过滤） ----------------
-    print("🌐 正在拉取外媒中文时政与宏观报道...")
+    # ---------------- 2. 抓取【中文圈时政/社会财经】板块（多源轮询，确保每次都有新鲜增量） ----------------
+    print("🌐 正在拉取中文圈时政与宏观财经动态...")
     politics_sources = [
-        "https://feedx.net/rss/zaobao.xml",
-        f"{node}/zaobao/realtime/china"
+        f"{node}/zhihu/hotlist",           # 知乎热榜（全天候实时滚动社会与时政讨论）
+        f"{node}/thepaper/featured",      # 澎湃新闻头条
+        "https://feedx.net/rss/zaobao.xml"  # 联合早报
     ]
     
     now_utc = datetime.now(timezone.utc)
@@ -98,9 +99,10 @@ def fetch_comprehensive_posts():
                         except Exception:
                             pass
 
+                    # 只要没发过，且在时间窗口内
                     if is_recent and title not in sent_history and not any(p['link'] == link for p in politics_posts):
                         politics_posts.append({
-                            "source": "外媒时政",
+                            "source": "中文时政",
                             "title": title[:75] + "..." if len(title) > 75 else title,
                             "link": link
                         })
@@ -111,6 +113,29 @@ def fetch_comprehensive_posts():
         except Exception as e:
             print(f"⚠️ 时政抓取 {p_url} 异常: {e}")
 
+    # 兜底：如果高频源也没凑够 2 条，放宽时间限制，直接取当前源最新的前 2 条
+    if len(politics_posts) < 2:
+        for p_url in politics_sources:
+            try:
+                resp = requests.get(p_url, timeout=6)
+                if resp.status_code == 200:
+                    feed = feedparser.parse(resp.content)
+                    for entry in feed.entries:
+                        title = entry.title.strip().replace('\n', ' ')
+                        link = entry.link
+                        if not any(p['link'] == link for p in politics_posts):
+                            politics_posts.append({
+                                "source": "中文时政",
+                                "title": title[:75] + "..." if len(title) > 75 else title,
+                                "link": link
+                            })
+                        if len(politics_posts) >= 2:
+                            break
+                if len(politics_posts) >= 2:
+                    break
+            except Exception:
+                pass
+
     # ---------------- 3. 合并与更新历史记录 ----------------
     final_posts = tech_posts[:4] + politics_posts[:2]
 
@@ -120,7 +145,7 @@ def fetch_comprehensive_posts():
     return final_posts
 
 def format_board(posts):
-    board = "🔥 <b>【科技 AI & 外媒中文时政看板】</b>\n"
+    board = "🔥 <b>【科技 AI & 中文圈时政热点看板】</b>\n"
     board += "───────────────────────────\n\n"
     
     if not posts:
@@ -130,7 +155,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>自动重试容灾 | 拒绝隔夜旧闻</i>"
+    board += "🤖 <i>多源高频轮询 | 智能去重防断流</i>"
     return board
 
 def send_telegram(text):
@@ -146,7 +171,6 @@ def send_telegram(text):
         "disable_web_page_preview": True
     }
     
-    # 最多重试 3 次（应对 502 Bad Gateway 偶发网关抖动）
     for attempt in range(1, 4):
         try:
             response = requests.post(url, json=payload, timeout=10)
@@ -159,10 +183,9 @@ def send_telegram(text):
             print(f"⚠️ 第 {attempt} 次推送网络异常: {e}")
         
         if attempt < 3:
-            print("⏳ 等待 3 秒后重试...")
             time.sleep(3)
             
-    print("❌ 多次重试后推送依然失败，请检查 Telegram 服务状态。")
+    print("❌ 多次重试后推送依然失败。")
 
 if __name__ == "__main__":
     posts = fetch_comprehensive_posts()
