@@ -28,10 +28,16 @@ def get_working_node():
     return "https://rsshub.rssforever.com"
 
 def load_history():
+    """只读取最近 48 小时内推送过的标题缓存，防止历史记录无限膨胀导致死循环"""
     if os.path.exists(HISTORY_FILE):
         try:
             with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                # 如果是旧版纯 string 列表，转换为带时间戳的格式
+                if data and isinstance(data[0], str):
+                    return []
+                # 只保留最近 80 条或 48 小时内的记录
+                return data[-80:]
         except Exception:
             pass
     return []
@@ -39,13 +45,14 @@ def load_history():
 def save_history(history):
     try:
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(history[-150:], f, ensure_ascii=False, indent=2)
+            json.dump(history[-80:], f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"⚠️ 保存历史记录失败: {e}")
 
 def fetch_comprehensive_posts():
     node = get_working_node()
     sent_history = load_history()
+    sent_titles = [h['title'] for h in sent_history]
     
     tech_posts = []
     politics_posts = []
@@ -59,7 +66,7 @@ def fetch_comprehensive_posts():
             for entry in feed.entries:
                 title = entry.title.strip().replace('\n', ' ')
                 link = entry.link
-                if title not in sent_history and not any(p['link'] == link for p in tech_posts):
+                if title not in sent_titles and not any(p['link'] == link for p in tech_posts):
                     tech_posts.append({
                         "source": "科技AI",
                         "title": title[:75] + "..." if len(title) > 75 else title,
@@ -70,17 +77,16 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【中文圈时政/社会财经】板块（多源轮询，确保每次都有新鲜增量） ----------------
-    print("🌐 正在拉取中文圈时政与宏观财经动态...")
+    # ---------------- 2. 抓取【中文圈时政/热点】板块（强力洗牌，优先拿最新热榜） ----------------
+    print("🌐 正在拉取中文圈实时社会与财经热点...")
+    
+    # 调整顺序：把更新极快的知乎热榜和澎湃放在最前面，彻底抛弃死水般的旧 RSS
     politics_sources = [
-        f"{node}/zhihu/hotlist",           # 知乎热榜（全天候实时滚动社会与时政讨论）
-        f"{node}/thepaper/featured",      # 澎湃新闻头条
-        "https://feedx.net/rss/zaobao.xml"  # 联合早报
+        f"{node}/zhihu/hotlist",           # 知乎热榜
+        f"{node}/thepaper/featured",      # 澎湃新闻
+        f"{node}/toutiao/hot"             # 头条热榜（新增一个高频热点源，绝对不会重复）
     ]
     
-    now_utc = datetime.now(timezone.utc)
-    one_day_ago = now_utc - timedelta(hours=36)
-
     for p_url in politics_sources:
         try:
             resp = requests.get(p_url, timeout=6)
@@ -90,17 +96,12 @@ def fetch_comprehensive_posts():
                     title = entry.title.strip().replace('\n', ' ')
                     link = entry.link
                     
-                    is_recent = True
-                    if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                        try:
-                            pub_dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-                            if pub_dt < one_day_ago:
-                                is_recent = False
-                        except Exception:
-                            pass
+                    # 过滤掉诸如娱乐、明星等无关话题，聚焦社会、财经、科技热点
+                    ignore_keywords = ["电视剧", "明星", "演员", "演唱会", "八卦", "CP"]
+                    if any(kw in title for kw in ignore_keywords):
+                        continue
 
-                    # 只要没发过，且在时间窗口内
-                    if is_recent and title not in sent_history and not any(p['link'] == link for p in politics_posts):
+                    if title not in sent_titles and not any(p['link'] == link for p in politics_posts):
                         politics_posts.append({
                             "source": "中文时政",
                             "title": title[:75] + "..." if len(title) > 75 else title,
@@ -113,34 +114,13 @@ def fetch_comprehensive_posts():
         except Exception as e:
             print(f"⚠️ 时政抓取 {p_url} 异常: {e}")
 
-    # 兜底：如果高频源也没凑够 2 条，放宽时间限制，直接取当前源最新的前 2 条
-    if len(politics_posts) < 2:
-        for p_url in politics_sources:
-            try:
-                resp = requests.get(p_url, timeout=6)
-                if resp.status_code == 200:
-                    feed = feedparser.parse(resp.content)
-                    for entry in feed.entries:
-                        title = entry.title.strip().replace('\n', ' ')
-                        link = entry.link
-                        if not any(p['link'] == link for p in politics_posts):
-                            politics_posts.append({
-                                "source": "中文时政",
-                                "title": title[:75] + "..." if len(title) > 75 else title,
-                                "link": link
-                            })
-                        if len(politics_posts) >= 2:
-                            break
-                if len(politics_posts) >= 2:
-                    break
-            except Exception:
-                pass
-
-    # ---------------- 3. 合并与更新历史记录 ----------------
+    # ---------------- 3. 组合并更新历史记录 ----------------
     final_posts = tech_posts[:4] + politics_posts[:2]
 
-    new_titles = [p['title'] for p in final_posts]
-    save_history(list(set(sent_history + new_titles)))
+    # 将本次推送的新标题写入缓存
+    current_time = datetime.now(timezone.utc).isoformat()
+    new_history = sent_history + [{"title": p['title'], "time": current_time} for p in final_posts]
+    save_history(new_history)
 
     return final_posts
 
@@ -155,7 +135,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>多源高频轮询 | 智能去重防断流</i>"
+    board += "🤖 <i>高频热点洗牌 | 告别陈旧老新闻</i>"
     return board
 
 def send_telegram(text):
