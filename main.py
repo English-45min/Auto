@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import requests
 import feedparser
 from datetime import datetime, timezone, timedelta
@@ -58,7 +59,6 @@ def fetch_comprehensive_posts():
             for entry in feed.entries:
                 title = entry.title.strip().replace('\n', ' ')
                 link = entry.link
-                # 使用标题作为唯一指纹去重
                 if title not in sent_history and not any(p['link'] == link for p in tech_posts):
                     tech_posts.append({
                         "source": "科技AI",
@@ -70,7 +70,7 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【外媒时政】板块（严格 24 小时内新鲜内容过滤） ----------------
+    # ---------------- 2. 抓取【外媒时政】板块（严格 36 小时内新鲜内容过滤） ----------------
     print("🌐 正在拉取外媒中文时政与宏观报道...")
     politics_sources = [
         "https://feedx.net/rss/zaobao.xml",
@@ -78,7 +78,7 @@ def fetch_comprehensive_posts():
     ]
     
     now_utc = datetime.now(timezone.utc)
-    one_day_ago = now_utc - timedelta(hours=36) # 放宽至 36 小时内
+    one_day_ago = now_utc - timedelta(hours=36)
 
     for p_url in politics_sources:
         try:
@@ -89,24 +89,22 @@ def fetch_comprehensive_posts():
                     title = entry.title.strip().replace('\n', ' ')
                     link = entry.link
                     
-                    # 检查发布时间（若 feed 包含 published_parsed）
                     is_recent = True
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         try:
                             pub_dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
                             if pub_dt < one_day_ago:
-                                is_recent = False # 太旧了，跳过
+                                is_recent = False
                         except Exception:
                             pass
 
-                    # 必须是历史没发过、且属于近期更新的文章
                     if is_recent and title not in sent_history and not any(p['link'] == link for p in politics_posts):
                         politics_posts.append({
                             "source": "外媒时政",
                             "title": title[:75] + "..." if len(title) > 75 else title,
                             "link": link
                         })
-                    if len(politics_posts) >= 2: # 最多取 2 条真正新鲜的时政
+                    if len(politics_posts) >= 2:
                         break
             if len(politics_posts) >= 2:
                 break
@@ -116,7 +114,6 @@ def fetch_comprehensive_posts():
     # ---------------- 3. 合并与更新历史记录 ----------------
     final_posts = tech_posts[:4] + politics_posts[:2]
 
-    # 将新出现的标题追加进历史档案
     new_titles = [p['title'] for p in final_posts]
     save_history(list(set(sent_history + new_titles)))
 
@@ -133,7 +130,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>严格时间戳去重 | 拒绝隔夜旧闻</i>"
+    board += "🤖 <i>自动重试容灾 | 拒绝隔夜旧闻</i>"
     return board
 
 def send_telegram(text):
@@ -148,14 +145,24 @@ def send_telegram(text):
         "parse_mode": "HTML",
         "disable_web_page_preview": True
     }
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            print("✅ Telegram 爆文看板推送成功！")
-        else:
-            print(f"❌ 推送失败: {response.text}")
-    except Exception as e:
-        print(f"❌ 发送 Telegram 消息失败: {e}")
+    
+    # 最多重试 3 次（应对 502 Bad Gateway 偶发网关抖动）
+    for attempt in range(1, 4):
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                print("✅ Telegram 爆文看板推送成功！")
+                return
+            else:
+                print(f"⚠️ 第 {attempt} 次推送遇到状态码 {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"⚠️ 第 {attempt} 次推送网络异常: {e}")
+        
+        if attempt < 3:
+            print("⏳ 等待 3 秒后重试...")
+            time.sleep(3)
+            
+    print("❌ 多次重试后推送依然失败，请检查 Telegram 服务状态。")
 
 if __name__ == "__main__":
     posts = fetch_comprehensive_posts()
