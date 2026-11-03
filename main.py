@@ -55,24 +55,25 @@ def save_history(titles):
     except Exception as e:
         print(f"⚠️ 保存历史记录失败: {e}")
 
-def is_recent_entry(entry):
-    """检查文章是否为最近 36 小时内发出的新鲜新闻"""
+def is_recent_entry(entry, max_hours=48):
+    """灵活的时间过滤，默认支持 48 小时内"""
     try:
         published_parsed = entry.get('published_parsed') or entry.get('updated_parsed')
         if published_parsed:
             entry_time = datetime(*published_parsed[:6], tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
-            if now - entry_time > timedelta(hours=36):
+            if now - entry_time > timedelta(hours=max_hours):
                 return False
     except Exception:
         pass
     return True
 
 def fetch_category_news(sources, target_count, source_label, sent_titles, node=""):
-    """通用地区分类限额抓取函数"""
+    """多级容灾抓取：先严格过滤，若不够则自动放宽条件补齐"""
     posts = []
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
+    # 第一阶段：严格抓取 48 小时内的全新内容
     for url in sources:
         target_url = f"{node}{url}" if url.startswith('/') else url
         try:
@@ -87,7 +88,7 @@ def fetch_category_news(sources, target_count, source_label, sent_titles, node="
                     if any(kw in title for kw in ignore_keywords) or any(kw in title for kw in FORBIDDEN_KEYWORDS):
                         continue
                     
-                    if not is_recent_entry(entry):
+                    if not is_recent_entry(entry, max_hours=48):
                         continue
 
                     if title not in sent_titles and not any(p['link'] == link for p in posts):
@@ -103,13 +104,42 @@ def fetch_category_news(sources, target_count, source_label, sent_titles, node="
         except Exception as e:
             print(f"⚠️ {source_label} 源 {target_url} 抓取异常: {e}")
             
+    # 第二阶段（兜底补齐）：如果还没达到目标数量，放宽时间限制直接取源内最新项
+    if len(posts) < target_count:
+        print(f"🔄 {source_label} 数量不足 {target_count} 条，正在执行智能兜底补齐...")
+        for url in sources:
+            target_url = f"{node}{url}" if url.startswith('/') else url
+            try:
+                resp = requests.get(target_url, headers=headers, timeout=6)
+                if resp.status_code == 200:
+                    feed = feedparser.parse(resp.content)
+                    entries = list(feed.entries)
+                    random.shuffle(entries)
+                    for entry in entries:
+                        title = entry.title.strip().replace('\n', ' ')
+                        link = entry.link
+                        if any(kw in title for kw in FORBIDDEN_KEYWORDS):
+                            continue
+                        if not any(p['link'] == link for p in posts):
+                            posts.append({
+                                "source": source_label,
+                                "title": title[:75] + "..." if len(title) > 75 else title,
+                                "link": link
+                            })
+                        if len(posts) >= target_count:
+                            break
+                if len(posts) >= target_count:
+                    break
+            except Exception:
+                pass
+                
     return posts
 
 def fetch_comprehensive_posts():
     node = get_working_node()
     sent_titles = load_history()
     
-    # ---------------- 1. 抓取【科技 AI】（严格目标 4 条） ----------------
+    # ---------------- 1. 抓取【科技 AI】（目标 4 条） ----------------
     print("🚀 正在拉取 36氪科技 AI 精选快讯...")
     tech_posts = []
     try:
@@ -119,7 +149,7 @@ def fetch_comprehensive_posts():
             for entry in feed.entries:
                 title = entry.title.strip().replace('\n', ' ')
                 link = entry.link
-                if any(kw in title for kw in FORBIDDEN_KEYWORDS) or not is_recent_entry(entry):
+                if any(kw in title for kw in FORBIDDEN_KEYWORDS) or not is_recent_entry(entry, 48):
                     continue
                 if title not in sent_titles and not any(p['link'] == link for p in tech_posts):
                     tech_posts.append({
@@ -132,14 +162,33 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 按配额抓取【台湾(3条) & 香港(3条，含原澳门)】 ----------------
+    # 若科技 AI 不足 4 条，从 36kr 随机补齐
+    if len(tech_posts) < 4:
+        try:
+            resp = requests.get(f"{node}/36kr/newsflashes", timeout=8)
+            if resp.status_code == 200:
+                feed = feedparser.parse(resp.content)
+                for entry in feed.entries:
+                    title = entry.title.strip().replace('\n', ' ')
+                    link = entry.link
+                    if not any(p['link'] == link for p in tech_posts):
+                        tech_posts.append({
+                            "source": "科技AI",
+                            "title": title[:75] + "..." if len(title) > 75 else title,
+                            "link": link
+                        })
+                    if len(tech_posts) >= 4:
+                        break
+        except Exception:
+            pass
+
+    # ---------------- 2. 按配额抓取【台湾(3条) & 香港(3条)】 ----------------
     print("🌐 正在按配额拉取台湾(3条)与香港(3条)头条...")
     
     tw_sources = [
         "https://www.cna.com.tw/cna2013/market/rss.aspx",
         "https://news.yahoo.com.tw/rss/"
     ]
-    # 香港新闻源扩容（纳入香港电台、Yahoo香港及星岛等，确保港区有3条充足货源）
     hk_sources = [
         "https://rthk.hk/rthk/news/rss/c_expressnews.xml",
         "https://hk.news.yahoo.com/rss/"
