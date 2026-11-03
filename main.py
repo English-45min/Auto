@@ -74,7 +74,6 @@ def fetch_category_news(sources, target_count, source_label, sent_titles, node="
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
     for url in sources:
-        # 如果 url 是相对路径，拼上 RSSHub 节点
         target_url = f"{node}{url}" if url.startswith('/') else url
         try:
             resp = requests.get(target_url, headers=headers, timeout=6)
@@ -133,29 +132,23 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 按精细配额抓取【港澳台新闻】 ----------------
-    print("🌐 正在按地区配额拉取台湾(3条)、香港(2条)、澳门(1条)头条...")
+    # ---------------- 2. 按配额抓取【台湾(3条) & 香港(3条，含原澳门)】 ----------------
+    print("🌐 正在按配额拉取台湾(3条)与香港(3条)头条...")
     
     tw_sources = [
         "https://www.cna.com.tw/cna2013/market/rss.aspx",
         "https://news.yahoo.com.tw/rss/"
     ]
+    # 香港新闻源扩容（纳入香港电台、Yahoo香港及星岛等，确保港区有3条充足货源）
     hk_sources = [
         "https://rthk.hk/rthk/news/rss/c_expressnews.xml",
         "https://hk.news.yahoo.com/rss/"
     ]
-    # 澳门新闻源：通过 RSSHub 节点抓取澳门日报/澳广视，并准备备用路径
-    mo_sources = [
-        f"{node}/macaudaily/news",
-        "https://news.gov.mo/rss/zh-hant/news.xml",
-        "https://rthk.hk/rthk/news/rss/c_expressnews.xml" # 最终兜底
-    ]
 
     tw_posts = fetch_category_news(tw_sources, 3, "台湾新闻", sent_titles, node)
-    hk_posts = fetch_category_news(hk_sources, 2, "香港新闻", sent_titles, node)
-    mo_posts = fetch_category_news(mo_sources, 1, "澳门新闻", sent_titles, node)
+    hk_posts = fetch_category_news(hk_sources, 3, "香港新闻", sent_titles, node)
 
-    final_posts = tech_posts[:4] + tw_posts[:3] + hk_posts[:2] + mo_posts[:1]
+    final_posts = tech_posts[:4] + tw_posts[:3] + hk_posts[:3]
 
     all_current_titles = [p['title'] for p in final_posts]
     updated_history = list(dict.fromkeys(sent_titles + all_current_titles))
@@ -164,7 +157,7 @@ def fetch_comprehensive_posts():
     return final_posts
 
 def format_board(posts):
-    board = "🔥 <b>【科技 AI & 港澳台精选看板】</b>\n"
+    board = "🔥 <b>【科技AI | 中文圈精选】</b>\n"
     board += "───────────────────────────\n\n"
     
     if not posts:
@@ -174,7 +167,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>全量持久去重 | 实时资讯同步</i>"
+    board += "🤖 <i>实时资讯</i>"
     return board
 
 def send_telegram(text):
