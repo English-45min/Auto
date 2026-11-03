@@ -10,9 +10,11 @@ TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 HISTORY_FILE = '.sent_history.json'
 
+# 🌐 保留 RSSHub 节点仅用于 36氪科技 AI 快讯
 RSSHUB_NODES = [
     os.getenv('RSSHUB_URL', '').rstrip('/'),
     "https://rsshub.rssforever.com",
+    "https://hub.slarker.me",
     "https://rsshub.app"
 ]
 
@@ -55,14 +57,13 @@ def save_history(titles):
         print(f"⚠️ 保存历史记录失败: {e}")
 
 def is_recent_entry(entry):
-    """检查文章是否为最近 48 小时内发出的新鲜新闻"""
+    """检查文章是否为最近 36 小时内发出的新鲜新闻"""
     try:
         published_parsed = entry.get('published_parsed') or entry.get('updated_parsed')
         if published_parsed:
             entry_time = datetime(*published_parsed[:6], tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
-            # 只要超过 48 小时，一律视为僵尸旧闻强行过滤
-            if now - entry_time > timedelta(hours=48):
+            if now - entry_time > timedelta(hours=36):
                 return False
     except Exception:
         pass
@@ -73,7 +74,7 @@ def fetch_comprehensive_posts():
     sent_titles = load_history()
     
     tech_posts = []
-    politics_posts = []
+    hkmotw_posts = []
 
     # ---------------- 1. 抓取【科技 AI】板块（4 条） ----------------
     print("🚀 正在拉取 36氪科技 AI 精选快讯...")
@@ -97,50 +98,55 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【中文圈时政】板块（彻底踢掉联合早报僵尸源） ----------------
-    print("🌐 正在拉取高频实时中文时政热点...")
-    politics_sources = [
-        f"{node}/thepaper/featured",      # 澎湃新闻头条（实时性强）
-        f"{node}/zhihu/hotlist",           # 知乎热榜（每小时更新）
-        f"{node}/toutiao/hot"              # 头条热榜（全网大事件）
+    # ---------------- 2. 抓取【港澳台地区】板块（直连官方原生 RSS） ----------------
+    print("🌐 正在拉取港澳台地区直连原生热点新闻...")
+    hkmotw_sources = [
+        "https://news.yahoo.com.tw/rss/",                 # 台湾 Yahoo 奇摩新闻焦点
+        "https://www me.cna.com.tw/cna2013/market/rss.aspx",# 台湾中央社 (CNA) 官方源
+        "https://rthk.hk/rthk/news/rss/c_expressnews.xml", # 香港电台 (RTHK) 现场即时新闻
+        "https://hk.news.yahoo.com/rss/"                  # 香港 Yahoo 新闻
     ]
     
-    for p_url in politics_sources:
+    # 兼容修正部分常见 CNA RSS 地址
+    cna_fallback = "https://www.cna.com.tw/cna2013/market/rss.aspx"
+    
+    for p_url in hkmotw_sources:
         try:
-            resp = requests.get(p_url, timeout=6)
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            resp = requests.get(p_url, headers=headers, timeout=6)
             if resp.status_code == 200:
                 feed = feedparser.parse(resp.content)
                 for entry in feed.entries:
                     title = entry.title.strip().replace('\n', ' ')
                     link = entry.link
                     
-                    ignore_keywords = ["电视剧", "明星", "演员", "演唱会", "八卦", "CP", "恋情"]
+                    ignore_keywords = ["综艺", "明星", "八卦", "CP", "恋情", "运势"]
                     if any(kw in title for kw in ignore_keywords) or any(kw in title for kw in FORBIDDEN_KEYWORDS):
                         continue
                     
-                    # 强力时间拦截：老新闻直接扔掉
                     if not is_recent_entry(entry):
                         continue
 
-                    if title not in sent_titles and not any(p['link'] == link for p in politics_posts):
-                        politics_posts.append({
-                            "source": "中文时政",
+                    if title not in sent_titles and not any(p['link'] == link for p in hkmotw_posts):
+                        hkmotw_posts.append({
+                            "source": "港澳台新闻",
                             "title": title[:75] + "..." if len(title) > 75 else title,
                             "link": link
                         })
-                    if len(politics_posts) >= 4:
+                    if len(hkmotw_posts) >= 4:
                         break
-            if len(politics_posts) >= 4:
+            if len(hkmotw_posts) >= 4:
                 break
         except Exception as e:
-            print(f"⚠️ 时政源 {p_url} 抓取异常: {e}")
+            print(f"⚠️ 港澳台新闻源 {p_url} 抓取异常: {e}")
 
-    # ---------------- 3. 兜底逻辑：仅限 48 小时内的活水新闻打乱补充 ----------------
-    if len(politics_posts) < 4:
-        print("🔄 执行时政板块实时兜底...")
-        for p_url in politics_sources:
+    # ---------------- 3. 兜底逻辑：若不足 4 条，自动打乱补充 ----------------
+    if len(hkmotw_posts) < 4:
+        print("🔄 执行港澳台板块实时兜底...")
+        for p_url in hkmotw_sources:
             try:
-                resp = requests.get(p_url, timeout=6)
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+                resp = requests.get(p_url, headers=headers, timeout=6)
                 if resp.status_code == 200:
                     feed = feedparser.parse(resp.content)
                     entries = [e for e in feed.entries if is_recent_entry(e)]
@@ -150,20 +156,20 @@ def fetch_comprehensive_posts():
                         link = entry.link
                         if any(kw in title for kw in FORBIDDEN_KEYWORDS):
                             continue
-                        if not any(p['link'] == link for p in politics_posts):
-                            politics_posts.append({
-                                "source": "中文时政",
+                        if not any(p['link'] == link for p in hkmotw_posts):
+                            hkmotw_posts.append({
+                                "source": "港澳台新闻",
                                 "title": title[:75] + "..." if len(title) > 75 else title,
                                 "link": link
                             })
-                        if len(politics_posts) >= 4:
+                        if len(hkmotw_posts) >= 4:
                             break
-                if len(politics_posts) >= 4:
+                if len(hkmotw_posts) >= 4:
                     break
             except Exception:
                 pass
 
-    final_posts = tech_posts[:4] + politics_posts[:4]
+    final_posts = tech_posts[:4] + hkmotw_posts[:4]
 
     all_current_titles = [p['title'] for p in final_posts]
     updated_history = list(dict.fromkeys(sent_titles + all_current_titles))
@@ -172,7 +178,7 @@ def fetch_comprehensive_posts():
     return final_posts
 
 def format_board(posts):
-    board = "🔥 <b>【科技 AI & 中文圈时政热点看板】</b>\n"
+    board = "🔥 <b>【科技 AI & 港澳台热点看板】</b>\n"
     board += "───────────────────────────\n\n"
     
     if not posts:
@@ -182,7 +188,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>48小时绝对时效拦截 | 科技 AI (4条) + 中文时政 (4条)</i>"
+    board += "🤖 <i>官方原生直连 | 科技 AI (4条) + 港澳台 (4条)</i>"
     return board
 
 def send_telegram(text):
