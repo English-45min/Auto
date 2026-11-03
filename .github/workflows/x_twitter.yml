@@ -1,4 +1,4 @@
-name: bot Daily News Board
+name: Run Daily News Board
 
 on:
   schedule:
