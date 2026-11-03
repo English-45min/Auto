@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import random
 import requests
 import feedparser
 from datetime import datetime, timezone
@@ -15,7 +16,6 @@ RSSHUB_NODES = [
     "https://rsshub.app"
 ]
 
-# 🛡️ 强制免疫黑名单：不管历史缓存怎么记录，只要包含以下关键词的“僵尸新闻”一律永久屏蔽！
 FORBIDDEN_KEYWORDS = [
     "贝森特", "许家印", "王兴兴", "山东社区爆炸", "全剧终", "伊朗经济"
 ]
@@ -47,7 +47,8 @@ def load_history():
 def save_history(titles):
     try:
         current_time = datetime.now(timezone.utc).isoformat()
-        history_data = [{"title": t, "time": current_time} for t in titles[-150:]]
+        # 保持最近 200 条缓存，彻底防止短时间内重复
+        history_data = [{"title": t, "time": current_time} for t in titles[-200:]]
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(history_data, f, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -60,7 +61,7 @@ def fetch_comprehensive_posts():
     tech_posts = []
     politics_posts = []
 
-    # ---------------- 1. 抓取【科技 AI】板块（严格 4 条） ----------------
+    # ---------------- 1. 抓取【科技 AI】板块 ----------------
     print("🚀 正在拉取 36氪科技 AI 精选快讯...")
     try:
         resp = requests.get(f"{node}/36kr/newsflashes", timeout=8)
@@ -69,11 +70,8 @@ def fetch_comprehensive_posts():
             for entry in feed.entries:
                 title = entry.title.strip().replace('\n', ' ')
                 link = entry.link
-                
-                # 检查黑名单
                 if any(kw in title for kw in FORBIDDEN_KEYWORDS):
                     continue
-                    
                 if title not in sent_titles and not any(p['link'] == link for p in tech_posts):
                     tech_posts.append({
                         "source": "科技AI",
@@ -85,37 +83,12 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # 科技兜底
-    if len(tech_posts) < 4:
-        try:
-            resp = requests.get(f"{node}/36kr/newsflashes", timeout=6)
-            if resp.status_code == 200:
-                feed = feedparser.parse(resp.content)
-                for entry in feed.entries:
-                    title = entry.title.strip().replace('\n', ' ')
-                    link = entry.link
-                    if any(kw in title for kw in FORBIDDEN_KEYWORDS):
-                        continue
-                    if not any(p['link'] == link for p in tech_posts):
-                        tech_posts.append({
-                            "source": "科技AI",
-                            "title": title[:75] + "..." if len(title) > 75 else title,
-                            "link": link
-                        })
-                    if len(tech_posts) >= 4:
-                        break
-        except Exception:
-            pass
-
-    # ---------------- 2. 抓取【中文圈时政】板块（多源轮询 + 强力黑名单过滤） ----------------
+    # ---------------- 2. 抓取【中文圈时政】板块 ----------------
     print("🌐 正在拉取中文圈时政与宏观热点...")
-    
-    # 彻底抛弃容易死机的单一源，引入更广泛的国内主流动态路由
     politics_sources = [
-        f"{node}/thepaper/featured",      # 澎湃新闻头条
         f"{node}/zhihu/hotlist",           # 知乎热榜
-        f"{node}/toutiao/hot",             # 头条热榜
-        "https://feedx.net/rss/zaobao.xml"  # 联合早报（放最后）
+        f"{node}/thepaper/featured",      # 澎湃新闻
+        "https://feedx.net/rss/zaobao.xml"  # 联合早报
     ]
     
     for p_url in politics_sources:
@@ -127,15 +100,11 @@ def fetch_comprehensive_posts():
                     title = entry.title.strip().replace('\n', ' ')
                     link = entry.link
                     
-                    # 1. 过滤垃圾/娱乐关键词
                     ignore_keywords = ["电视剧", "明星", "演员", "演唱会", "八卦", "CP", "恋情"]
-                    if any(kw in title for kw in ignore_keywords):
-                        continue
-                        
-                    # 2. 核心大招：直接拦截这几天阴魂不散的僵尸新闻
-                    if any(kw in title for kw in FORBIDDEN_KEYWORDS):
+                    if any(kw in title for kw in ignore_keywords) or any(kw in title for kw in FORBIDDEN_KEYWORDS):
                         continue
 
+                    # 严格过滤掉已发送的历史标题
                     if title not in sent_titles and not any(p['link'] == link for p in politics_posts):
                         politics_posts.append({
                             "source": "中文时政",
@@ -149,14 +118,17 @@ def fetch_comprehensive_posts():
         except Exception as e:
             print(f"⚠️ 时政源 {p_url} 抓取异常: {e}")
 
-    # 时政强制兜底（同样应用黑名单）
+    # ---------------- 3. 兜底逻辑：若不足 4 条，从候选池中跳过已发标题补齐 ----------------
     if len(politics_posts) < 4:
         for p_url in politics_sources:
             try:
                 resp = requests.get(p_url, timeout=6)
                 if resp.status_code == 200:
                     feed = feedparser.parse(resp.content)
-                    for entry in feed.entries:
+                    entries = feed.entries
+                    # 随机打乱兜底列表的抓取顺序，避免永远拿前4条
+                    random.shuffle(entries)
+                    for entry in entries:
                         title = entry.title.strip().replace('\n', ' ')
                         link = entry.link
                         if any(kw in title for kw in FORBIDDEN_KEYWORDS):
@@ -174,12 +146,12 @@ def fetch_comprehensive_posts():
             except Exception:
                 pass
 
-    # ---------------- 3. 严格合并为 4 + 4 ----------------
     final_posts = tech_posts[:4] + politics_posts[:4]
 
-    # 归档入库
+    # 重点修复：无论来自常规去重还是兜底，本次推送的所有标题一律强制写入历史档案！
     all_current_titles = [p['title'] for p in final_posts]
-    save_history(sent_titles + all_current_titles)
+    updated_history = list(dict.fromkeys(sent_titles + all_current_titles))
+    save_history(updated_history)
 
     return final_posts
 
@@ -194,7 +166,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>硬核黑名单过滤 | 科技 AI (4条) + 中文时政 (4条)</i>"
+    board += "🤖 <i>无死角缓存归档 | 科技 AI (4条) + 中文时政 (4条)</i>"
     return board
 
 def send_telegram(text):
