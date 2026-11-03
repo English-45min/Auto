@@ -4,7 +4,7 @@ import time
 import random
 import requests
 import feedparser
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
@@ -16,10 +16,9 @@ RSSHUB_NODES = [
     "https://rsshub.app"
 ]
 
-# 🛡️ 终极硬编码黑名单：彻底封杀已连续推送多天的高频旧闻关键词
 FORBIDDEN_KEYWORDS = [
     "贝森特", "许家印", "王兴兴", "山东社区爆炸", "全剧终", "伊朗经济",
-    "支联会", "张雪机车", "湖南省领导动作频频", "算力狂飙"
+    "支联会", "张雪机车", "湖南省领导动作频频", "算力狂飙", "韩咏红", "长和", "巴拿马运河"
 ]
 
 def get_working_node():
@@ -49,11 +48,25 @@ def load_history():
 def save_history(titles):
     try:
         current_time = datetime.now(timezone.utc).isoformat()
-        history_data = [{"title": t, "time": current_time} for t in titles[-250:]]
+        history_data = [{"title": t, "time": current_time} for t in titles[-300:]]
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(history_data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"⚠️ 保存历史记录失败: {e}")
+
+def is_recent_entry(entry):
+    """检查文章是否为最近 48 小时内发出的新鲜新闻"""
+    try:
+        published_parsed = entry.get('published_parsed') or entry.get('updated_parsed')
+        if published_parsed:
+            entry_time = datetime(*published_parsed[:6], tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            # 只要超过 48 小时，一律视为僵尸旧闻强行过滤
+            if now - entry_time > timedelta(hours=48):
+                return False
+    except Exception:
+        pass
+    return True
 
 def fetch_comprehensive_posts():
     node = get_working_node()
@@ -62,7 +75,7 @@ def fetch_comprehensive_posts():
     tech_posts = []
     politics_posts = []
 
-    # ---------------- 1. 抓取【科技 AI】板块（目标 4 条） ----------------
+    # ---------------- 1. 抓取【科技 AI】板块（4 条） ----------------
     print("🚀 正在拉取 36氪科技 AI 精选快讯...")
     try:
         resp = requests.get(f"{node}/36kr/newsflashes", timeout=8)
@@ -71,7 +84,7 @@ def fetch_comprehensive_posts():
             for entry in feed.entries:
                 title = entry.title.strip().replace('\n', ' ')
                 link = entry.link
-                if any(kw in title for kw in FORBIDDEN_KEYWORDS):
+                if any(kw in title for kw in FORBIDDEN_KEYWORDS) or not is_recent_entry(entry):
                     continue
                 if title not in sent_titles and not any(p['link'] == link for p in tech_posts):
                     tech_posts.append({
@@ -84,12 +97,12 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【中文圈时政】板块（目标 4 条，多源优先） ----------------
-    print("🌐 正在拉取中文圈时政与宏观热点...")
+    # ---------------- 2. 抓取【中文圈时政】板块（彻底踢掉联合早报僵尸源） ----------------
+    print("🌐 正在拉取高频实时中文时政热点...")
     politics_sources = [
-        f"{node}/zhihu/hotlist",           # 知乎热榜
-        f"{node}/thepaper/featured",      # 澎湃新闻
-        "https://feedx.net/rss/zaobao.xml"  # 联合早报
+        f"{node}/thepaper/featured",      # 澎湃新闻头条（实时性强）
+        f"{node}/zhihu/hotlist",           # 知乎热榜（每小时更新）
+        f"{node}/toutiao/hot"              # 头条热榜（全网大事件）
     ]
     
     for p_url in politics_sources:
@@ -103,6 +116,10 @@ def fetch_comprehensive_posts():
                     
                     ignore_keywords = ["电视剧", "明星", "演员", "演唱会", "八卦", "CP", "恋情"]
                     if any(kw in title for kw in ignore_keywords) or any(kw in title for kw in FORBIDDEN_KEYWORDS):
+                        continue
+                    
+                    # 强力时间拦截：老新闻直接扔掉
+                    if not is_recent_entry(entry):
                         continue
 
                     if title not in sent_titles and not any(p['link'] == link for p in politics_posts):
@@ -118,15 +135,15 @@ def fetch_comprehensive_posts():
         except Exception as e:
             print(f"⚠️ 时政源 {p_url} 抓取异常: {e}")
 
-    # ---------------- 3. 兜底逻辑：若不够 4 条，打乱抓取顺序避免重复旧条目 ----------------
+    # ---------------- 3. 兜底逻辑：仅限 48 小时内的活水新闻打乱补充 ----------------
     if len(politics_posts) < 4:
-        print("🔄 正在执行时政板块随机打乱兜底抓取...")
+        print("🔄 执行时政板块实时兜底...")
         for p_url in politics_sources:
             try:
                 resp = requests.get(p_url, timeout=6)
                 if resp.status_code == 200:
                     feed = feedparser.parse(resp.content)
-                    entries = list(feed.entries)
+                    entries = [e for e in feed.entries if is_recent_entry(e)]
                     random.shuffle(entries)
                     for entry in entries:
                         title = entry.title.strip().replace('\n', ' ')
@@ -165,7 +182,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>全量持久去重 | 科技 AI (4条) + 中文时政 (4条)</i>"
+    board += "🤖 <i>48小时绝对时效拦截 | 科技 AI (4条) + 中文时政 (4条)</i>"
     return board
 
 def send_telegram(text):
