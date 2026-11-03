@@ -1,4 +1,4 @@
-name: bot Daily News Board
+name: TG_Bot Daily News Board
 
 on:
   schedule:
