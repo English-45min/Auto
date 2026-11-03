@@ -10,7 +10,6 @@ TG_BOT_TOKEN = os.getenv('TG_BOT_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 HISTORY_FILE = '.sent_history.json'
 
-# 🌐 保留 RSSHub 节点仅用于 36氪科技 AI 快讯
 RSSHUB_NODES = [
     os.getenv('RSSHUB_URL', '').rstrip('/'),
     "https://rsshub.rssforever.com",
@@ -76,7 +75,7 @@ def fetch_comprehensive_posts():
     tech_posts = []
     hkmotw_posts = []
 
-    # ---------------- 1. 抓取【科技 AI】板块（4 条） ----------------
+    # ---------------- 1. 抓取【科技 AI】板块（严格目标 4 条） ----------------
     print("🚀 正在拉取 36氪科技 AI 精选快讯...")
     try:
         resp = requests.get(f"{node}/36kr/newsflashes", timeout=8)
@@ -98,17 +97,14 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【港澳台地区】板块（直连官方原生 RSS） ----------------
+    # ---------------- 2. 抓取【港澳台新闻】板块（严格目标 4 条） ----------------
     print("🌐 正在拉取港澳台地区直连原生热点新闻...")
     hkmotw_sources = [
         "https://news.yahoo.com.tw/rss/",                 # 台湾 Yahoo 奇摩新闻焦点
-        "https://www me.cna.com.tw/cna2013/market/rss.aspx",# 台湾中央社 (CNA) 官方源
-        "https://rthk.hk/rthk/news/rss/c_expressnews.xml", # 香港电台 (RTHK) 现场即时新闻
+        "https://www.cna.com.tw/cna2013/market/rss.aspx", # 台湾中央社 (CNA) 官方源
+        "https://rthk.hk/rthk/news/rss/c_expressnews.xml", # 香港电台 (RTHK) 即时新闻
         "https://hk.news.yahoo.com/rss/"                  # 香港 Yahoo 新闻
     ]
-    
-    # 兼容修正部分常见 CNA RSS 地址
-    cna_fallback = "https://www.cna.com.tw/cna2013/market/rss.aspx"
     
     for p_url in hkmotw_sources:
         try:
@@ -188,7 +184,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>官方原生直连 | 科技 AI (4条) + 港澳台 (4条)</i>"
+    board += "🤖 <i>全量持久去重 | 科技 AI (4条) + 港澳台新闻 (4条)</i>"
     return board
 
 def send_telegram(text):
