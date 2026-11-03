@@ -68,14 +68,16 @@ def is_recent_entry(entry):
         pass
     return True
 
-def fetch_category_news(sources, target_count, source_label, sent_titles):
+def fetch_category_news(sources, target_count, source_label, sent_titles, node=""):
     """通用地区分类限额抓取函数"""
     posts = []
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
     for url in sources:
+        # 如果 url 是相对路径，拼上 RSSHub 节点
+        target_url = f"{node}{url}" if url.startswith('/') else url
         try:
-            resp = requests.get(url, headers=headers, timeout=6)
+            resp = requests.get(target_url, headers=headers, timeout=6)
             if resp.status_code == 200:
                 feed = feedparser.parse(resp.content)
                 for entry in feed.entries:
@@ -100,7 +102,7 @@ def fetch_category_news(sources, target_count, source_label, sent_titles):
             if len(posts) >= target_count:
                 break
         except Exception as e:
-            print(f"⚠️ {source_label} 源 {url} 抓取异常: {e}")
+            print(f"⚠️ {source_label} 源 {target_url} 抓取异常: {e}")
             
     return posts
 
@@ -134,29 +136,27 @@ def fetch_comprehensive_posts():
     # ---------------- 2. 按精细配额抓取【港澳台新闻】 ----------------
     print("🌐 正在按地区配额拉取台湾(3条)、香港(2条)、澳门(1条)头条...")
     
-    # 台湾主流媒体源（中央社 CNA / Yahoo奇摩新闻）
     tw_sources = [
         "https://www.cna.com.tw/cna2013/market/rss.aspx",
         "https://news.yahoo.com.tw/rss/"
     ]
-    # 香港主流媒体源（香港电台 RTHK / Yahoo香港新闻）
     hk_sources = [
         "https://rthk.hk/rthk/news/rss/c_expressnews.xml",
         "https://hk.news.yahoo.com/rss/"
     ]
-    # 澳门主流媒体源（澳门电台 TDM / 澳门新闻局）
+    # 澳门新闻源：通过 RSSHub 节点抓取澳门日报/澳广视，并准备备用路径
     mo_sources = [
-        "https://rthk.hk/rthk/news/rss/c_expressnews.xml", # 备用源兜底
-        "https://news.gov.mo/rss/zh-hant/news.xml"
+        f"{node}/macaudaily/news",
+        "https://news.gov.mo/rss/zh-hant/news.xml",
+        "https://rthk.hk/rthk/news/rss/c_expressnews.xml" # 最终兜底
     ]
 
-    tw_posts = fetch_category_news(tw_sources, 3, "台湾新闻", sent_titles)
-    hk_posts = fetch_category_news(hk_sources, 2, "香港新闻", sent_titles)
-    mo_posts = fetch_category_news(mo_sources, 1, "澳门新闻", sent_titles)
+    tw_posts = fetch_category_news(tw_sources, 3, "台湾新闻", sent_titles, node)
+    hk_posts = fetch_category_news(hk_sources, 2, "香港新闻", sent_titles, node)
+    mo_posts = fetch_category_news(mo_sources, 1, "澳门新闻", sent_titles, node)
 
     final_posts = tech_posts[:4] + tw_posts[:3] + hk_posts[:2] + mo_posts[:1]
 
-    # 保存历史记录
     all_current_titles = [p['title'] for p in final_posts]
     updated_history = list(dict.fromkeys(sent_titles + all_current_titles))
     save_history(updated_history)
@@ -174,7 +174,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>精确配额 | 科技AI(4条) + 台湾(3条) + 香港(2条) + 澳门(1条)</i>"
+    board += "🤖 <i>全量持久去重 | 实时资讯同步</i>"
     return board
 
 def send_telegram(text):
