@@ -16,8 +16,10 @@ RSSHUB_NODES = [
     "https://rsshub.app"
 ]
 
+# 🛡️ 终极硬编码黑名单：彻底封杀已连续推送多天的高频旧闻关键词
 FORBIDDEN_KEYWORDS = [
-    "贝森特", "许家印", "王兴兴", "山东社区爆炸", "全剧终", "伊朗经济"
+    "贝森特", "许家印", "王兴兴", "山东社区爆炸", "全剧终", "伊朗经济",
+    "支联会", "张雪机车", "湖南省领导动作频频", "算力狂飙"
 ]
 
 def get_working_node():
@@ -47,8 +49,8 @@ def load_history():
 def save_history(titles):
     try:
         current_time = datetime.now(timezone.utc).isoformat()
-        # 保持最近 200 条缓存，彻底防止短时间内重复
-        history_data = [{"title": t, "time": current_time} for t in titles[-200:]]
+        # 保存最近 250 条缓存，防止历史膨胀同时保证去重窗口足够大
+        history_data = [{"title": t, "time": current_time} for t in titles[-250:]]
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(history_data, f, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -61,7 +63,7 @@ def fetch_comprehensive_posts():
     tech_posts = []
     politics_posts = []
 
-    # ---------------- 1. 抓取【科技 AI】板块 ----------------
+    # ---------------- 1. 抓取【科技 AI】板块（目标 4 条） ----------------
     print("🚀 正在拉取 36氪科技 AI 精选快讯...")
     try:
         resp = requests.get(f"{node}/36kr/newsflashes", timeout=8)
@@ -83,10 +85,10 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # ---------------- 2. 抓取【中文圈时政】板块 ----------------
+    # ---------------- 2. 抓取【中文圈时政】板块（目标 4 条，多源优先） ----------------
     print("🌐 正在拉取中文圈时政与宏观热点...")
     politics_sources = [
-        f"{node}/zhihu/hotlist",           # 知乎热榜
+        f"{node}/zhihu/hotlist",           # 知乎热榜（实时滚动）
         f"{node}/thepaper/featured",      # 澎湃新闻
         "https://feedx.net/rss/zaobao.xml"  # 联合早报
     ]
@@ -104,7 +106,6 @@ def fetch_comprehensive_posts():
                     if any(kw in title for kw in ignore_keywords) or any(kw in title for kw in FORBIDDEN_KEYWORDS):
                         continue
 
-                    # 严格过滤掉已发送的历史标题
                     if title not in sent_titles and not any(p['link'] == link for p in politics_posts):
                         politics_posts.append({
                             "source": "中文时政",
@@ -118,16 +119,16 @@ def fetch_comprehensive_posts():
         except Exception as e:
             print(f"⚠️ 时政源 {p_url} 抓取异常: {e}")
 
-    # ---------------- 3. 兜底逻辑：若不足 4 条，从候选池中跳过已发标题补齐 ----------------
+    # ---------------- 3. 兜底逻辑：若不够 4 条，打乱抓取顺序避免重复旧条目 ----------------
     if len(politics_posts) < 4:
+        print("🔄 正在执行时政板块随机打乱兜底抓取...")
         for p_url in politics_sources:
             try:
                 resp = requests.get(p_url, timeout=6)
                 if resp.status_code == 200:
                     feed = feedparser.parse(resp.content)
-                    entries = feed.entries
-                    # 随机打乱兜底列表的抓取顺序，避免永远拿前4条
-                    random.shuffle(entries)
+                    entries = list(feed.entries)
+                    random.shuffle(entries)  # 随机打乱兜底列表，防止死扣固定前几条
                     for entry in entries:
                         title = entry.title.strip().replace('\n', ' ')
                         link = entry.link
@@ -148,7 +149,7 @@ def fetch_comprehensive_posts():
 
     final_posts = tech_posts[:4] + politics_posts[:4]
 
-    # 重点修复：无论来自常规去重还是兜底，本次推送的所有标题一律强制写入历史档案！
+    # 无论来自常规去重还是兜底，本次推送的所有标题一律写回历史档案
     all_current_titles = [p['title'] for p in final_posts]
     updated_history = list(dict.fromkeys(sent_titles + all_current_titles))
     save_history(updated_history)
@@ -166,7 +167,7 @@ def format_board(posts):
             board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
-    board += "🤖 <i>无死角缓存归档 | 科技 AI (4条) + 中文时政 (4条)</i>"
+    board += "🤖 <i>全量持久去重 | 科技 AI (4条) + 中文时政 (4条)</i>"
     return board
 
 def send_telegram(text):
