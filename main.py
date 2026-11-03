@@ -49,7 +49,6 @@ def load_history():
 def save_history(titles):
     try:
         current_time = datetime.now(timezone.utc).isoformat()
-        # 保存最近 250 条缓存，防止历史膨胀同时保证去重窗口足够大
         history_data = [{"title": t, "time": current_time} for t in titles[-250:]]
         with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
             json.dump(history_data, f, ensure_ascii=False, indent=2)
@@ -88,7 +87,7 @@ def fetch_comprehensive_posts():
     # ---------------- 2. 抓取【中文圈时政】板块（目标 4 条，多源优先） ----------------
     print("🌐 正在拉取中文圈时政与宏观热点...")
     politics_sources = [
-        f"{node}/zhihu/hotlist",           # 知乎热榜（实时滚动）
+        f"{node}/zhihu/hotlist",           # 知乎热榜
         f"{node}/thepaper/featured",      # 澎湃新闻
         "https://feedx.net/rss/zaobao.xml"  # 联合早报
     ]
@@ -128,7 +127,7 @@ def fetch_comprehensive_posts():
                 if resp.status_code == 200:
                     feed = feedparser.parse(resp.content)
                     entries = list(feed.entries)
-                    random.shuffle(entries)  # 随机打乱兜底列表，防止死扣固定前几条
+                    random.shuffle(entries)
                     for entry in entries:
                         title = entry.title.strip().replace('\n', ' ')
                         link = entry.link
@@ -149,7 +148,6 @@ def fetch_comprehensive_posts():
 
     final_posts = tech_posts[:4] + politics_posts[:4]
 
-    # 无论来自常规去重还是兜底，本次推送的所有标题一律写回历史档案
     all_current_titles = [p['title'] for p in final_posts]
     updated_history = list(dict.fromkeys(sent_titles + all_current_titles))
     save_history(updated_history)
