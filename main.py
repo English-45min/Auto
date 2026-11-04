@@ -56,7 +56,6 @@ def save_history(titles):
         print(f"⚠️ 保存历史记录失败: {e}")
 
 def is_recent_entry(entry, max_hours=48):
-    """灵活的时间过滤，默认支持 48 小时内"""
     try:
         published_parsed = entry.get('published_parsed') or entry.get('updated_parsed')
         if published_parsed:
@@ -69,11 +68,9 @@ def is_recent_entry(entry, max_hours=48):
     return True
 
 def fetch_category_news(sources, target_count, source_label, sent_titles, node=""):
-    """多级容灾抓取：先严格过滤，若不够则自动放宽条件补齐"""
     posts = []
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
-    # 第一阶段：严格抓取 48 小时内的全新内容
     for url in sources:
         target_url = f"{node}{url}" if url.startswith('/') else url
         try:
@@ -104,9 +101,7 @@ def fetch_category_news(sources, target_count, source_label, sent_titles, node="
         except Exception as e:
             print(f"⚠️ {source_label} 源 {target_url} 抓取异常: {e}")
             
-    # 第二阶段（兜底补齐）：如果还没达到目标数量，放宽时间限制直接取源内最新项
     if len(posts) < target_count:
-        print(f"🔄 {source_label} 数量不足 {target_count} 条，正在执行智能兜底补齐...")
         for url in sources:
             target_url = f"{node}{url}" if url.startswith('/') else url
             try:
@@ -162,7 +157,6 @@ def fetch_comprehensive_posts():
     except Exception as e:
         print(f"❌ 抓取科技快讯失败: {e}")
 
-    # 若科技 AI 不足 4 条，从 36kr 随机补齐
     if len(tech_posts) < 4:
         try:
             resp = requests.get(f"{node}/36kr/newsflashes", timeout=8)
@@ -213,7 +207,8 @@ def format_board(posts):
         board += "<i>当前时间窗口内暂无新推送</i>\n"
     else:
         for i, post in enumerate(posts, 1):
-            board += f"🔹 <b>#{i} [{post['source']}]</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
+            # 💡 已完全移除分类标签，只显示纯序号
+            board += f"🔹 <b>#{i}</b>\n<a href='{post['link']}'>{post['title']}</a>\n\n"
             
     board += "───────────────────────────\n"
     board += "🤖 <i>实时资讯</i>"
