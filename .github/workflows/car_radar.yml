@@ -1,346 +1,106 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex">
-<title>二手车雷达｜车源汇总</title>
-<style>
-:root {
-    color-scheme: dark;
-    --bg: #0b0f17;
-    --panel: #151c29;
-    --line: #293447;
-    --text: #e5edf7;
-    --muted: #94a3b8;
-    --accent: #f59e0b;
-    --green: #34d399;
-}
-* { box-sizing: border-box; }
-body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-header {
-    padding: 24px 18px;
-    border-bottom: 1px solid var(--line);
-    background: #111827;
-}
-.container {
-    width: min(1100px, 94%);
-    margin: auto;
-}
-h1 {
-    margin: 0 0 8px;
-    font-size: 24px;
-}
-.subtitle {
-    color: var(--muted);
-    font-size: 13px;
-}
-.summary {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin: 18px auto;
-}
-.stat {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 14px;
-}
-.stat strong {
-    display: block;
-    font-size: 23px;
-    color: var(--accent);
-}
-.stat span {
-    color: var(--muted);
-    font-size: 12px;
-}
-.toolbar {
-    display: flex;
-    gap: 9px;
-    flex-wrap: wrap;
-    margin: 18px 0;
-}
-input, select {
-    background: var(--panel);
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    padding: 11px;
-    min-width: 0;
-}
-input { flex: 1; }
-select { max-width: 180px; }
-.list {
-    display: grid;
-    gap: 12px;
-    padding-bottom: 35px;
-}
-.card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 13px;
-    padding: 16px;
-}
-.card h2 {
-    font-size: 17px;
-    margin: 0 0 12px;
-    line-height: 1.5;
-}
-.tags {
-    display: flex;
-    gap: 7px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-}
-.tag {
-    background: #263246;
-    color: #cbd5e1;
-    padding: 5px 9px;
-    border-radius: 6px;
-    font-size: 12px;
-}
-.price {
-    color: var(--green);
-    font-size: 19px;
-    font-weight: 700;
-}
-.meta {
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.8;
-    margin: 8px 0 13px;
-}
-.link {
-    display: inline-block;
-    color: #fbbf24;
-    text-decoration: none;
-    border: 1px solid #805b16;
-    padding: 9px 13px;
-    border-radius: 8px;
-    font-size: 13px;
-}
-.link:hover { background: #3b2b10; }
-.empty {
-    text-align: center;
-    padding: 45px 15px;
-    color: var(--muted);
-    background: var(--panel);
-    border-radius: 12px;
-}
-footer {
-    border-top: 1px solid var(--line);
-    padding: 18px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 12px;
-}
-@media(max-width:520px) {
-    h1 { font-size: 21px; }
-    .summary { gap: 7px; }
-    .stat { padding: 10px; }
-    .stat strong { font-size: 19px; }
-    select { max-width: 100%; flex: 1; }
-}
-</style>
-</head>
-<body>
 
-<header>
-    <div class="container">
-        <h1>🚗 二手车雷达</h1>
-        <div class="subtitle">目标预算：15万元以内 · 车源集中展示 · 点击查看原始信息</div>
-    </div>
-</header>
+name: Car Radar
 
-<main class="container">
-    <section class="summary">
-        <div class="stat">
-            <strong id="total">0</strong>
-            <span>累计车源</span>
-        </div>
-        <div class="stat">
-            <strong id="models">0</strong>
-            <span>涉及车型</span>
-        </div>
-        <div class="stat">
-            <strong id="updated">--</strong>
-            <span>最近更新</span>
-        </div>
-    </section>
+on:
+  # 每天北京时间 09:00 自动运行（UTC 01:00）
+  schedule:
+    - cron: "0 1 * * *"
 
-    <section class="toolbar">
-        <input id="search" type="search" placeholder="搜索车型、平台或关键词">
-        <select id="platform">
-            <option value="">全部平台</option>
-        </select>
-        <select id="sort">
-            <option value="new">最新更新</option>
-            <option value="price">价格从低到高</option>
-            <option value="year">年份从新到旧</option>
-        </select>
-    </section>
+  # 允许手动启动
+  workflow_dispatch:
 
-    <section id="list" class="list">
-        <div class="empty">正在加载车源数据……</div>
-    </section>
-</main>
+permissions:
+  contents: write
 
-<footer>
-    二手车雷达 · 信息来自公开网页搜索，购车前请核实车辆信息
-</footer>
+concurrency:
+  group: car-radar
+  cancel-in-progress: false
 
-<script>
-let allListings = [];
+jobs:
+  car-radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-const $ = id => document.getElementById(id);
+    steps:
+      # 1. 获取仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-function formatPrice(value) {
-    if (value === null || value === undefined || value === "") {
-        return "价格待核实";
-    }
-    return Number(value).toLocaleString("zh-CN") + " 元";
-}
+      # 2. 安装 Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-function safeText(value) {
-    return String(value ?? "").replace(/[&<>"']/g, ch => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-    })[ch]);
-}
+      # 3. 安装依赖
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install requests beautifulsoup4
+          fi
 
-function validLink(value) {
-    try {
-        const url = new URL(value);
-        return ["http:", "https:"].includes(url.protocol)
-            ? url.href
-            : "";
-    } catch {
-        return "";
-    }
-}
+      # 4. 检查必要配置
+      - name: Check configuration
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          if [ -z "$TG_BOT_TOKEN" ]; then
+            echo "缺少 GitHub Secret: TG_BOT_TOKEN"
+            exit 1
+          fi
 
-function render() {
-    const keyword = $("search").value.trim().toLowerCase();
-    const platform = $("platform").value;
-    const sort = $("sort").value;
+          if [ -z "$TG_CHAT_ID" ]; then
+            echo "缺少 GitHub Secret: TG_CHAT_ID"
+            exit 1
+          fi
 
-    let data = allListings.filter(item => {
-        const text = [
-            item.title, item.model, item.platform, item.snippet
-        ].join(" ").toLowerCase();
+          if [ ! -f car_radar.py ]; then
+            echo "找不到 car_radar.py"
+            exit 1
+          fi
 
-        return (!keyword || text.includes(keyword))
-            && (!platform || item.platform === platform);
-    });
+          if [ ! -f car_radar_config.json ]; then
+            echo "找不到 car_radar_config.json"
+            exit 1
+          fi
 
-    if (sort === "price") {
-        data.sort((a, b) =>
-            (a.price_rmb || Infinity) - (b.price_rmb || Infinity)
-        );
-    } else if (sort === "year") {
-        data.sort((a, b) => (b.year || 0) - (a.year || 0));
-    } else {
-        data.sort((a, b) =>
-            String(b.last_seen || "").localeCompare(
-                String(a.last_seen || "")
-            )
-        );
-    }
+      # 5. 运行二手车雷达
+      - name: Run Car Radar
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          python car_radar.py
 
-    $("total").textContent = allListings.length;
-    $("models").textContent = new Set(
-        allListings.map(x => x.model)
-    ).size;
+      # 6. 检查网页数据文件
+      - name: Check generated data
+        run: |
+          if [ ! -f car_radar_data.json ]; then
+            echo "错误：car_radar.py 没有生成 car_radar_data.json"
+            exit 1
+          fi
 
-    if (!data.length) {
-        $("list").innerHTML =
-            '<div class="empty">暂无符合条件的车源。下次自动更新后会显示在这里。</div>';
-        return;
-    }
+          python -m json.tool car_radar_data.json > /dev/null
+          echo "车源数据 JSON 检查通过"
 
-    $("list").innerHTML = data.map(item => {
-        const link = validLink(item.url);
-        return `
-        <article class="card">
-            <h2>${safeText(item.title || item.model || "未命名车源")}</h2>
-            <div class="tags">
-                <span class="tag">${safeText(item.model || "车型待核实")}</span>
-                <span class="tag">${safeText(item.platform || "来源未知")}</span>
-                <span class="tag">${item.year ? safeText(item.year + "年") : "年份待核实"}</span>
-            </div>
-            <div class="price">${formatPrice(item.price_rmb)}</div>
-            <div class="meta">
-                ${safeText(item.snippet || "暂无更多描述")}
-                ${item.needs_check ? "<br>部分信息待人工核实" : ""}
-            </div>
-            ${
-                link
-                ? `<a class="link" href="${safeText(link)}" target="_blank" rel="noopener noreferrer">打开原始车源 ↗</a>`
-                : '<span class="tag">暂无有效原始链接</span>'
-            }
-        </article>`;
-    }).join("");
-}
+      # 7. 将最新车源数据保存到仓库
+      - name: Commit updated car data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-async function loadData() {
-    try {
-        const response = await fetch(
-            "./car_radar_data.json?t=" + Date.now(),
-            { cache: "no-store" }
-        );
+          git add car_radar_data.json
 
-        if (!response.ok) {
-            throw new Error("数据文件读取失败");
-        }
-
-        const data = await response.json();
-        allListings = Array.isArray(data.listings)
-            ? data.listings
-            : [];
-
-        const platforms = [...new Set(
-            allListings.map(x => x.platform).filter(Boolean)
-        )];
-
-        $("platform").innerHTML =
-            '<option value="">全部平台</option>' +
-            platforms.map(p =>
-                `<option value="${safeText(p)}">${safeText(p)}</option>`
-            ).join("");
-
-        $("updated").textContent = data.updatedAt
-            ? new Date(data.updatedAt).toLocaleString("zh-CN", {
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit"
-            })
-            : "--";
-
-        render();
-    } catch (error) {
-        $("list").innerHTML =
-            '<div class="empty">车源数据暂时无法加载，请稍后再试。</div>';
-        console.error(error);
-    }
-}
-
-$("search").addEventListener("input", render);
-$("platform").addEventListener("change", render);
-$("sort").addEventListener("change", render);
-
-loadData();
-</script>
-
-</body>
-</html>
+          if git diff --cached --quiet; then
+            echo "车源数据没有变化，无需提交"
+          else
+            git commit -m "Update car radar data"
+            git push
+          fi
