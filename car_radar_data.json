@@ -1,30 +1,5 @@
 {
-  "updatedAt": "2026-11-06T01:58:09.393883+00:00",
-  "count": 2,
-  "listings": [
-    {
-      "url": "https://www.dongchedi.com/usedcar/21267738",
-      "title": "二手沃尔沃s60 2020款t4 智逸豪华版_13.18万_5年_沃尔沃s60二手车_懂车帝",
-      "model": "沃尔沃 S60 T4/T5",
-      "platform": "懂车帝",
-      "price_rmb": null,
-      "year": 2020,
-      "snippet": "",
-      "needs_check": true,
-      "first_seen": "2026-11-06T01:57:25.600602+00:00",
-      "last_seen": "2026-11-06T01:57:25.600602+00:00"
-    },
-    {
-      "url": "https://www.guazi.com/car-detail/c173278619155089.html",
-      "title": "沃尔沃s60 2020款 T4 智远豪华版 - 瓜子二手车",
-      "model": "沃尔沃 S60 T4/T5",
-      "platform": "瓜子二手车",
-      "price_rmb": null,
-      "year": 2020,
-      "snippet": "",
-      "needs_check": true,
-      "first_seen": "2026-11-06T01:57:24.060179+00:00",
-      "last_seen": "2026-11-06T01:57:24.060179+00:00"
-    }
-  ]
+  "updatedAt": "2026-11-07T01:49:22.939585+00:00",
+  "count": 0,
+  "listings": []
 }
