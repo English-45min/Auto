@@ -1,33 +1,16 @@
 {
-  "id": "./finance.html",
-  "name": "BILLBOARD 财经与时政看点",
-  "short_name": "财经看板",
-  "description": "全球财经、亚太动态、中国市场与企业财报资讯及 AI 分析",
-  "lang": "zh-CN",
+  "name": "BILLBOARD // 财经时政看点",
+  "short_name": "BILLBOARD",
   "start_url": "./finance.html",
-  "scope": "./",
   "display": "standalone",
-  "orientation": "any",
   "background_color": "#0b0f19",
   "theme_color": "#0b0f19",
   "icons": [
     {
-      "src": "./icons/finance-192.png",
-      "sizes": "192x192",
+      "src": "icon.png",
+      "sizes": "192x192 512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icons/finance-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icons/finance-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ]
 }
