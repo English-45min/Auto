@@ -10,8 +10,8 @@
 <meta name="google" content="notranslate">
 <title>billboard // 财经时政看点</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" sizes="180x180" href="icon.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon.jpg">
+<link rel="icon" type="image/jpeg" sizes="512x512" href="icon.jpg">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 :root{color-scheme:dark}
@@ -897,6 +897,10 @@ document.querySelectorAll("[data-tab]").forEach(button => {
 
 document.addEventListener("DOMContentLoaded", render);
 render();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
 </script>
 </body>
 </html>
