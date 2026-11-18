@@ -1,3 +1,4 @@
+
 import os
 import re
 import json
@@ -32,6 +33,7 @@ TIME_LIMIT = timedelta(hours=24)
 
 CHANNEL_LIMITS = {
     'global': 20,
+    'politics': 15,
     'asia': 10,
     'china': 10,
     'earnings': 10
@@ -256,6 +258,44 @@ FEEDS = [
         'source': '美联储会议报道',
         'channels': ['global']
     },
+
+    # 国际政治、外交与地缘局势
+    {
+        'url': gnews('(Reuters OR AP OR BBC OR Guardian) world politics diplomacy government'),
+        'source': '国际政治与外交',
+        'channels': ['politics']
+    },
+    {
+        'url': gnews('(Reuters OR AP OR BBC) United States politics White House Congress foreign policy'),
+        'source': '美国政治与外交',
+        'channels': ['politics']
+    },
+    {
+        'url': gnews('(Reuters OR AP OR BBC) Europe European Union politics elections government'),
+        'source': '欧洲政治动态',
+        'channels': ['politics']
+    },
+    {
+        'url': gnews('(Reuters OR AP OR BBC) Middle East conflict diplomacy security'),
+        'source': '中东局势',
+        'channels': ['politics']
+    },
+    {
+        'url': gnews('(Reuters OR AP OR BBC) Asia Pacific geopolitics security diplomacy'),
+        'source': '亚太地缘政治',
+        'channels': ['politics']
+    },
+    {
+        'url': gnews('(Reuters OR AP OR BBC) United Nations NATO G7 G20 summit diplomacy'),
+        'source': '国际组织与峰会',
+        'channels': ['politics']
+    },
+    {
+        'url': gnews('(Reuters OR AP OR BBC) Taiwan Strait Taiwan politics cross-strait relations'),
+        'source': '台湾与台海动态',
+        'channels': ['politics']
+    },
+
     {
         'url': 'https://feeds.bbci.co.uk/news/world/asia/rss.xml',
         'source': 'BBC Asia',
@@ -273,13 +313,18 @@ FEEDS = [
     },
     {
         'url': 'https://feeds.feedburner.com/rsscna/politics',
-        'source': '台湾中央社政治',
-        'channels': ['asia']
+        'source': '中央社·台湾政治',
+        'channels': ['politics', 'asia']
+    },
+    {
+        'url': 'https://feeds.feedburner.com/rsscna/mainland',
+        'source': '中央社·两岸关系',
+        'channels': ['politics', 'asia']
     },
     {
         'url': 'https://feeds.feedburner.com/rsscna/intworld',
-        'source': '台湾中央社国际',
-        'channels': ['asia']
+        'source': '中央社·国际',
+        'channels': ['politics', 'asia']
     },
     {
         'url': 'https://feeds.feedburner.com/rsscna/finance',
@@ -715,8 +760,19 @@ def translate_batch(items, tcache, call_counter):
 
 
 def analyze_one(item):
-    prompt = f'''你是严谨、克制的顶级财经与宏观时政分析员。请严格依据给定新闻事实，用精炼的简体中文输出四部分结构化深度拆解。绝对禁止编造未提及的数据或因果关系；信息有限时直接聚焦事实本身客观分析，不要输出“信息不足”之类的套话。
+    channels = item.get('channels', [])
+    channel_names = {
+        'global': '国际财经',
+        'politics': '国际时政（包括台湾岛内政治、两岸关系、台海安全与国际外交）',
+        'asia': '亚太财经',
+        'china': '中国财经',
+        'earnings': '企业财报'
+    }
+    channel_context = '、'.join(channel_names.get(ch, ch) for ch in channels) or '综合新闻'
+    prompt = f'''你是严谨、克制的财经与国际时政分析员。请严格依据给定新闻事实，用精炼的简体中文输出结构化深度拆解。绝对禁止编造未提及的数据或因果关系；信息有限时直接聚焦事实本身客观分析，不要输出“信息不足”之类的套话。
 
+新闻所属栏目：{channel_context}
+对于台湾相关报道，准确区分台湾岛内政治、两岸关系、台海军事安全、台湾对外关系，不预设政治立场，不把推测写成事实。
 新闻标题：{item['title']}
 新闻摘要：{item['summary']}
 信息来源：{item['source']}
@@ -917,8 +973,8 @@ def main():
     OUTPUT_FILE.write_text(page, encoding='utf-8')
 
     print('=' * 68)
-    print('四大板块更新完成')
-    for channel, label in (('global', '国际财经'), ('asia', '亚太财经'), ('china', '国内财经'), ('earnings', '核心财报')):
+    print('五大板块更新完成')
+    for channel, label in (('global', '国际财经'), ('politics', '国际时政'), ('asia', '亚太财经'), ('china', '国内财经'), ('earnings', '核心财报')):
         print(f'{label}：{len(result[channel])} 条')
     print(f'DeepSeek深度评论：{calls["analysis"]}次，成功{successes}次，失败{failed}次')
     print(f'DeepSeek批量翻译：{calls["translation"]}次；待翻译字段{translated_count}个，成功{translated_ok}个')
