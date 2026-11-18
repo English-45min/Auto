@@ -1,40 +1,30 @@
-const CACHE_NAME = 'billboard-cache-v1';
-const ASSETS = [
-  './finance.html',
-  './manifest.json',
-  './icon.jpg'
-];
 
-// 安装时缓存核心文件
-self.addEventListener('install', event => {
+/*
+ * BILLBOARD / Auto Repository
+ * Shared Service Worker - Safe Compatibility Version
+ *
+ * 作用：
+ * 1. 保留旧 Service Worker 的更新入口。
+ * 2. 不删除其他网页应用的缓存。
+ * 3. 不拦截其他网页的网络请求。
+ * 4. 不负责财经看板的缓存。
+ *
+ * 财经看板使用独立的 finance-sw.js。
+ */
+
+const SHARED_SW_VERSION = "auto-shared-sw-v2";
+
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
+    self.skipWaiting()
   );
 });
 
-// 激活时清理旧缓存
-self.addEventListener('activate', event => {
+self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    self.clients.claim()
   );
 });
 
-// 拦截请求：优先从网络获取，网络失败时回退到缓存
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
-  );
-});
+// 不设置 fetch 事件。
+// 让浏览器正常处理网络请求，避免影响其他网页。
