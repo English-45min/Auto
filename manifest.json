@@ -1,16 +1,25 @@
+
 {
-  "name": "BILLBOARD // 财经时政看点",
+  "id": "./finance.html",
+  "name": "BILLBOARD｜全球财经时政",
   "short_name": "BILLBOARD",
+  "description": "全球财经与国际时政资讯看板",
   "start_url": "./finance.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b0f19",
-  "theme_color": "#0b0f19",
+  "background_color": "#071225",
+  "theme_color": "#071225",
   "icons": [
     {
-      "src": "icon.jpg",
+      "src": "./icons/finance-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/finance-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
