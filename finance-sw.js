@@ -1,109 +1,96 @@
 
-/*
- * BILLBOARD Finance Dashboard
- * Dedicated Service Worker
- *
- * 只缓存财经看板自己的文件。
- * 不删除其他应用的缓存。
- * 不拦截其他应用的网络请求。
- */
+const CACHE_NAME = "billboard-finance-v4";
 
-const CACHE_NAME = "billboard-finance-v3";
-
-const FINANCE_ASSETS = [
+const REQUIRED_ASSETS = [
   "./finance.html",
-  "./manifest.json",
+  "./manifest.json"
+];
+
+const OPTIONAL_ASSETS = [
   "./icons/finance-192.png",
   "./icons/finance-512.png",
   "./icons/apple-touch-icon.png"
 ];
 
-// 判断请求是否属于财经看板
-function isFinanceAsset(url) {
-  if (url.origin !== self.location.origin) {
-    return false;
-  }
-
-  const path = url.pathname;
-
-  return (
-    path.endsWith("/finance.html") ||
-    path.endsWith("/manifest.json") ||
-    path.endsWith("/icons/finance-192.png") ||
-    path.endsWith("/icons/finance-512.png") ||
-    path.endsWith("/icons/apple-touch-icon.png")
-  );
-}
-
-// 安装：只缓存财经看板文件
+// 安装：核心文件必须缓存，图标缺失时不阻止安装
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(FINANCE_ASSETS))
-      .then(() => self.skipWaiting())
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+
+      await cache.addAll(REQUIRED_ASSETS);
+
+      await Promise.allSettled(
+        OPTIONAL_ASSETS.map(asset => cache.add(asset))
+      );
+
+      await self.skipWaiting();
+    })()
   );
 });
 
-// 激活：只清理财经看板自己的旧版本缓存
+// 激活：只清理 BILLBOARD 财经看板自己的旧缓存
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys()
-      .then(keys => {
-        const oldFinanceCaches = keys.filter(key =>
-          key.startsWith("billboard-finance-") &&
-          key !== CACHE_NAME
-        );
+    (async () => {
+      const keys = await caches.keys();
 
-        return Promise.all(
-          oldFinanceCaches.map(key => caches.delete(key))
-        );
-      })
-      .then(() => self.clients.claim())
+      await Promise.all(
+        keys
+          .filter(key =>
+            key.startsWith("billboard-finance-") &&
+            key !== CACHE_NAME
+          )
+          .map(key => caches.delete(key))
+      );
+
+      await self.clients.claim();
+    })()
   );
 });
 
-// 网络优先，网络失败时使用财经看板缓存
+// 请求：只处理财经看板相关资源
 self.addEventListener("fetch", event => {
   const request = event.request;
 
-  if (request.method !== "GET") {
-    return;
-  }
+  if (request.method !== "GET") return;
 
   const url = new URL(request.url);
 
-  if (!isFinanceAsset(url)) {
-    return;
-  }
+  if (url.origin !== self.location.origin) return;
+
+  const isFinanceAsset =
+    url.pathname.endsWith("/finance.html") ||
+    url.pathname.endsWith("/manifest.json") ||
+    url.pathname.includes("/icons/finance-") ||
+    url.pathname.endsWith("/icons/apple-touch-icon.png");
+
+  if (!isFinanceAsset) return;
 
   event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response && response.ok) {
-          const copy = response.clone();
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
 
-          caches.open(CACHE_NAME)
-            .then(cache => cache.put(request, copy));
+      try {
+        const response = await fetch(request);
+
+        if (response && response.ok) {
+          await cache.put(request, response.clone());
         }
 
         return response;
-      })
-      .catch(() => {
-        return caches.match(request).then(cached => {
-          if (cached) {
-            return cached;
-          }
+      } catch (error) {
+        const cached = await cache.match(request);
 
-          return new Response(
-            "当前网络不可用，财经看板资源暂时无法加载。",
-            {
-              status: 503,
-              headers: {
-                "Content-Type": "text/plain; charset=utf-8"
-              }
-            }
-          );
+        if (cached) return cached;
+
+        return new Response("当前资源暂时无法加载，请检查网络连接。", {
+          status: 503,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8"
+          }
         });
-      })
+      }
+    })()
   );
 });
