@@ -2,8 +2,8 @@ name: TG_Bot Daily News Board
 
 on:
   schedule:
-    # 每天 UTC 0:00 和 12:00（即北京时间 08:00 和 20:00）自动触发
-    - cron: '0 0,12 * * *'
+    # 每天 UTC 02:00 （即北京 时间 10:00）自动触发
+    - cron: '0 2 * * *'
   workflow_dispatch: # 支持在 GitHub Actions 页面手动点击运行
 
 jobs:
