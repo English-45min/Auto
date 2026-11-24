@@ -3,7 +3,7 @@ name: Daily Update
 
 on:
   schedule:
-    # 每天 UTC 01:00（即北京时间 09:00）运行一次
+    # 每天北京时间 09:00（UTC 01:00）运行一次
     - cron: "0 1 * * *"
   workflow_dispatch:
 
@@ -36,11 +36,9 @@ jobs:
         run: |
           test -f update.py
           test -f finance.html
-
           grep -Fq '<!-- NEWS_DATA_START -->' finance.html
           grep -Fq '<!-- NEWS_DATA_END -->' finance.html
-
-          echo "财经看板文件及新闻数据标记检查通过"
+          echo "财经看板文件检查通过"
 
       - name: 执行新闻更新
         env:
@@ -54,16 +52,22 @@ jobs:
           grep -Fq 'window.newsData=' finance.html
           echo "财经新闻数据写入检查通过"
 
-      - name: 提交更新后的网页和缓存
+      - name: 提交并推送更新
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+users.noreply.github.com"
 
           git add finance.html ai_cache.json translation_cache.json market_cap_cache.json
 
           if git diff --cached --quiet; then
             echo "没有新的网页或缓存变化"
-          else
-            git commit -m "auto: update finance and Asia Pacific news"
-            git push
+            exit 0
           fi
+
+          git commit -m "auto: update finance and Asia Pacific news"
+
+          # 同步远端最新版本，再推送
+          git pull --rebase origin "$TARGET_BRANCH"
+          git push origin "HEAD:$TARGET_BRANCH"
