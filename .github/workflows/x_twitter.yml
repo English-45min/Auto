@@ -1,18 +1,29 @@
+
 name: TG_Bot Daily News Board
 
 on:
   schedule:
-    # 每天 UTC 02:00 （即北京 时间 10:00）自动触发
+    # 主推送：北京时间每天 10:00
     - cron: '0 2 * * *'
-  workflow_dispatch: # 支持在 GitHub Actions 页面手动点击运行
+    # 备用推送：北京时间每天 10:30
+    - cron: '30 2 * * *'
+    # 第二备用：北京时间每天 11:00
+    - cron: '0 3 * * *'
+
+  workflow_dispatch:
+
+# 避免多个定时任务同时执行
+concurrency:
+  group: telegram-daily-news-push
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
   build-and-run:
     runs-on: ubuntu-latest
-    
-    # 🔑 给 Actions 赋予写权限，以便自动提交和推送 .sent_history.json 历史记录
-    permissions:
-      contents: write
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Repository
@@ -34,11 +45,20 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: python main.py
 
-      # 🔑 核心步骤：将脚本更新后的 .sent_history.json 自动 commit 并 push 回仓库
+      # 保存新闻历史和每日推送日期
       - name: Commit & Push Sent History
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add .sent_history.json
-          git commit -m "chore: auto-update sent history [skip ci]" || exit 0
-          git push
+
+          git add .sent_history.json .last_push_date.txt
+
+          if git diff --cached --quiet; then
+            echo "No push history changes"
+            exit 0
+          fi
+
+          git commit -m "chore: record daily Telegram push [skip ci]"
+
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
