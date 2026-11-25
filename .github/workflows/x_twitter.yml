@@ -3,8 +3,8 @@ name: TG_Bot Daily News Board
 
 on:
   schedule:
-    # 主推送：北京时间每天 10:00
-    - cron: '0 2 * * *'
+    # 主推送：北京时间每天 09:07(UTC 01:07)
+    - cron: '7 1 * * *'
 
   workflow_dispatch:
 
