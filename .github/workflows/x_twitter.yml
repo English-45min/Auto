@@ -6,7 +6,7 @@ on:
     # 主推送：北京时间每天 10:00
     - cron: '0 2 * * *'
 
-  workflowdispatch:
+  workflow_dispatch:
 
 # 避免多个定时任务同时执行
 concurrency:
