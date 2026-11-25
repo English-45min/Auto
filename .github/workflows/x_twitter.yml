@@ -5,12 +5,8 @@ on:
   schedule:
     # 主推送：北京时间每天 10:00
     - cron: '0 2 * * *'
-    # 备用推送：北京时间每天 10:30
-    - cron: '30 2 * * *'
-    # 第二备用：北京时间每天 11:00
-    - cron: '0 3 * * *'
 
-  workflow_dispatch:
+  workflowdispatch:
 
 # 避免多个定时任务同时执行
 concurrency:
