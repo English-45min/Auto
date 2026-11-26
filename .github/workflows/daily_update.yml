@@ -3,8 +3,8 @@ name: Daily Update
 
 on:
   schedule:
-    # 每天北京时间 08:47（UTC 00:47）运行一次
-    - cron: "47 0 * * *"
+    - cron: "37 2 * * *"   # 北京时间 10:37
+    - cron: "43 4 * * *"   # 北京时间 12:43，备用
   workflow_dispatch:
 
 permissions:
