@@ -1,23 +1,37 @@
-
 name: Daily Update
 
+# 每小时触发一次，但只有北京时间 09 点那次真正执行(避开 GitHub 对"每天一次"定时的不稳定)
 on:
   schedule:
-    - cron: "41 0 * * *"   # 北京时间 08:37
-    - cron: "23 3 * * *"   # 北京时间 10:43，备用
+    - cron: "7 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
-concurrency:
-  group: finance-dashboard-update
-  cancel-in-progress: false
-
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.t.outputs.go }}
+    steps:
+      - id: t
+        run: |
+          H=$(TZ=Asia/Shanghai date +%H)
+          if [ "$H" = "09" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "go=true" >> $GITHUB_OUTPUT
+          else
+            echo "go=false" >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: gate
+    if: needs.gate.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: finance-dashboard-update
+      cancel-in-progress: false
 
     steps:
       - name: 检出仓库代码
@@ -57,7 +71,7 @@ jobs:
           TARGET_BRANCH: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add finance.html ai_cache.json translation_cache.json market_cap_cache.json
 
