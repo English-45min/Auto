@@ -4,7 +4,7 @@ name: Daily Update
 on:
   schedule:
     - cron: "41 0 * * *"   # 北京时间 08:37
-    - cron: "43 2 * * *"   # 北京时间 10:43，备用
+    - cron: "23 3 * * *"   # 北京时间 10:43，备用
   workflow_dispatch:
 
 permissions:
