@@ -1,24 +1,38 @@
-
 name: TG_Bot Daily News Board
 
+# 每小时触发一次，但只有北京时间 10 点那次真正执行(避开 GitHub 对"每天一次"定时的不稳定)
 on:
   schedule:
-    - cron: "37 1 * * *"   # 北京时间 09:37
-    - cron: "43 2 * * *"   # 北京时间 10:43，备用
+    - cron: "7 * * * *"
   workflow_dispatch:
-
-# 避免多个定时任务同时执行
-concurrency:
-  group: telegram-daily-news-push
-  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.t.outputs.go }}
+    steps:
+      - id: t
+        run: |
+          H=$(TZ=Asia/Shanghai date +%H)
+          if [ "$H" = "10" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "go=true" >> $GITHUB_OUTPUT
+          else
+            echo "go=false" >> $GITHUB_OUTPUT
+          fi
+
   build-and-run:
+    needs: gate
+    if: needs.gate.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # 避免多个任务同时执行
+    concurrency:
+      group: telegram-daily-news-push
+      cancel-in-progress: false
 
     steps:
       - name: Checkout Repository
