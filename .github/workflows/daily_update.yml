@@ -2,8 +2,6 @@ name: Daily Update
 
 # 每小时触发一次，但只有北京时间 09 点那次真正执行(避开 GitHub 对"每天一次"定时的不稳定)
 on:
-  schedule:
-    - cron: "7 * * * *"
   workflow_dispatch:
 
 permissions:
